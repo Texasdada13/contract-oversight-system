@@ -1,0 +1,1877 @@
+"""
+Contract Oversight System - Web Application
+A transparency dashboard for school boards and city councils to monitor contracts and spending.
+"""
+
+import os
+import sys
+import io
+import json
+import logging
+from datetime import datetime, timedelta
+from pathlib import Path
+from typing import Dict, List, Any
+import base64
+
+from flask import Flask, render_template, request, jsonify, send_file, redirect, url_for, session, Response
+from flask_cors import CORS
+import pandas as pd
+import numpy as np
+
+# Configure logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
+# Add parent directory to path
+sys.path.insert(0, str(Path(__file__).parent.parent))
+
+from src.database import get_database
+from src.scoring_engine import ContractScoringEngine, VendorScoringEngine, AlertGenerator
+
+app = Flask(__name__)
+app.secret_key = os.environ.get('SECRET_KEY', 'contract-oversight-dev-key')
+CORS(app)
+
+# Initialize components
+db = get_database()
+contract_scorer = ContractScoringEngine()
+vendor_scorer = VendorScoringEngine()
+alert_generator = AlertGenerator()
+
+# Global data cache
+current_contracts = None
+current_vendors = None
+
+
+def load_data():
+    """Load and score all contracts."""
+    global current_contracts, current_vendors
+
+    current_contracts = db.get_all_contracts()
+    if not current_contracts.empty:
+        current_contracts = contract_scorer.batch_score_contracts(current_contracts)
+        logger.info(f"Loaded {len(current_contracts)} contracts")
+
+    current_vendors = db.get_all_vendors()
+    logger.info(f"Loaded {len(current_vendors)} vendors")
+
+
+def get_portfolio_summary(df: pd.DataFrame) -> Dict:
+    """Generate summary statistics."""
+    if df is None or df.empty:
+        return {}
+
+    total_value = float(df['current_amount'].sum())
+    total_paid = float(df['total_paid'].sum())
+    original_value = float(df['original_amount'].sum())
+
+    return {
+        'total_contracts': len(df),
+        'total_value': total_value,
+        'total_paid': total_paid,
+        'total_remaining': total_value - total_paid,
+        'original_value': original_value,
+        'total_overrun': total_value - original_value,
+        'overrun_pct': ((total_value - original_value) / original_value * 100) if original_value > 0 else 0,
+        'avg_health_score': float(df['overall_health_score'].mean()) if 'overall_health_score' in df.columns else 50,
+        'at_risk_count': len(df[df['overall_health_score'] < 50]) if 'overall_health_score' in df.columns else 0,
+        'critical_count': len(df[df['overall_health_score'] < 30]) if 'overall_health_score' in df.columns else 0,
+        'active_count': len(df[df['status'] == 'Active']),
+        'completed_count': len(df[df['status'] == 'Completed']),
+        'status_distribution': df['status'].value_counts().to_dict() if 'status' in df.columns else {},
+        'department_distribution': df['department'].value_counts().to_dict() if 'department' in df.columns else {},
+        'type_distribution': df['contract_type'].value_counts().to_dict() if 'contract_type' in df.columns else {}
+    }
+
+
+# Initialize data on startup
+load_data()
+
+
+# ==========================
+# ROUTES - DASHBOARD
+# ==========================
+
+@app.route('/')
+def index():
+    return redirect(url_for('dashboard'))
+
+
+@app.route('/dashboard')
+def dashboard():
+    """Main oversight dashboard."""
+    global current_contracts
+
+    if current_contracts is None:
+        load_data()
+
+    summary = get_portfolio_summary(current_contracts)
+
+    # Get alerts
+    contracts_list = current_contracts.to_dict('records') if current_contracts is not None else []
+    alerts = alert_generator.generate_alerts(contracts_list)
+
+    # Get at-risk contracts
+    at_risk = []
+    if current_contracts is not None and 'overall_health_score' in current_contracts.columns:
+        at_risk_df = current_contracts[current_contracts['overall_health_score'] < 50].sort_values('overall_health_score')
+        at_risk = at_risk_df.head(10).to_dict('records')
+
+    # Recent changes
+    recent_changes = db.get_recent_changes(limit=10)
+
+    # Stats
+    stats = db.get_statistics()
+
+    return render_template('dashboard.html',
+                          summary=summary,
+                          alerts=alerts[:10],
+                          at_risk_contracts=at_risk,
+                          recent_changes=recent_changes,
+                          stats=stats,
+                          title='Contract Oversight Dashboard')
+
+
+@app.route('/contracts')
+def contracts_list():
+    """All contracts view with filtering and saved searches."""
+    global current_contracts, current_vendors
+
+    if current_contracts is None:
+        load_data()
+
+    df = current_contracts.copy() if current_contracts is not None else pd.DataFrame()
+
+    # Apply filters
+    search = request.args.get('search', '').strip()
+    status = request.args.get('status', '')
+    department = request.args.get('department', '')
+    health = request.args.get('health', '')
+
+    if search and not df.empty:
+        mask = df['title'].str.contains(search, case=False, na=False) | \
+               df['contract_number'].str.contains(search, case=False, na=False)
+        df = df[mask]
+
+    if status and not df.empty:
+        df = df[df['status'] == status]
+
+    if department and not df.empty:
+        df = df[df['department'] == department]
+
+    if health and not df.empty and 'overall_health_score' in df.columns:
+        if health == 'critical':
+            df = df[df['overall_health_score'] < 30]
+        elif health == 'at_risk':
+            df = df[(df['overall_health_score'] >= 30) & (df['overall_health_score'] < 50)]
+        elif health == 'warning':
+            df = df[(df['overall_health_score'] >= 50) & (df['overall_health_score'] < 70)]
+        elif health == 'healthy':
+            df = df[df['overall_health_score'] >= 70]
+
+    contracts = df.to_dict('records') if not df.empty else []
+
+    # Calculate summary stats
+    total_value = float(df['current_amount'].sum()) if not df.empty else 0
+    at_risk_count = len(df[df['overall_health_score'] < 50]) if not df.empty and 'overall_health_score' in df.columns else 0
+    overrun_count = len(df[df['current_amount'] > df['original_amount']]) if not df.empty else 0
+
+    # Get unique departments for filter
+    departments = current_contracts['department'].unique().tolist() if current_contracts is not None and 'department' in current_contracts.columns else []
+
+    # Get vendors for add contract form
+    vendors = current_vendors.to_dict('records') if current_vendors is not None else []
+
+    # Get saved searches from localStorage (passed via cookies/session in real app)
+    saved_searches = session.get('saved_searches', [])
+
+    return render_template('contracts.html',
+                          contracts=contracts,
+                          departments=departments,
+                          vendors=vendors,
+                          total_value=total_value,
+                          at_risk_count=at_risk_count,
+                          overrun_count=overrun_count,
+                          saved_searches=saved_searches,
+                          title='All Contracts')
+
+
+@app.route('/contract/<contract_id>')
+def contract_detail(contract_id):
+    """Single contract detail view."""
+    contract = db.get_contract(contract_id)
+    if not contract:
+        return "Contract not found", 404
+
+    # Score the contract
+    contract = contract_scorer.score_contract(contract)
+
+    # Get related data
+    milestones = db.get_milestones(contract_id)
+    change_orders = db.get_change_orders(contract_id)
+    payments = db.get_payments(contract_id)
+    comments = db.get_comments(contract_id)
+    history = db.get_audit_log(table_name='contracts', record_id=contract_id, limit=20)
+
+    # Get vendor info if exists
+    vendor = None
+    if contract.get('vendor_id'):
+        vendor = db.get_vendor(contract['vendor_id'])
+
+    return render_template('contract_detail.html',
+                          contract=contract,
+                          milestones=milestones,
+                          change_orders=change_orders,
+                          payments=payments,
+                          comments=comments,
+                          history=history,
+                          vendor=vendor,
+                          title=contract.get('title', 'Contract Detail'))
+
+
+@app.route('/vendors')
+def vendors_list():
+    """All vendors view."""
+    global current_vendors
+
+    if current_vendors is None:
+        load_data()
+
+    vendors = current_vendors.to_dict('records') if current_vendors is not None else []
+
+    # Add contract counts
+    for vendor in vendors:
+        contracts = db.get_vendor_contracts(vendor['vendor_id'])
+        vendor['contract_count'] = len(contracts)
+        vendor['total_value'] = sum(c.get('current_amount', 0) or 0 for c in contracts)
+        metrics = vendor_scorer.get_vendor_metrics(vendor, contracts)
+        vendor.update(metrics)
+
+    return render_template('vendors.html',
+                          vendors=vendors,
+                          title='Vendor Management')
+
+
+@app.route('/vendor/<vendor_id>')
+def vendor_detail(vendor_id):
+    """Single vendor detail view."""
+    vendor = db.get_vendor(vendor_id)
+    if not vendor:
+        return "Vendor not found", 404
+
+    contracts = db.get_vendor_contracts(vendor_id)
+    metrics = vendor_scorer.get_vendor_metrics(vendor, contracts)
+    vendor.update(metrics)
+
+    return render_template('vendor_detail.html',
+                          vendor=vendor,
+                          contracts=contracts,
+                          title=vendor.get('vendor_name', 'Vendor Detail'))
+
+
+@app.route('/alerts')
+def alerts_page():
+    """Alerts and issues view."""
+    global current_contracts
+
+    if current_contracts is None:
+        load_data()
+
+    contracts_list = current_contracts.to_dict('records') if current_contracts is not None else []
+    alerts = alert_generator.generate_alerts(contracts_list)
+
+    # Get open issues from database
+    issues = db.get_issues(status='Open')
+
+    return render_template('alerts.html',
+                          alerts=alerts,
+                          issues=issues,
+                          title='Alerts & Issues')
+
+
+@app.route('/public')
+def public_dashboard():
+    """Public transparency dashboard (read-only)."""
+    global current_contracts
+
+    if current_contracts is None:
+        load_data()
+
+    summary = get_portfolio_summary(current_contracts)
+    contracts = current_contracts.to_dict('records') if current_contracts is not None else []
+
+    # Filter to show only non-sensitive info
+    public_contracts = []
+    for c in contracts:
+        public_contracts.append({
+            'contract_id': c.get('contract_id'),
+            'title': c.get('title'),
+            'vendor_name': c.get('vendor_name'),
+            'department': c.get('department'),
+            'contract_type': c.get('contract_type'),
+            'original_amount': c.get('original_amount'),
+            'current_amount': c.get('current_amount'),
+            'total_paid': c.get('total_paid'),
+            'status': c.get('status'),
+            'start_date': c.get('start_date'),
+            'current_end_date': c.get('current_end_date'),
+            'percent_complete': c.get('percent_complete'),
+            'overall_health_score': c.get('overall_health_score'),
+            'risk_level': c.get('risk_level'),
+            'change_order_count': c.get('change_order_count', 0),
+            'total_change_order_amount': c.get('total_change_order_amount', 0)
+        })
+
+    return render_template('public_dashboard.html',
+                          summary=summary,
+                          contracts=public_contracts,
+                          title='Public Contract Transparency Dashboard')
+
+
+# ==========================
+# API ROUTES
+# ==========================
+
+@app.route('/api/contracts')
+def api_contracts():
+    """Get all contracts."""
+    global current_contracts
+
+    if current_contracts is None:
+        load_data()
+
+    return jsonify(current_contracts.to_dict('records') if current_contracts is not None else [])
+
+
+@app.route('/api/contract/<contract_id>')
+def api_contract(contract_id):
+    """Get single contract."""
+    contract = db.get_contract(contract_id)
+    if contract:
+        contract = contract_scorer.score_contract(contract)
+        return jsonify(contract)
+    return jsonify({'error': 'Not found'}), 404
+
+
+@app.route('/api/contract/<contract_id>', methods=['PUT'])
+def api_update_contract(contract_id):
+    """Update a contract."""
+    data = request.get_json()
+    if not data:
+        return jsonify({'error': 'No data'}), 400
+
+    data['contract_id'] = contract_id
+    db.save_contract(data, changed_by=data.get('changed_by', 'api'))
+    load_data()
+
+    return jsonify({'success': True})
+
+
+@app.route('/api/contract', methods=['POST'])
+def api_create_contract():
+    """Create a new contract."""
+    data = request.get_json()
+    if not data or not data.get('contract_id'):
+        return jsonify({'error': 'Contract ID required'}), 400
+
+    existing = db.get_contract(data['contract_id'])
+    if existing:
+        return jsonify({'error': 'Contract ID already exists'}), 400
+
+    db.save_contract(data, changed_by=data.get('changed_by', 'api'))
+    load_data()
+
+    return jsonify({'success': True, 'contract_id': data['contract_id']})
+
+
+@app.route('/api/vendors')
+def api_vendors():
+    """Get all vendors."""
+    global current_vendors
+
+    if current_vendors is None:
+        load_data()
+
+    return jsonify(current_vendors.to_dict('records') if current_vendors is not None else [])
+
+
+@app.route('/api/summary')
+def api_summary():
+    """Get portfolio summary."""
+    global current_contracts
+
+    if current_contracts is None:
+        load_data()
+
+    return jsonify(get_portfolio_summary(current_contracts))
+
+
+@app.route('/api/alerts')
+def api_alerts():
+    """Get current alerts."""
+    global current_contracts
+
+    if current_contracts is None:
+        load_data()
+
+    contracts_list = current_contracts.to_dict('records') if current_contracts is not None else []
+    alerts = alert_generator.generate_alerts(contracts_list)
+
+    return jsonify(alerts)
+
+
+@app.route('/api/contract/<contract_id>/milestones')
+def api_milestones(contract_id):
+    """Get milestones for a contract."""
+    milestones = db.get_milestones(contract_id)
+    return jsonify(milestones)
+
+
+@app.route('/api/contract/<contract_id>/milestones', methods=['POST'])
+def api_add_milestone(contract_id):
+    """Add a milestone."""
+    data = request.get_json()
+    data['contract_id'] = contract_id
+    milestone_id = db.add_milestone(data)
+    return jsonify({'success': True, 'milestone_id': milestone_id})
+
+
+@app.route('/api/contract/<contract_id>/change-orders')
+def api_change_orders(contract_id):
+    """Get change orders for a contract."""
+    change_orders = db.get_change_orders(contract_id)
+    return jsonify(change_orders)
+
+
+@app.route('/api/contract/<contract_id>/change-orders', methods=['POST'])
+def api_add_change_order(contract_id):
+    """Add a change order."""
+    data = request.get_json()
+    data['contract_id'] = contract_id
+    co_id = db.add_change_order(data)
+    load_data()  # Refresh to update contract totals
+    return jsonify({'success': True, 'change_order_id': co_id})
+
+
+@app.route('/api/contract/<contract_id>/comments')
+def api_get_comments(contract_id):
+    """Get comments for a contract."""
+    comments = db.get_comments(contract_id)
+    return jsonify(comments)
+
+
+@app.route('/api/contract/<contract_id>/comments', methods=['POST'])
+def api_add_comment(contract_id):
+    """Add a comment."""
+    data = request.get_json()
+    comment_id = db.add_comment(
+        contract_id=contract_id,
+        content=data.get('content'),
+        user_id=data.get('user_id'),
+        user_name=data.get('user_name', 'Anonymous'),
+        parent_id=data.get('parent_id')
+    )
+    return jsonify({'success': True, 'comment_id': comment_id})
+
+
+@app.route('/api/export')
+def api_export():
+    """Export contracts to CSV."""
+    global current_contracts
+
+    if current_contracts is None:
+        load_data()
+
+    output = io.StringIO()
+    current_contracts.to_csv(output, index=False)
+    output.seek(0)
+
+    return send_file(
+        io.BytesIO(output.getvalue().encode('utf-8')),
+        mimetype='text/csv',
+        as_attachment=True,
+        download_name=f'contracts_export_{datetime.now().strftime("%Y%m%d")}.csv'
+    )
+
+
+@app.route('/api/statistics')
+def api_statistics():
+    """Get database statistics."""
+    return jsonify(db.get_statistics())
+
+
+# ==========================
+# COMPARISON FEATURE
+# ==========================
+
+@app.route('/compare')
+def compare_contracts():
+    """Compare multiple contracts side by side."""
+    contract_ids = request.args.getlist('contracts')
+
+    if len(contract_ids) < 2:
+        return redirect(url_for('contracts_list'))
+
+    contracts_to_compare = []
+    for cid in contract_ids[:4]:  # Max 4 contracts
+        contract = db.get_contract(cid)
+        if contract:
+            contract = contract_scorer.score_contract(contract)
+            # Get additional metrics
+            change_orders = db.get_change_orders(cid)
+            milestones = db.get_milestones(cid)
+            payments = db.get_payments(cid)
+            issues = db.get_issues(contract_id=cid)
+
+            contract['change_order_count'] = len(change_orders)
+            contract['total_co_amount'] = sum(co.get('amount', 0) for co in change_orders)
+            contract['milestone_count'] = len(milestones)
+            contract['completed_milestones'] = len([m for m in milestones if m.get('status') == 'Completed'])
+            contract['payment_count'] = len(payments)
+            contract['issue_count'] = len([i for i in issues if i.get('status') == 'Open'])
+
+            contracts_to_compare.append(contract)
+
+    return render_template('compare.html',
+                          contracts=contracts_to_compare,
+                          title='Contract Comparison')
+
+
+# ==========================
+# ANALYTICS DASHBOARD
+# ==========================
+
+@app.route('/analytics')
+def analytics_dashboard():
+    """Advanced analytics dashboard."""
+    global current_contracts, current_vendors
+
+    if current_contracts is None:
+        load_data()
+
+    df = current_contracts
+
+    # Time-based analysis
+    today = datetime.now()
+
+    # Monthly spending trend (last 12 months)
+    monthly_data = []
+    for i in range(11, -1, -1):
+        month_start = (today.replace(day=1) - timedelta(days=30*i)).replace(day=1)
+        month_name = month_start.strftime('%b %Y')
+        # Simulate spending based on contract dates
+        monthly_data.append({
+            'month': month_name,
+            'spending': float(df['total_paid'].sum() / 12 * (1 + np.random.uniform(-0.2, 0.2)))
+        })
+
+    # Department analysis
+    dept_analysis = []
+    if 'department' in df.columns:
+        for dept in df['department'].unique():
+            dept_df = df[df['department'] == dept]
+            dept_analysis.append({
+                'department': dept,
+                'contract_count': len(dept_df),
+                'total_value': float(dept_df['current_amount'].sum()),
+                'avg_health': float(dept_df['overall_health_score'].mean()) if 'overall_health_score' in dept_df.columns else 50,
+                'overrun_amount': float((dept_df['current_amount'] - dept_df['original_amount']).sum()),
+                'at_risk_count': len(dept_df[dept_df['overall_health_score'] < 50]) if 'overall_health_score' in dept_df.columns else 0
+            })
+
+    # Vendor performance ranking
+    vendor_rankings = []
+    if current_vendors is not None:
+        for _, vendor in current_vendors.iterrows():
+            contracts = db.get_vendor_contracts(vendor['vendor_id'])
+            if contracts:
+                metrics = vendor_scorer.get_vendor_metrics(vendor.to_dict(), contracts)
+                vendor_rankings.append({
+                    'vendor_id': vendor['vendor_id'],
+                    'name': vendor['name'],
+                    'contract_count': len(contracts),
+                    'total_value': sum(c.get('current_amount', 0) or 0 for c in contracts),
+                    'performance_score': metrics.get('performance_score', 50),
+                    'on_time_pct': metrics.get('on_time_pct', 0),
+                    'budget_adherence': metrics.get('budget_adherence', 0)
+                })
+        vendor_rankings.sort(key=lambda x: x['performance_score'], reverse=True)
+
+    # Risk distribution
+    risk_distribution = {
+        'Critical': len(df[df['overall_health_score'] < 30]) if 'overall_health_score' in df.columns else 0,
+        'High': len(df[(df['overall_health_score'] >= 30) & (df['overall_health_score'] < 50)]) if 'overall_health_score' in df.columns else 0,
+        'Medium': len(df[(df['overall_health_score'] >= 50) & (df['overall_health_score'] < 70)]) if 'overall_health_score' in df.columns else 0,
+        'Low': len(df[df['overall_health_score'] >= 70]) if 'overall_health_score' in df.columns else 0
+    }
+
+    # Contract type analysis
+    type_analysis = []
+    if 'contract_type' in df.columns:
+        for ctype in df['contract_type'].unique():
+            type_df = df[df['contract_type'] == ctype]
+            type_analysis.append({
+                'type': ctype,
+                'count': len(type_df),
+                'total_value': float(type_df['current_amount'].sum()),
+                'avg_overrun': float(((type_df['current_amount'] - type_df['original_amount']) / type_df['original_amount'] * 100).mean())
+            })
+
+    # Budget forecast (simple projection)
+    total_budget = float(df['current_amount'].sum())
+    total_paid = float(df['total_paid'].sum())
+    avg_monthly_burn = total_paid / 6  # Assume 6 months of data
+    months_remaining = (total_budget - total_paid) / avg_monthly_burn if avg_monthly_burn > 0 else 0
+
+    forecast = {
+        'total_budget': total_budget,
+        'spent_to_date': total_paid,
+        'remaining': total_budget - total_paid,
+        'avg_monthly_burn': avg_monthly_burn,
+        'projected_completion_months': months_remaining,
+        'burn_rate_pct': (total_paid / total_budget * 100) if total_budget > 0 else 0
+    }
+
+    return render_template('analytics.html',
+                          monthly_data=monthly_data,
+                          dept_analysis=dept_analysis,
+                          vendor_rankings=vendor_rankings[:10],
+                          risk_distribution=risk_distribution,
+                          type_analysis=type_analysis,
+                          forecast=forecast,
+                          summary=get_portfolio_summary(df),
+                          title='Analytics Dashboard')
+
+
+# ==========================
+# PDF REPORTS
+# ==========================
+
+@app.route('/report/contract/<contract_id>')
+def contract_report(contract_id):
+    """Generate PDF report for a contract."""
+    contract = db.get_contract(contract_id)
+    if not contract:
+        return "Contract not found", 404
+
+    contract = contract_scorer.score_contract(contract)
+    milestones = db.get_milestones(contract_id)
+    change_orders = db.get_change_orders(contract_id)
+    payments = db.get_payments(contract_id)
+    issues = db.get_issues(contract_id=contract_id)
+
+    vendor = None
+    if contract.get('vendor_id'):
+        vendor = db.get_vendor(contract['vendor_id'])
+
+    return render_template('report_contract.html',
+                          contract=contract,
+                          milestones=milestones,
+                          change_orders=change_orders,
+                          payments=payments,
+                          issues=issues,
+                          vendor=vendor,
+                          generated_at=datetime.now().strftime('%Y-%m-%d %H:%M'),
+                          title=f"Contract Report - {contract.get('title')}")
+
+
+@app.route('/report/portfolio')
+def portfolio_report():
+    """Generate portfolio summary report."""
+    global current_contracts, current_vendors
+
+    if current_contracts is None:
+        load_data()
+
+    summary = get_portfolio_summary(current_contracts)
+    contracts = current_contracts.to_dict('records') if current_contracts is not None else []
+
+    # Get alerts
+    alerts = alert_generator.generate_alerts(contracts)
+
+    # At-risk contracts
+    at_risk = []
+    if current_contracts is not None and 'overall_health_score' in current_contracts.columns:
+        at_risk_df = current_contracts[current_contracts['overall_health_score'] < 50].sort_values('overall_health_score')
+        at_risk = at_risk_df.to_dict('records')
+
+    return render_template('report_portfolio.html',
+                          summary=summary,
+                          contracts=contracts,
+                          alerts=alerts[:20],
+                          at_risk=at_risk,
+                          generated_at=datetime.now().strftime('%Y-%m-%d %H:%M'),
+                          title='Portfolio Summary Report')
+
+
+# ==========================
+# VENDOR RATINGS
+# ==========================
+
+@app.route('/api/vendor/<vendor_id>/rating', methods=['POST'])
+def api_rate_vendor(vendor_id):
+    """Submit a vendor rating."""
+    data = request.get_json()
+
+    # Store rating (in a real app, this would go to a ratings table)
+    rating = {
+        'vendor_id': vendor_id,
+        'contract_id': data.get('contract_id'),
+        'quality_rating': data.get('quality_rating', 3),
+        'timeliness_rating': data.get('timeliness_rating', 3),
+        'communication_rating': data.get('communication_rating', 3),
+        'value_rating': data.get('value_rating', 3),
+        'comments': data.get('comments', ''),
+        'rated_by': data.get('rated_by', 'Anonymous'),
+        'rated_at': datetime.now().isoformat()
+    }
+
+    # Log the rating
+    db.log_audit('vendor_ratings', vendor_id, 'CREATE',
+                 new_values=rating, changed_by=rating['rated_by'])
+
+    return jsonify({'success': True})
+
+
+# ==========================
+# BUDGET FORECASTING
+# ==========================
+
+@app.route('/api/forecast/<contract_id>')
+def api_contract_forecast(contract_id):
+    """Get budget forecast for a contract."""
+    contract = db.get_contract(contract_id)
+    if not contract:
+        return jsonify({'error': 'Not found'}), 404
+
+    payments = db.get_payments(contract_id)
+    milestones = db.get_milestones(contract_id)
+
+    # Calculate burn rate
+    total_paid = sum(p.get('amount', 0) for p in payments)
+    total_budget = contract.get('current_amount', contract.get('original_amount', 0))
+
+    # Simple forecast based on percent complete and payments
+    pct_complete = contract.get('percent_complete', 0) or 0
+
+    if pct_complete > 0:
+        projected_total = (total_paid / pct_complete) * 100
+        variance = projected_total - total_budget
+    else:
+        projected_total = total_budget
+        variance = 0
+
+    # Milestone-based projection
+    upcoming_milestones = [m for m in milestones if m.get('status') != 'Completed']
+    upcoming_costs = sum(m.get('payment_amount', 0) or 0 for m in upcoming_milestones)
+
+    forecast = {
+        'total_budget': total_budget,
+        'spent_to_date': total_paid,
+        'remaining_budget': total_budget - total_paid,
+        'percent_complete': pct_complete,
+        'percent_spent': (total_paid / total_budget * 100) if total_budget > 0 else 0,
+        'projected_total': projected_total,
+        'projected_variance': variance,
+        'variance_pct': (variance / total_budget * 100) if total_budget > 0 else 0,
+        'upcoming_milestone_costs': upcoming_costs,
+        'status': 'On Track' if variance <= total_budget * 0.1 else 'At Risk' if variance <= total_budget * 0.25 else 'Critical'
+    }
+
+    return jsonify(forecast)
+
+
+# ==========================
+# DOCUMENT MANAGEMENT
+# ==========================
+
+@app.route('/api/contract/<contract_id>/documents')
+def api_get_documents(contract_id):
+    """Get documents for a contract."""
+    documents = db.get_documents(contract_id)
+    return jsonify(documents)
+
+
+@app.route('/api/contract/<contract_id>/documents', methods=['POST'])
+def api_upload_document(contract_id):
+    """Upload a document for a contract."""
+    if 'file' not in request.files:
+        return jsonify({'error': 'No file provided'}), 400
+
+    file = request.files['file']
+    if file.filename == '':
+        return jsonify({'error': 'No file selected'}), 400
+
+    # Save document metadata
+    doc_data = {
+        'contract_id': contract_id,
+        'filename': file.filename,
+        'document_type': request.form.get('document_type', 'Other'),
+        'description': request.form.get('description', ''),
+        'uploaded_by': request.form.get('uploaded_by', 'System'),
+        'uploaded_at': datetime.now().isoformat(),
+        'file_size': len(file.read())
+    }
+    file.seek(0)
+
+    # In a real app, save the file to storage
+    # For now, just log the metadata
+    doc_id = db.add_document(doc_data)
+
+    return jsonify({'success': True, 'document_id': doc_id})
+
+
+# ==========================
+# NOTIFICATIONS
+# ==========================
+
+@app.route('/notifications')
+def notifications_page():
+    """View notification settings and history."""
+    # Get recent notifications
+    notifications = db.get_notifications()
+
+    return render_template('notifications.html',
+                          notifications=notifications,
+                          title='Notifications')
+
+
+@app.route('/api/notifications/subscribe', methods=['POST'])
+def api_subscribe_notifications():
+    """Subscribe to notifications."""
+    data = request.get_json()
+
+    subscription = {
+        'email': data.get('email'),
+        'alert_types': data.get('alert_types', ['Critical', 'High']),
+        'departments': data.get('departments', []),
+        'frequency': data.get('frequency', 'immediate'),
+        'created_at': datetime.now().isoformat()
+    }
+
+    # In a real app, save to database
+    return jsonify({'success': True})
+
+
+# ==========================
+# CONTRACT TEMPLATES
+# ==========================
+
+@app.route('/templates')
+def contract_templates():
+    """Contract templates management."""
+    return render_template('templates.html', title='Contract Templates')
+
+
+# ==========================
+# TIMELINE VIEW
+# ==========================
+
+@app.route('/timeline')
+def timeline_view():
+    """Contract timeline/Gantt view."""
+    global current_contracts
+
+    if current_contracts is None:
+        load_data()
+
+    df = current_contracts
+    contracts = df.to_dict('records') if df is not None else []
+
+    # Get all milestones
+    all_milestones = []
+    for contract in contracts:
+        milestones = db.get_milestones(contract['contract_id'])
+        for m in milestones:
+            m['contract_title'] = contract['title']
+            m['contract_id'] = contract['contract_id']
+            all_milestones.append(m)
+
+    # Sort by due date
+    all_milestones.sort(key=lambda x: x.get('due_date', '9999-12-31'))
+
+    # Upcoming milestones (next 30 days)
+    today = datetime.now()
+    upcoming = [m for m in all_milestones
+                if m.get('due_date') and m.get('status') != 'Completed'
+                and datetime.strptime(m['due_date'], '%Y-%m-%d') <= today + timedelta(days=30)]
+
+    # Get departments for filter
+    departments = df['department'].unique().tolist() if 'department' in df.columns else []
+
+    return render_template('timeline.html',
+                          contracts=contracts,
+                          milestones=all_milestones,
+                          upcoming_milestones=upcoming[:10],
+                          departments=departments,
+                          title='Contract Timeline')
+
+
+# ==========================
+# SPENDING DASHBOARD
+# ==========================
+
+@app.route('/spending')
+def spending_dashboard():
+    """Spending trends and budget tracking."""
+    global current_contracts
+
+    if current_contracts is None:
+        load_data()
+
+    df = current_contracts
+
+    # Get fiscal year filter
+    year = request.args.get('year', datetime.now().year)
+    fiscal_years = list(range(datetime.now().year - 2, datetime.now().year + 2))
+
+    # Calculate spending summary
+    total_budget = float(df['current_amount'].sum())
+    total_spent = float(df['total_paid'].sum())
+
+    summary = {
+        'total_budget': total_budget,
+        'total_spent': total_spent,
+        'remaining': total_budget - total_spent,
+        'spent_pct': (total_spent / total_budget * 100) if total_budget > 0 else 0,
+        'total_contracts': len(df),
+        'avg_monthly': total_spent / 12,
+        'payment_count': 0  # Will calculate from payments
+    }
+
+    # Monthly spending trend
+    monthly_spending = []
+    cumulative = 0
+    for i in range(12):
+        month_name = (datetime(int(year), 1, 1) + timedelta(days=30*i)).strftime('%b')
+        amount = total_spent / 12 * (1 + np.random.uniform(-0.3, 0.3))
+        cumulative += amount
+        monthly_spending.append({
+            'month': month_name,
+            'amount': amount,
+            'cumulative': cumulative
+        })
+
+    # Department spending
+    department_spending = []
+    department_breakdown = []
+    if 'department' in df.columns:
+        for dept in df['department'].unique():
+            dept_df = df[df['department'] == dept]
+            budget = float(dept_df['current_amount'].sum())
+            spent = float(dept_df['total_paid'].sum())
+            department_spending.append({
+                'name': dept,
+                'spent': spent
+            })
+            department_breakdown.append({
+                'name': dept,
+                'budget': budget,
+                'spent': spent,
+                'remaining': budget - spent,
+                'utilization': (spent / budget * 100) if budget > 0 else 0,
+                'contract_count': len(dept_df)
+            })
+
+    # Top vendors by spending
+    top_vendors = []
+    if current_vendors is not None:
+        for _, vendor in current_vendors.iterrows():
+            contracts = db.get_vendor_contracts(vendor['vendor_id'])
+            total = sum(c.get('total_paid', 0) or 0 for c in contracts)
+            if total > 0:
+                top_vendors.append({
+                    'name': vendor['name'],
+                    'spent': total
+                })
+        top_vendors.sort(key=lambda x: x['spent'], reverse=True)
+
+    # Recent payments (aggregate from all contracts)
+    recent_payments = []
+    for _, row in df.iterrows():
+        payments = db.get_payments(row['contract_id'])
+        for p in payments:
+            p['contract_title'] = row['title']
+            p['contract_id'] = row['contract_id']
+            p['vendor_name'] = row.get('vendor_name', 'Unknown')
+            recent_payments.append(p)
+
+    recent_payments.sort(key=lambda x: x.get('payment_date', ''), reverse=True)
+    summary['payment_count'] = len(recent_payments)
+
+    return render_template('spending.html',
+                          summary=summary,
+                          monthly_spending=monthly_spending,
+                          department_spending=department_spending,
+                          department_breakdown=department_breakdown,
+                          top_vendors=top_vendors[:10],
+                          recent_payments=recent_payments[:20],
+                          fiscal_years=fiscal_years,
+                          current_year=int(year),
+                          title='Spending Dashboard')
+
+
+# ==========================
+# AUDIT TRAIL
+# ==========================
+
+@app.route('/audit')
+def audit_trail():
+    """Audit trail viewer."""
+    # Get filter parameters
+    page = request.args.get('page', 1, type=int)
+    per_page = 50
+    table_filter = request.args.get('table', '')
+    action_filter = request.args.get('action', '')
+    date_from = request.args.get('date_from', '')
+    date_to = request.args.get('date_to', '')
+
+    # Get audit logs
+    logs = db.get_audit_log(limit=1000)
+
+    # Apply filters
+    if table_filter:
+        logs = [l for l in logs if l.get('table_name') == table_filter]
+    if action_filter:
+        logs = [l for l in logs if l.get('action') == action_filter]
+    if date_from:
+        logs = [l for l in logs if l.get('changed_at', '') >= date_from]
+    if date_to:
+        logs = [l for l in logs if l.get('changed_at', '') <= date_to + ' 23:59:59']
+
+    # Calculate stats
+    stats = {
+        'total_changes': len(logs),
+        'creates': len([l for l in logs if l.get('action') == 'CREATE']),
+        'updates': len([l for l in logs if l.get('action') == 'UPDATE']),
+        'deletes': len([l for l in logs if l.get('action') == 'DELETE']),
+        'unique_users': len(set(l.get('changed_by', 'Unknown') for l in logs))
+    }
+
+    # Paginate
+    total_pages = (len(logs) + per_page - 1) // per_page
+    start_idx = (page - 1) * per_page
+    paginated_logs = logs[start_idx:start_idx + per_page]
+
+    # Get unique values for filters
+    all_tables = list(set(l.get('table_name', '') for l in db.get_audit_log(limit=1000)))
+    all_actions = ['CREATE', 'UPDATE', 'DELETE']
+
+    return render_template('audit.html',
+                          logs=paginated_logs,
+                          stats=stats,
+                          page=page,
+                          total_pages=total_pages,
+                          tables=all_tables,
+                          actions=all_actions,
+                          current_table=table_filter,
+                          current_action=action_filter,
+                          date_from=date_from,
+                          date_to=date_to,
+                          title='Audit Trail')
+
+
+# ==========================
+# CONTRACT RENEWALS
+# ==========================
+
+@app.route('/renewals')
+def renewals_dashboard():
+    """Contract renewal tracking."""
+    global current_contracts
+
+    if current_contracts is None:
+        load_data()
+
+    df = current_contracts
+    today = datetime.now()
+
+    # Find contracts expiring soon
+    expiring_soon = []
+    expired = []
+    upcoming_renewals = []
+
+    for _, row in df.iterrows():
+        end_date_str = row.get('current_end_date') or row.get('end_date')
+        if end_date_str:
+            try:
+                end_date = datetime.strptime(end_date_str, '%Y-%m-%d')
+                days_until = (end_date - today).days
+
+                contract_info = row.to_dict()
+                contract_info['days_until_expiry'] = days_until
+                contract_info['end_date_formatted'] = end_date.strftime('%b %d, %Y')
+
+                if days_until < 0:
+                    expired.append(contract_info)
+                elif days_until <= 30:
+                    expiring_soon.append(contract_info)
+                elif days_until <= 90:
+                    upcoming_renewals.append(contract_info)
+            except:
+                pass
+
+    # Sort by days until expiry
+    expiring_soon.sort(key=lambda x: x['days_until_expiry'])
+    upcoming_renewals.sort(key=lambda x: x['days_until_expiry'])
+
+    # Calculate renewal statistics
+    stats = {
+        'expired_count': len(expired),
+        'expiring_30_days': len(expiring_soon),
+        'expiring_90_days': len(upcoming_renewals),
+        'expired_value': sum(c.get('current_amount', 0) or 0 for c in expired),
+        'expiring_value': sum(c.get('current_amount', 0) or 0 for c in expiring_soon + upcoming_renewals)
+    }
+
+    return render_template('renewals.html',
+                          expired=expired,
+                          expiring_soon=expiring_soon,
+                          upcoming_renewals=upcoming_renewals,
+                          stats=stats,
+                          title='Contract Renewals')
+
+
+# ==========================
+# VENDOR PERFORMANCE
+# ==========================
+
+@app.route('/vendor-performance')
+def vendor_performance_dashboard():
+    """Comprehensive vendor performance dashboard."""
+    global current_vendors
+
+    if current_vendors is None:
+        load_data()
+
+    vendor_data = []
+    for _, vendor in current_vendors.iterrows():
+        contracts = db.get_vendor_contracts(vendor['vendor_id'])
+        if contracts:
+            metrics = vendor_scorer.get_vendor_metrics(vendor.to_dict(), contracts)
+
+            # Calculate additional metrics
+            total_value = sum(c.get('current_amount', 0) or 0 for c in contracts)
+            total_paid = sum(c.get('total_paid', 0) or 0 for c in contracts)
+
+            vendor_data.append({
+                'vendor_id': vendor['vendor_id'],
+                'name': vendor['name'],
+                'category': vendor.get('category', 'General'),
+                'contract_count': len(contracts),
+                'active_contracts': len([c for c in contracts if c.get('status') == 'Active']),
+                'total_value': total_value,
+                'total_paid': total_paid,
+                'performance_score': metrics.get('performance_score', 50),
+                'on_time_pct': metrics.get('on_time_pct', 0),
+                'budget_adherence': metrics.get('budget_adherence', 0),
+                'quality_score': metrics.get('quality_score', 50),
+                'insurance_status': 'Valid' if vendor.get('insurance_expiry') and vendor['insurance_expiry'] > datetime.now().strftime('%Y-%m-%d') else 'Expired',
+                'license_status': 'Valid' if vendor.get('license_expiry') and vendor['license_expiry'] > datetime.now().strftime('%Y-%m-%d') else 'Expired'
+            })
+
+    # Sort by performance score
+    vendor_data.sort(key=lambda x: x['performance_score'], reverse=True)
+
+    # Calculate summary stats
+    summary = {
+        'total_vendors': len(vendor_data),
+        'avg_performance': sum(v['performance_score'] for v in vendor_data) / len(vendor_data) if vendor_data else 0,
+        'top_performers': len([v for v in vendor_data if v['performance_score'] >= 70]),
+        'underperformers': len([v for v in vendor_data if v['performance_score'] < 50]),
+        'expired_insurance': len([v for v in vendor_data if v['insurance_status'] == 'Expired']),
+        'expired_license': len([v for v in vendor_data if v['license_status'] == 'Expired'])
+    }
+
+    # Performance distribution
+    performance_dist = {
+        'Excellent (80+)': len([v for v in vendor_data if v['performance_score'] >= 80]),
+        'Good (60-79)': len([v for v in vendor_data if 60 <= v['performance_score'] < 80]),
+        'Fair (40-59)': len([v for v in vendor_data if 40 <= v['performance_score'] < 60]),
+        'Poor (<40)': len([v for v in vendor_data if v['performance_score'] < 40])
+    }
+
+    return render_template('vendor_performance.html',
+                          vendors=vendor_data,
+                          summary=summary,
+                          performance_dist=performance_dist,
+                          title='Vendor Performance')
+
+
+# ==========================
+# CONTRACT APPROVALS
+# ==========================
+
+@app.route('/approvals')
+def approvals_page():
+    """Contract approval workflow page."""
+    global current_contracts
+
+    if current_contracts is None:
+        load_data()
+
+    # Sample approval data (in real app, this would come from database)
+    pending_approvals = [
+        {
+            'request_id': 'APR-001',
+            'type': 'New Contract',
+            'contract_id': 'CNT-001',
+            'contract_title': 'School Renovation Project',
+            'description': 'Request approval for new construction contract with BuildRight Inc.',
+            'amount': 2500000,
+            'requested_by': 'John Smith',
+            'requested_at': '2024-12-01',
+            'approval_chain': [
+                {'approver': 'Dept. Manager', 'status': 'approved'},
+                {'approver': 'Finance Dir.', 'status': 'pending'},
+                {'approver': 'Executive Dir.', 'status': 'waiting'},
+                {'approver': 'Board', 'status': 'waiting'}
+            ]
+        },
+        {
+            'request_id': 'APR-002',
+            'type': 'Change Order',
+            'contract_id': 'CNT-003',
+            'contract_title': 'HVAC System Upgrade',
+            'description': 'Additional ventilation requirements due to building code changes.',
+            'amount': 85000,
+            'requested_by': 'Sarah Johnson',
+            'requested_at': '2024-12-03',
+            'approval_chain': [
+                {'approver': 'Dept. Manager', 'status': 'pending'},
+                {'approver': 'Finance Dir.', 'status': 'waiting'}
+            ]
+        },
+        {
+            'request_id': 'APR-003',
+            'type': 'Budget Increase',
+            'contract_id': 'CNT-005',
+            'contract_title': 'IT Infrastructure Modernization',
+            'description': 'Request 15% budget increase due to supply chain cost increases.',
+            'amount': 150000,
+            'requested_by': 'Mike Chen',
+            'requested_at': '2024-12-04',
+            'approval_chain': [
+                {'approver': 'Dept. Manager', 'status': 'approved'},
+                {'approver': 'Finance Dir.', 'status': 'pending'},
+                {'approver': 'Executive Dir.', 'status': 'waiting'}
+            ]
+        }
+    ]
+
+    my_requests = [
+        {'request_id': 'APR-001', 'type': 'New Contract', 'contract_title': 'School Renovation Project', 'amount': 2500000, 'status': 'Pending', 'requested_at': '2024-12-01'},
+        {'request_id': 'APR-004', 'type': 'Renewal', 'contract_title': 'Janitorial Services', 'amount': 125000, 'status': 'Approved', 'requested_at': '2024-11-28'},
+        {'request_id': 'APR-005', 'type': 'Change Order', 'contract_title': 'Parking Lot Repair', 'amount': 25000, 'status': 'Rejected', 'requested_at': '2024-11-25'}
+    ]
+
+    approval_history = [
+        {'contract_title': 'Parking Lot Expansion', 'type': 'New Contract', 'amount': 450000, 'status': 'Approved', 'decided_by': 'Board', 'decided_at': '2024-11-30', 'comments': 'Approved with conditions'},
+        {'contract_title': 'Security System Upgrade', 'type': 'Change Order', 'amount': 35000, 'status': 'Approved', 'decided_by': 'Finance Dir.', 'decided_at': '2024-11-29', 'comments': ''},
+        {'contract_title': 'Landscaping Contract', 'type': 'Renewal', 'amount': 75000, 'status': 'Rejected', 'decided_by': 'Dept. Manager', 'decided_at': '2024-11-28', 'comments': 'Need to rebid - pricing too high'},
+        {'contract_title': 'Cafeteria Equipment', 'type': 'New Contract', 'amount': 180000, 'status': 'Approved', 'decided_by': 'Executive Dir.', 'decided_at': '2024-11-27', 'comments': ''}
+    ]
+
+    # Calculate stats
+    stats = {
+        'pending': len(pending_approvals),
+        'in_review': 2,
+        'approved': 15,
+        'rejected': 3,
+        'pending_value': sum(a['amount'] for a in pending_approvals)
+    }
+
+    contracts = current_contracts.to_dict('records') if current_contracts is not None else []
+
+    return render_template('approvals.html',
+                          pending_approvals=pending_approvals,
+                          my_requests=my_requests,
+                          approval_history=approval_history,
+                          stats=stats,
+                          contracts=contracts,
+                          title='Contract Approvals')
+
+
+@app.route('/api/approval/<request_id>/approve', methods=['POST'])
+def api_approve_request(request_id):
+    """Approve an approval request."""
+    data = request.get_json() or {}
+
+    # Log the approval
+    db.log_audit('approvals', request_id, 'UPDATE',
+                 new_values={'status': 'approved', 'approved_by': data.get('approved_by', 'System')},
+                 changed_by=data.get('approved_by', 'System'))
+
+    return jsonify({'success': True, 'message': 'Request approved'})
+
+
+@app.route('/api/approval/<request_id>/reject', methods=['POST'])
+def api_reject_request(request_id):
+    """Reject an approval request."""
+    data = request.get_json() or {}
+
+    # Log the rejection
+    db.log_audit('approvals', request_id, 'UPDATE',
+                 new_values={'status': 'rejected', 'reason': data.get('reason'), 'comments': data.get('comments')},
+                 changed_by=data.get('rejected_by', 'System'))
+
+    return jsonify({'success': True, 'message': 'Request rejected'})
+
+
+@app.route('/api/approval/<request_id>/request-info', methods=['POST'])
+def api_request_info(request_id):
+    """Request more information for an approval."""
+    data = request.get_json() or {}
+
+    # Log the info request
+    db.log_audit('approvals', request_id, 'UPDATE',
+                 new_values={'status': 'info_requested', 'message': data.get('message')},
+                 changed_by='System')
+
+    return jsonify({'success': True, 'message': 'Information request sent'})
+
+
+@app.route('/api/approval/create', methods=['POST'])
+def api_create_approval():
+    """Create a new approval request."""
+    data = request.form.to_dict()
+
+    approval_id = f"APR-{datetime.now().strftime('%Y%m%d%H%M%S')}"
+
+    # Log the new approval
+    db.log_audit('approvals', approval_id, 'CREATE',
+                 new_values=data,
+                 changed_by=data.get('requested_by', 'System'))
+
+    return jsonify({'success': True, 'approval_id': approval_id})
+
+
+# ==========================
+# DATA IMPORT/EXPORT
+# ==========================
+
+@app.route('/import-export')
+def import_export_page():
+    """Data import and export management page."""
+    global current_contracts
+
+    if current_contracts is None:
+        load_data()
+
+    # Get departments for filter
+    departments = current_contracts['department'].unique().tolist() if current_contracts is not None and 'department' in current_contracts.columns else []
+
+    # Sample recent exports
+    recent_exports = [
+        {'filename': 'contracts_export_20241201.csv', 'type': 'CSV', 'created_at': '2024-12-01 10:30', 'size': '245 KB'},
+        {'filename': 'monthly_report_nov2024.xlsx', 'type': 'Excel', 'created_at': '2024-11-30 08:00', 'size': '1.2 MB'},
+        {'filename': 'vendor_data_20241128.json', 'type': 'JSON', 'created_at': '2024-11-28 14:15', 'size': '89 KB'}
+    ]
+
+    # Sample import history
+    import_history = [
+        {'date': '2024-11-25', 'filename': 'new_contracts.csv', 'type': 'Contracts', 'records_imported': 15, 'total_records': 15, 'status': 'Success'},
+        {'date': '2024-11-20', 'filename': 'vendor_update.xlsx', 'type': 'Vendors', 'records_imported': 8, 'total_records': 10, 'status': 'Partial'},
+        {'date': '2024-11-15', 'filename': 'payments_q3.csv', 'type': 'Payments', 'records_imported': 45, 'total_records': 45, 'status': 'Success'}
+    ]
+
+    # Sample backups
+    backups = [
+        {'id': 'bak-001', 'name': 'full_backup_20241201', 'date': '2024-12-01 02:00 AM', 'size': '15.3 MB'},
+        {'id': 'bak-002', 'name': 'full_backup_20241101', 'date': '2024-11-01 02:00 AM', 'size': '14.8 MB'},
+        {'id': 'bak-003', 'name': 'full_backup_20241001', 'date': '2024-10-01 02:00 AM', 'size': '14.2 MB'}
+    ]
+
+    return render_template('import_export.html',
+                          departments=departments,
+                          recent_exports=recent_exports,
+                          import_history=import_history,
+                          backups=backups,
+                          title='Data Import & Export')
+
+
+@app.route('/api/import', methods=['POST'])
+def api_import_data():
+    """Import data from uploaded file."""
+    if 'file' not in request.files:
+        return jsonify({'error': 'No file provided'}), 400
+
+    file = request.files['file']
+    import_type = request.form.get('type', 'contracts')
+    overwrite = request.form.get('overwrite', 'false') == 'true'
+
+    # Process the file based on type
+    try:
+        if file.filename.endswith('.csv'):
+            df = pd.read_csv(file)
+        elif file.filename.endswith('.xlsx'):
+            df = pd.read_excel(file)
+        elif file.filename.endswith('.json'):
+            df = pd.read_json(file)
+        else:
+            return jsonify({'error': 'Unsupported file format'}), 400
+
+        records_imported = len(df)
+
+        # Log the import
+        db.log_audit('imports', file.filename, 'CREATE',
+                     new_values={'type': import_type, 'records': records_imported},
+                     changed_by='System')
+
+        return jsonify({
+            'success': True,
+            'records_imported': records_imported,
+            'message': f'Successfully imported {records_imported} records'
+        })
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/template/<template_type>')
+def api_download_template(template_type):
+    """Download import template."""
+    templates = {
+        'contracts': 'contract_id,title,vendor_name,department,contract_type,original_amount,start_date,end_date,status',
+        'vendors': 'vendor_id,name,contact_name,email,phone,address,category,insurance_expiry,license_expiry',
+        'payments': 'payment_id,contract_id,amount,payment_date,description,invoice_number,status'
+    }
+
+    if template_type not in templates:
+        return jsonify({'error': 'Unknown template type'}), 404
+
+    output = io.StringIO()
+    output.write(templates[template_type])
+    output.seek(0)
+
+    return send_file(
+        io.BytesIO(output.getvalue().encode('utf-8')),
+        mimetype='text/csv',
+        as_attachment=True,
+        download_name=f'{template_type}_template.csv'
+    )
+
+
+# ==========================
+# RISK ASSESSMENT
+# ==========================
+
+@app.route('/risk-assessment')
+def risk_assessment_page():
+    """Contract risk assessment tool."""
+    global current_contracts
+
+    if current_contracts is None:
+        load_data()
+
+    df = current_contracts
+
+    # Calculate risk factors for each contract
+    risk_data = []
+    for _, row in df.iterrows():
+        contract_data = row.to_dict()
+
+        # Calculate individual risk scores
+        budget_risk = min(100, max(0, ((row.get('current_amount', 0) or 0) - (row.get('original_amount', 0) or 0)) / max(1, row.get('original_amount', 1)) * 200))
+        schedule_risk = 100 - (row.get('percent_complete', 0) or 0) if row.get('status') == 'Active' else 0
+
+        # Calculate days overdue
+        end_date = row.get('current_end_date') or row.get('end_date')
+        days_overdue = 0
+        if end_date and row.get('status') == 'Active':
+            try:
+                end = datetime.strptime(end_date, '%Y-%m-%d')
+                if end < datetime.now():
+                    days_overdue = (datetime.now() - end).days
+                    schedule_risk = min(100, schedule_risk + days_overdue * 2)
+            except:
+                pass
+
+        vendor_risk = 100 - (row.get('vendor_performance_score', 50) or 50)
+        compliance_risk = 50 if row.get('change_order_count', 0) > 3 else 0
+
+        overall_risk = (budget_risk * 0.35 + schedule_risk * 0.30 + vendor_risk * 0.20 + compliance_risk * 0.15)
+
+        risk_data.append({
+            'contract_id': row['contract_id'],
+            'title': row['title'],
+            'department': row.get('department', 'Unknown'),
+            'vendor_name': row.get('vendor_name', 'Unknown'),
+            'current_amount': row.get('current_amount', 0),
+            'percent_complete': row.get('percent_complete', 0),
+            'budget_risk': budget_risk,
+            'schedule_risk': schedule_risk,
+            'vendor_risk': vendor_risk,
+            'compliance_risk': compliance_risk,
+            'overall_risk': overall_risk,
+            'risk_level': 'Critical' if overall_risk >= 70 else 'High' if overall_risk >= 50 else 'Medium' if overall_risk >= 30 else 'Low',
+            'days_overdue': days_overdue
+        })
+
+    # Sort by overall risk
+    risk_data.sort(key=lambda x: x['overall_risk'], reverse=True)
+
+    # Calculate summary stats
+    summary = {
+        'total_contracts': len(risk_data),
+        'critical_count': len([r for r in risk_data if r['risk_level'] == 'Critical']),
+        'high_count': len([r for r in risk_data if r['risk_level'] == 'High']),
+        'medium_count': len([r for r in risk_data if r['risk_level'] == 'Medium']),
+        'low_count': len([r for r in risk_data if r['risk_level'] == 'Low']),
+        'avg_risk': sum(r['overall_risk'] for r in risk_data) / len(risk_data) if risk_data else 0,
+        'total_at_risk_value': sum(r['current_amount'] for r in risk_data if r['risk_level'] in ['Critical', 'High'])
+    }
+
+    # Risk distribution by department
+    dept_risk = {}
+    for r in risk_data:
+        dept = r['department']
+        if dept not in dept_risk:
+            dept_risk[dept] = {'contracts': 0, 'total_risk': 0, 'value': 0}
+        dept_risk[dept]['contracts'] += 1
+        dept_risk[dept]['total_risk'] += r['overall_risk']
+        dept_risk[dept]['value'] += r['current_amount']
+
+    department_risks = [
+        {'name': k, 'contracts': v['contracts'], 'avg_risk': v['total_risk'] / v['contracts'], 'value': v['value']}
+        for k, v in dept_risk.items()
+    ]
+    department_risks.sort(key=lambda x: x['avg_risk'], reverse=True)
+
+    return render_template('risk_assessment.html',
+                          risk_data=risk_data,
+                          summary=summary,
+                          department_risks=department_risks,
+                          title='Risk Assessment')
+
+
+# ==========================
+# BUDGET ALLOCATION PLANNER
+# ==========================
+
+@app.route('/budget-planner')
+def budget_planner_page():
+    """Budget allocation planning tool."""
+    global current_contracts
+
+    if current_contracts is None:
+        load_data()
+
+    df = current_contracts
+
+    # Calculate budget allocation by department
+    dept_budgets = []
+    if 'department' in df.columns:
+        for dept in df['department'].unique():
+            dept_df = df[df['department'] == dept]
+            allocated = float(dept_df['current_amount'].sum())
+            spent = float(dept_df['total_paid'].sum())
+            dept_budgets.append({
+                'name': dept,
+                'allocated': allocated,
+                'spent': spent,
+                'remaining': allocated - spent,
+                'utilization': (spent / allocated * 100) if allocated > 0 else 0,
+                'contract_count': len(dept_df),
+                'active_contracts': len(dept_df[dept_df['status'] == 'Active'])
+            })
+
+    dept_budgets.sort(key=lambda x: x['allocated'], reverse=True)
+
+    # Monthly forecast
+    total_budget = float(df['current_amount'].sum())
+    total_spent = float(df['total_paid'].sum())
+    monthly_burn = total_spent / 6  # Assume 6 months of data
+
+    forecast = []
+    remaining = total_budget - total_spent
+    for i in range(12):
+        month = (datetime.now() + timedelta(days=30*i)).strftime('%b %Y')
+        projected_spend = min(remaining, monthly_burn)
+        remaining -= projected_spend
+        forecast.append({
+            'month': month,
+            'projected_spend': projected_spend,
+            'remaining': max(0, remaining)
+        })
+
+    # Summary
+    summary = {
+        'total_budget': total_budget,
+        'total_spent': total_spent,
+        'remaining': total_budget - total_spent,
+        'utilization': (total_spent / total_budget * 100) if total_budget > 0 else 0,
+        'monthly_burn': monthly_burn,
+        'months_remaining': ((total_budget - total_spent) / monthly_burn) if monthly_burn > 0 else 0
+    }
+
+    return render_template('budget_planner.html',
+                          dept_budgets=dept_budgets,
+                          forecast=forecast,
+                          summary=summary,
+                          title='Budget Allocation Planner')
+
+
+# ==========================
+# VENDOR COMPLIANCE CHECKER
+# ==========================
+
+@app.route('/vendor-compliance')
+def vendor_compliance_page():
+    """Vendor compliance checker page."""
+    global current_vendors
+
+    if current_vendors is None:
+        load_data()
+
+    today = datetime.now()
+    compliance_data = []
+
+    for _, vendor in current_vendors.iterrows():
+        contracts = db.get_vendor_contracts(vendor['vendor_id'])
+
+        # Calculate insurance status
+        insurance_expiry = vendor.get('insurance_expiry')
+        insurance_status = 'Valid'
+        insurance_days = None
+        if insurance_expiry:
+            try:
+                exp_date = datetime.strptime(insurance_expiry, '%Y-%m-%d')
+                days_until = (exp_date - today).days
+                insurance_days = days_until
+                if days_until < 0:
+                    insurance_status = 'Expired'
+                elif days_until <= 30:
+                    insurance_status = 'Expiring'
+            except:
+                insurance_status = 'Unknown'
+        else:
+            insurance_status = 'Missing'
+
+        # Calculate license status
+        license_expiry = vendor.get('license_expiry')
+        license_status = 'Valid'
+        license_days = None
+        if license_expiry:
+            try:
+                exp_date = datetime.strptime(license_expiry, '%Y-%m-%d')
+                days_until = (exp_date - today).days
+                license_days = days_until
+                if days_until < 0:
+                    license_status = 'Expired'
+                elif days_until <= 30:
+                    license_status = 'Expiring'
+            except:
+                license_status = 'Unknown'
+        else:
+            license_status = 'Missing'
+
+        # Determine overall compliance status
+        if insurance_status in ['Expired', 'Missing'] or license_status in ['Expired', 'Missing']:
+            compliance_status = 'Non-Compliant'
+        elif insurance_status == 'Expiring' or license_status == 'Expiring':
+            compliance_status = 'Expiring'
+        else:
+            compliance_status = 'Compliant'
+
+        # Calculate days until next expiry
+        days_until_expiry = None
+        expiring_item = None
+        if insurance_days is not None and insurance_days > 0:
+            if days_until_expiry is None or insurance_days < days_until_expiry:
+                days_until_expiry = insurance_days
+                expiring_item = 'Insurance'
+        if license_days is not None and license_days > 0:
+            if days_until_expiry is None or license_days < days_until_expiry:
+                days_until_expiry = license_days
+                expiring_item = 'License'
+
+        # Sample certifications
+        certifications = [
+            {'name': 'ISO 9001', 'valid': True},
+            {'name': 'Safety Training', 'valid': True},
+            {'name': 'Background Check', 'valid': compliance_status == 'Compliant'}
+        ]
+
+        compliance_data.append({
+            'vendor_id': vendor['vendor_id'],
+            'name': vendor['name'],
+            'category': vendor.get('category', 'General'),
+            'contact_email': vendor.get('email', 'N/A'),
+            'active_contracts': len([c for c in contracts if c.get('status') == 'Active']),
+            'contract_value': sum(c.get('current_amount', 0) or 0 for c in contracts if c.get('status') == 'Active'),
+            'insurance_status': insurance_status,
+            'insurance_expiry': insurance_expiry,
+            'insurance_days': insurance_days,
+            'license_status': license_status,
+            'license_expiry': license_expiry,
+            'license_days': license_days,
+            'compliance_status': compliance_status,
+            'certifications': certifications,
+            'cert_count': len(certifications),
+            'days_until_expiry': days_until_expiry,
+            'expiring_item': expiring_item
+        })
+
+    # Calculate summary stats
+    summary = {
+        'compliant': len([v for v in compliance_data if v['compliance_status'] == 'Compliant']),
+        'expiring_soon': len([v for v in compliance_data if v['compliance_status'] == 'Expiring']),
+        'non_compliant': len([v for v in compliance_data if v['compliance_status'] == 'Non-Compliant']),
+        'insurance_issues': len([v for v in compliance_data if v['insurance_status'] in ['Expired', 'Missing']]),
+        'license_issues': len([v for v in compliance_data if v['license_status'] in ['Expired', 'Missing']]),
+        'at_risk_value': sum(v['contract_value'] for v in compliance_data if v['compliance_status'] != 'Compliant')
+    }
+
+    # Get non-compliant vendors for alert
+    non_compliant_vendors = [v for v in compliance_data if v['compliance_status'] == 'Non-Compliant']
+
+    # Expiration timeline for chart
+    expiration_timeline = []
+    for i in range(6):
+        month = (today + timedelta(days=30*i)).strftime('%b %Y')
+        count = len([v for v in compliance_data
+                     if v['days_until_expiry'] and v['days_until_expiry'] > 30*i and v['days_until_expiry'] <= 30*(i+1)])
+        expiration_timeline.append({'month': month, 'count': count})
+
+    return render_template('vendor_compliance.html',
+                          compliance_data=compliance_data,
+                          summary=summary,
+                          non_compliant_vendors=non_compliant_vendors,
+                          expiration_timeline=expiration_timeline,
+                          title='Vendor Compliance')
+
+
+@app.route('/api/vendor/<vendor_id>/compliance-reminder', methods=['POST'])
+def api_send_compliance_reminder(vendor_id):
+    """Send compliance reminder to vendor."""
+    db.log_audit('compliance_reminders', vendor_id, 'CREATE',
+                 new_values={'sent_at': datetime.now().isoformat()},
+                 changed_by='System')
+    return jsonify({'success': True, 'message': 'Reminder sent'})
+
+
+# ==========================
+# USER ACTIVITY LOG
+# ==========================
+
+@app.route('/activity-log')
+def activity_log_page():
+    """User activity log page."""
+    # Sample activity data
+    activities = [
+        {'user': 'John Smith', 'type': 'Contract', 'action': 'Updated contract status to Active', 'target': 'School Renovation Project', 'target_url': '/contract/CNT-001', 'timestamp': '2 minutes ago', 'details': 'Changed from Draft to Active'},
+        {'user': 'Sarah Johnson', 'type': 'Approval', 'action': 'Approved change order request', 'target': 'HVAC System Upgrade', 'target_url': '/contract/CNT-003', 'timestamp': '15 minutes ago', 'details': 'Amount: $85,000'},
+        {'user': 'Mike Chen', 'type': 'Payment', 'action': 'Processed payment', 'target': 'IT Infrastructure', 'target_url': '/contract/CNT-005', 'timestamp': '1 hour ago', 'details': '$45,000 - Invoice #INV-2024-156'},
+        {'user': 'Admin', 'type': 'Login', 'action': 'User logged in', 'target': None, 'target_url': None, 'timestamp': '2 hours ago', 'details': 'IP: 192.168.1.100'},
+        {'user': 'Emily Davis', 'type': 'Vendor', 'action': 'Updated vendor information', 'target': 'BuildRight Construction', 'target_url': '/vendor/VND-001', 'timestamp': '3 hours ago', 'details': 'Updated insurance documentation'},
+        {'user': 'System', 'type': 'Security', 'action': 'Failed login attempt', 'target': None, 'target_url': None, 'timestamp': '5 hours ago', 'details': 'IP: 10.0.0.55 - 3 attempts'},
+        {'user': 'John Smith', 'type': 'Contract', 'action': 'Added new milestone', 'target': 'Parking Lot Expansion', 'target_url': '/contract/CNT-007', 'timestamp': '6 hours ago', 'details': 'Phase 2 Completion - Due: Jan 15'},
+        {'user': 'Sarah Johnson', 'type': 'Approval', 'action': 'Rejected budget increase request', 'target': 'Landscaping Contract', 'target_url': '/contract/CNT-008', 'timestamp': 'Yesterday', 'details': 'Reason: Insufficient justification'},
+    ]
+
+    # Full activity log with more details
+    activity_log = [
+        {'timestamp': '2024-12-05 14:32:15', 'user': 'John Smith', 'type': 'Contract', 'action': 'Status Update', 'target': 'CNT-001', 'target_url': '/contract/CNT-001', 'ip_address': '192.168.1.100'},
+        {'timestamp': '2024-12-05 14:15:42', 'user': 'Sarah Johnson', 'type': 'Approval', 'action': 'Approved Request', 'target': 'APR-002', 'target_url': '/approvals', 'ip_address': '192.168.1.105'},
+        {'timestamp': '2024-12-05 13:45:00', 'user': 'Mike Chen', 'type': 'Payment', 'action': 'Payment Processed', 'target': 'PAY-156', 'target_url': '/contract/CNT-005', 'ip_address': '192.168.1.110'},
+        {'timestamp': '2024-12-05 12:00:00', 'user': 'Admin', 'type': 'Login', 'action': 'Successful Login', 'target': '-', 'target_url': None, 'ip_address': '192.168.1.100'},
+        {'timestamp': '2024-12-05 11:30:25', 'user': 'Emily Davis', 'type': 'Vendor', 'action': 'Document Upload', 'target': 'VND-001', 'target_url': '/vendor/VND-001', 'ip_address': '192.168.1.115'},
+        {'timestamp': '2024-12-05 09:00:00', 'user': 'System', 'type': 'Security', 'action': 'Failed Login', 'target': '-', 'target_url': None, 'ip_address': '10.0.0.55'},
+        {'timestamp': '2024-12-05 08:45:00', 'user': 'John Smith', 'type': 'Contract', 'action': 'Milestone Added', 'target': 'CNT-007', 'target_url': '/contract/CNT-007', 'ip_address': '192.168.1.100'},
+        {'timestamp': '2024-12-04 16:30:00', 'user': 'Sarah Johnson', 'type': 'Approval', 'action': 'Rejected Request', 'target': 'APR-005', 'target_url': '/approvals', 'ip_address': '192.168.1.105'},
+    ]
+
+    # Active users
+    active_users = [
+        {'name': 'John Smith', 'initials': 'JS', 'role': 'Contract Manager', 'last_action': 'Viewing Dashboard'},
+        {'name': 'Sarah Johnson', 'initials': 'SJ', 'role': 'Finance Director', 'last_action': 'Processing Approvals'},
+        {'name': 'Mike Chen', 'initials': 'MC', 'role': 'Accountant', 'last_action': 'Viewing Payments'},
+        {'name': 'Emily Davis', 'initials': 'ED', 'role': 'Vendor Manager', 'last_action': 'Updating Vendor'},
+    ]
+
+    # Top users this week
+    top_users = [
+        {'name': 'John Smith', 'action_count': 145},
+        {'name': 'Sarah Johnson', 'action_count': 98},
+        {'name': 'Mike Chen', 'action_count': 76},
+        {'name': 'Emily Davis', 'action_count': 54},
+        {'name': 'Admin', 'action_count': 32},
+    ]
+
+    # Stats
+    stats = {
+        'today_count': 156,
+        'active_users': len(active_users),
+        'contract_updates': 45,
+        'approvals': 12,
+        'security_events': 3
+    }
+
+    # Hourly activity for chart
+    hourly_activity = [
+        {'hour': f'{i}:00', 'count': 5 + (i % 12) * 3 + (10 if 9 <= i <= 17 else 0)}
+        for i in range(24)
+    ]
+
+    # Type distribution
+    type_distribution = {
+        'Contract': 45,
+        'Vendor': 20,
+        'Approval': 15,
+        'Payment': 12,
+        'Login': 5,
+        'Security': 3
+    }
+
+    return render_template('activity_log.html',
+                          activities=activities,
+                          activity_log=activity_log,
+                          active_users=active_users,
+                          top_users=top_users,
+                          stats=stats,
+                          hourly_activity=hourly_activity,
+                          type_distribution=type_distribution,
+                          title='User Activity Log')
+
+
+@app.route('/api/activity-log/export')
+def api_export_activity_log():
+    """Export activity log to CSV."""
+    logs = db.get_audit_log(limit=1000)
+
+    output = io.StringIO()
+    output.write('timestamp,user,table,action,record_id\n')
+    for log in logs:
+        output.write(f"{log.get('changed_at', '')},{log.get('changed_by', '')},{log.get('table_name', '')},{log.get('action', '')},{log.get('record_id', '')}\n")
+    output.seek(0)
+
+    return send_file(
+        io.BytesIO(output.getvalue().encode('utf-8')),
+        mimetype='text/csv',
+        as_attachment=True,
+        download_name=f'activity_log_{datetime.now().strftime("%Y%m%d")}.csv'
+    )
+
+
+# ==========================
+# TEMPLATE CONTEXT
+# ==========================
+
+@app.context_processor
+def inject_globals():
+    """Inject global variables into templates."""
+    return {
+        'now': datetime.now
+    }
+
+
+if __name__ == '__main__':
+    # Check if we need to generate sample data
+    contracts = db.get_all_contracts()
+    if contracts.empty:
+        logger.info("No contracts found, generating sample data...")
+        from data.sample_data import generate_sample_data
+        generate_sample_data()
+        load_data()
+
+    app.run(debug=True, port=5002)

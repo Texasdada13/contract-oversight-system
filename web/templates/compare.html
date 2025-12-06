@@ -1,0 +1,278 @@
+{% extends "base.html" %}
+
+{% block content %}
+<!-- Page Header -->
+<div class="flex items-center justify-between mb-6">
+    <div>
+        <h1 class="text-2xl font-bold text-gray-800 dark:text-white">Contract Comparison</h1>
+        <p class="text-gray-500 dark:text-gray-400">Side-by-side comparison of {{ contracts|length }} contracts</p>
+    </div>
+    <a href="{{ url_for('contracts_list') }}" class="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700">
+        Back to Contracts
+    </a>
+</div>
+
+<!-- Comparison Table -->
+<div class="bg-white dark:bg-gray-800 rounded-lg shadow overflow-hidden mb-6">
+    <div class="overflow-x-auto">
+        <table class="min-w-full">
+            <thead class="bg-gray-50 dark:bg-gray-700">
+                <tr>
+                    <th class="px-6 py-4 text-left text-sm font-medium text-gray-500 dark:text-gray-300 w-48">Metric</th>
+                    {% for contract in contracts %}
+                    <th class="px-6 py-4 text-left text-sm font-medium text-gray-800 dark:text-white">
+                        <a href="{{ url_for('contract_detail', contract_id=contract.contract_id) }}" class="text-blue-600 hover:underline">
+                            {{ contract.title[:30] }}{% if contract.title|length > 30 %}...{% endif %}
+                        </a>
+                        <p class="text-xs text-gray-500 font-normal">{{ contract.contract_number }}</p>
+                    </th>
+                    {% endfor %}
+                </tr>
+            </thead>
+            <tbody class="divide-y divide-gray-200 dark:divide-gray-700">
+                <!-- Basic Info -->
+                <tr class="bg-blue-50 dark:bg-blue-900/30">
+                    <td colspan="{{ contracts|length + 1 }}" class="px-6 py-2 text-sm font-semibold text-blue-800 dark:text-blue-200">
+                        Basic Information
+                    </td>
+                </tr>
+                <tr>
+                    <td class="px-6 py-3 text-sm text-gray-600 dark:text-gray-400">Vendor</td>
+                    {% for contract in contracts %}
+                    <td class="px-6 py-3 text-sm text-gray-800 dark:text-white">{{ contract.vendor_name }}</td>
+                    {% endfor %}
+                </tr>
+                <tr class="bg-gray-50 dark:bg-gray-700/50">
+                    <td class="px-6 py-3 text-sm text-gray-600 dark:text-gray-400">Department</td>
+                    {% for contract in contracts %}
+                    <td class="px-6 py-3 text-sm text-gray-800 dark:text-white">{{ contract.department }}</td>
+                    {% endfor %}
+                </tr>
+                <tr>
+                    <td class="px-6 py-3 text-sm text-gray-600 dark:text-gray-400">Type</td>
+                    {% for contract in contracts %}
+                    <td class="px-6 py-3 text-sm text-gray-800 dark:text-white">{{ contract.contract_type }}</td>
+                    {% endfor %}
+                </tr>
+                <tr class="bg-gray-50 dark:bg-gray-700/50">
+                    <td class="px-6 py-3 text-sm text-gray-600 dark:text-gray-400">Status</td>
+                    {% for contract in contracts %}
+                    <td class="px-6 py-3">
+                        <span class="px-2 py-1 text-xs font-medium rounded-full
+                            {% if contract.status == 'Active' %}bg-green-100 text-green-800
+                            {% elif contract.status == 'Completed' %}bg-blue-100 text-blue-800
+                            {% else %}bg-gray-100 text-gray-800{% endif %}">
+                            {{ contract.status }}
+                        </span>
+                    </td>
+                    {% endfor %}
+                </tr>
+
+                <!-- Financial -->
+                <tr class="bg-green-50 dark:bg-green-900/30">
+                    <td colspan="{{ contracts|length + 1 }}" class="px-6 py-2 text-sm font-semibold text-green-800 dark:text-green-200">
+                        Financial
+                    </td>
+                </tr>
+                <tr>
+                    <td class="px-6 py-3 text-sm text-gray-600 dark:text-gray-400">Original Amount</td>
+                    {% for contract in contracts %}
+                    <td class="px-6 py-3 text-sm font-medium text-gray-800 dark:text-white">${{ '{:,.0f}'.format(contract.original_amount) }}</td>
+                    {% endfor %}
+                </tr>
+                <tr class="bg-gray-50 dark:bg-gray-700/50">
+                    <td class="px-6 py-3 text-sm text-gray-600 dark:text-gray-400">Current Amount</td>
+                    {% for contract in contracts %}
+                    <td class="px-6 py-3 text-sm font-medium text-gray-800 dark:text-white">${{ '{:,.0f}'.format(contract.current_amount or contract.original_amount) }}</td>
+                    {% endfor %}
+                </tr>
+                <tr>
+                    <td class="px-6 py-3 text-sm text-gray-600 dark:text-gray-400">Cost Variance</td>
+                    {% for contract in contracts %}
+                    {% set variance = (contract.current_amount or contract.original_amount) - contract.original_amount %}
+                    {% set variance_pct = (variance / contract.original_amount * 100) if contract.original_amount else 0 %}
+                    <td class="px-6 py-3 text-sm font-medium {% if variance > 0 %}text-red-600{% elif variance < 0 %}text-green-600{% else %}text-gray-800{% endif %}">
+                        {% if variance > 0 %}+{% endif %}${{ '{:,.0f}'.format(variance) }}
+                        <span class="text-xs">({% if variance > 0 %}+{% endif %}{{ '{:.1f}'.format(variance_pct) }}%)</span>
+                    </td>
+                    {% endfor %}
+                </tr>
+                <tr class="bg-gray-50 dark:bg-gray-700/50">
+                    <td class="px-6 py-3 text-sm text-gray-600 dark:text-gray-400">Amount Paid</td>
+                    {% for contract in contracts %}
+                    <td class="px-6 py-3 text-sm font-medium text-green-600">${{ '{:,.0f}'.format(contract.total_paid or 0) }}</td>
+                    {% endfor %}
+                </tr>
+                <tr>
+                    <td class="px-6 py-3 text-sm text-gray-600 dark:text-gray-400">Change Orders</td>
+                    {% for contract in contracts %}
+                    <td class="px-6 py-3 text-sm text-gray-800 dark:text-white">
+                        {{ contract.change_order_count }} orders
+                        <span class="text-xs {% if contract.total_co_amount > 0 %}text-red-600{% else %}text-gray-500{% endif %}">
+                            ({% if contract.total_co_amount > 0 %}+{% endif %}${{ '{:,.0f}'.format(contract.total_co_amount) }})
+                        </span>
+                    </td>
+                    {% endfor %}
+                </tr>
+
+                <!-- Schedule -->
+                <tr class="bg-purple-50 dark:bg-purple-900/30">
+                    <td colspan="{{ contracts|length + 1 }}" class="px-6 py-2 text-sm font-semibold text-purple-800 dark:text-purple-200">
+                        Schedule
+                    </td>
+                </tr>
+                <tr>
+                    <td class="px-6 py-3 text-sm text-gray-600 dark:text-gray-400">Start Date</td>
+                    {% for contract in contracts %}
+                    <td class="px-6 py-3 text-sm text-gray-800 dark:text-white">{{ contract.start_date }}</td>
+                    {% endfor %}
+                </tr>
+                <tr class="bg-gray-50 dark:bg-gray-700/50">
+                    <td class="px-6 py-3 text-sm text-gray-600 dark:text-gray-400">End Date</td>
+                    {% for contract in contracts %}
+                    <td class="px-6 py-3 text-sm text-gray-800 dark:text-white">{{ contract.current_end_date or contract.end_date }}</td>
+                    {% endfor %}
+                </tr>
+                <tr>
+                    <td class="px-6 py-3 text-sm text-gray-600 dark:text-gray-400">% Complete</td>
+                    {% for contract in contracts %}
+                    <td class="px-6 py-3">
+                        <div class="flex items-center">
+                            <div class="w-24 bg-gray-200 dark:bg-gray-600 rounded-full h-2 mr-2">
+                                <div class="bg-blue-600 h-2 rounded-full" style="width: {{ contract.percent_complete or 0 }}%"></div>
+                            </div>
+                            <span class="text-sm text-gray-800 dark:text-white">{{ contract.percent_complete or 0 }}%</span>
+                        </div>
+                    </td>
+                    {% endfor %}
+                </tr>
+                <tr class="bg-gray-50 dark:bg-gray-700/50">
+                    <td class="px-6 py-3 text-sm text-gray-600 dark:text-gray-400">Milestones</td>
+                    {% for contract in contracts %}
+                    <td class="px-6 py-3 text-sm text-gray-800 dark:text-white">
+                        {{ contract.completed_milestones }}/{{ contract.milestone_count }} completed
+                    </td>
+                    {% endfor %}
+                </tr>
+
+                <!-- Performance -->
+                <tr class="bg-orange-50 dark:bg-orange-900/30">
+                    <td colspan="{{ contracts|length + 1 }}" class="px-6 py-2 text-sm font-semibold text-orange-800 dark:text-orange-200">
+                        Performance & Risk
+                    </td>
+                </tr>
+                <tr>
+                    <td class="px-6 py-3 text-sm text-gray-600 dark:text-gray-400">Health Score</td>
+                    {% for contract in contracts %}
+                    {% set health = contract.overall_health_score|int if contract.overall_health_score else 50 %}
+                    <td class="px-6 py-3">
+                        <div class="flex items-center">
+                            <span class="text-2xl font-bold mr-2
+                                {% if health < 30 %}text-red-600
+                                {% elif health < 50 %}text-orange-600
+                                {% elif health < 70 %}text-yellow-600
+                                {% else %}text-green-600{% endif %}">
+                                {{ health }}
+                            </span>
+                            <div class="w-16 bg-gray-200 dark:bg-gray-600 rounded-full h-2">
+                                <div class="h-2 rounded-full
+                                    {% if health < 30 %}bg-red-500
+                                    {% elif health < 50 %}bg-orange-500
+                                    {% elif health < 70 %}bg-yellow-500
+                                    {% else %}bg-green-500{% endif %}"
+                                    style="width: {{ health }}%"></div>
+                            </div>
+                        </div>
+                    </td>
+                    {% endfor %}
+                </tr>
+                <tr class="bg-gray-50 dark:bg-gray-700/50">
+                    <td class="px-6 py-3 text-sm text-gray-600 dark:text-gray-400">Cost Variance Score</td>
+                    {% for contract in contracts %}
+                    <td class="px-6 py-3 text-sm font-medium
+                        {% if contract.cost_variance_score < 50 %}text-red-600
+                        {% elif contract.cost_variance_score < 70 %}text-yellow-600
+                        {% else %}text-green-600{% endif %}">
+                        {{ contract.cost_variance_score|int if contract.cost_variance_score else '-' }}
+                    </td>
+                    {% endfor %}
+                </tr>
+                <tr>
+                    <td class="px-6 py-3 text-sm text-gray-600 dark:text-gray-400">Schedule Score</td>
+                    {% for contract in contracts %}
+                    <td class="px-6 py-3 text-sm font-medium
+                        {% if contract.schedule_variance_score < 50 %}text-red-600
+                        {% elif contract.schedule_variance_score < 70 %}text-yellow-600
+                        {% else %}text-green-600{% endif %}">
+                        {{ contract.schedule_variance_score|int if contract.schedule_variance_score else '-' }}
+                    </td>
+                    {% endfor %}
+                </tr>
+                <tr class="bg-gray-50 dark:bg-gray-700/50">
+                    <td class="px-6 py-3 text-sm text-gray-600 dark:text-gray-400">Open Issues</td>
+                    {% for contract in contracts %}
+                    <td class="px-6 py-3 text-sm {% if contract.issue_count > 0 %}text-red-600 font-medium{% else %}text-green-600{% endif %}">
+                        {{ contract.issue_count }}
+                    </td>
+                    {% endfor %}
+                </tr>
+                <tr>
+                    <td class="px-6 py-3 text-sm text-gray-600 dark:text-gray-400">Risk Level</td>
+                    {% for contract in contracts %}
+                    <td class="px-6 py-3">
+                        <span class="px-2 py-1 text-xs font-medium rounded
+                            {% if contract.risk_level == 'Critical' %}bg-red-100 text-red-800
+                            {% elif contract.risk_level == 'High' %}bg-orange-100 text-orange-800
+                            {% elif contract.risk_level == 'Medium' %}bg-yellow-100 text-yellow-800
+                            {% else %}bg-green-100 text-green-800{% endif %}">
+                            {{ contract.risk_level or 'Low' }}
+                        </span>
+                    </td>
+                    {% endfor %}
+                </tr>
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- Radar Chart Comparison -->
+<div class="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
+    <h3 class="text-lg font-semibold text-gray-800 dark:text-white mb-4">Performance Radar</h3>
+    <div id="radarChart" style="height: 400px;"></div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    // Radar chart data
+    const contracts = {{ contracts | tojson | safe }};
+
+    const categories = ['Cost Variance', 'Schedule', 'Performance', 'Compliance', 'Health Score'];
+
+    const data = contracts.map((c, idx) => ({
+        type: 'scatterpolar',
+        r: [
+            c.cost_variance_score || 50,
+            c.schedule_variance_score || 50,
+            c.performance_score || 50,
+            c.compliance_score || 50,
+            c.overall_health_score || 50
+        ],
+        theta: categories,
+        fill: 'toself',
+        name: c.title.substring(0, 25) + (c.title.length > 25 ? '...' : ''),
+        opacity: 0.7
+    }));
+
+    Plotly.newPlot('radarChart', data, {
+        polar: {
+            radialaxis: {
+                visible: true,
+                range: [0, 100]
+            }
+        },
+        showlegend: true,
+        legend: { orientation: 'h', y: -0.2 }
+    }, { responsive: true });
+</script>
+{% endblock %}

@@ -1,0 +1,482 @@
+{% extends "base.html" %}
+
+{% block content %}
+<!-- Breadcrumb -->
+<nav class="flex mb-6" aria-label="Breadcrumb">
+    <ol class="inline-flex items-center space-x-1 md:space-x-3">
+        <li><a href="{{ url_for('contracts_list') }}" class="text-gray-500 dark:text-gray-400 hover:text-blue-600">Contracts</a></li>
+        <li class="flex items-center">
+            <svg class="w-4 h-4 text-gray-400 mx-2" fill="currentColor" viewBox="0 0 20 20">
+                <path fill-rule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clip-rule="evenodd"></path>
+            </svg>
+            <span class="text-gray-800 dark:text-white font-medium">{{ contract.contract_number }}</span>
+        </li>
+    </ol>
+</nav>
+
+<!-- Contract Header -->
+<div class="bg-white dark:bg-gray-800 rounded-lg shadow mb-6">
+    <div class="p-6">
+        <div class="flex flex-col md:flex-row md:items-start md:justify-between">
+            <div class="flex-1">
+                <div class="flex items-center space-x-3 mb-2">
+                    <h1 class="text-2xl font-bold text-gray-800 dark:text-white">{{ contract.title }}</h1>
+                    <span class="px-3 py-1 text-sm font-medium rounded-full
+                        {% if contract.status == 'Active' %}bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200
+                        {% elif contract.status == 'Completed' %}bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200
+                        {% elif contract.status == 'Draft' %}bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-200
+                        {% else %}bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200{% endif %}">
+                        {{ contract.status }}
+                    </span>
+                </div>
+                <p class="text-gray-500 dark:text-gray-400">{{ contract.contract_number }} | {{ contract.contract_type }}</p>
+                <p class="text-gray-600 dark:text-gray-300 mt-2">{{ contract.description }}</p>
+                <div class="mt-4 flex flex-wrap gap-4 text-sm">
+                    <div>
+                        <span class="text-gray-500 dark:text-gray-400">Vendor:</span>
+                        <a href="{{ url_for('vendor_detail', vendor_id=contract.vendor_id) }}" class="text-blue-600 dark:text-blue-400 hover:underline ml-1">{{ contract.vendor_name }}</a>
+                    </div>
+                    <div>
+                        <span class="text-gray-500 dark:text-gray-400">Department:</span>
+                        <span class="text-gray-800 dark:text-white ml-1">{{ contract.department }}</span>
+                    </div>
+                    <div>
+                        <span class="text-gray-500 dark:text-gray-400">Duration:</span>
+                        <span class="text-gray-800 dark:text-white ml-1">{{ contract.start_date }} - {{ contract.end_date }}</span>
+                    </div>
+                </div>
+            </div>
+            <div class="mt-4 md:mt-0 md:ml-6 flex flex-col items-end">
+                <!-- Health Score Circle -->
+                <div class="relative w-24 h-24">
+                    <svg class="w-24 h-24 transform -rotate-90">
+                        <circle cx="48" cy="48" r="40" stroke="currentColor" stroke-width="8" fill="none"
+                                class="text-gray-200 dark:text-gray-700"></circle>
+                        <circle cx="48" cy="48" r="40" stroke="currentColor" stroke-width="8" fill="none"
+                                stroke-dasharray="{{ (health_score * 251.2 / 100)|int }} 251.2"
+                                class="{% if health_score < 30 %}text-red-500{% elif health_score < 50 %}text-orange-500{% elif health_score < 70 %}text-yellow-500{% else %}text-green-500{% endif %}"></circle>
+                    </svg>
+                    <div class="absolute inset-0 flex items-center justify-center">
+                        <span class="text-2xl font-bold {% if health_score < 30 %}text-red-600{% elif health_score < 50 %}text-orange-600{% elif health_score < 70 %}text-yellow-600{% else %}text-green-600{% endif %}">{{ health_score|int }}</span>
+                    </div>
+                </div>
+                <p class="text-sm text-gray-500 dark:text-gray-400 mt-1">Health Score</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Score Breakdown & Financial Summary -->
+<div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+    <!-- Score Breakdown -->
+    <div class="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
+        <h3 class="text-lg font-semibold text-gray-800 dark:text-white mb-4">Score Breakdown</h3>
+        <div class="space-y-4">
+            <div>
+                <div class="flex justify-between mb-1">
+                    <span class="text-sm text-gray-600 dark:text-gray-400">Cost Variance</span>
+                    <span class="text-sm font-medium">{{ scores.cost_variance_score|int }}</span>
+                </div>
+                <div class="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
+                    <div class="h-2 rounded-full {% if scores.cost_variance_score < 30 %}bg-red-500{% elif scores.cost_variance_score < 50 %}bg-orange-500{% elif scores.cost_variance_score < 70 %}bg-yellow-500{% else %}bg-green-500{% endif %}"
+                         style="width: {{ scores.cost_variance_score }}%"></div>
+                </div>
+            </div>
+            <div>
+                <div class="flex justify-between mb-1">
+                    <span class="text-sm text-gray-600 dark:text-gray-400">Schedule Variance</span>
+                    <span class="text-sm font-medium">{{ scores.schedule_variance_score|int }}</span>
+                </div>
+                <div class="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
+                    <div class="h-2 rounded-full {% if scores.schedule_variance_score < 30 %}bg-red-500{% elif scores.schedule_variance_score < 50 %}bg-orange-500{% elif scores.schedule_variance_score < 70 %}bg-yellow-500{% else %}bg-green-500{% endif %}"
+                         style="width: {{ scores.schedule_variance_score }}%"></div>
+                </div>
+            </div>
+            <div>
+                <div class="flex justify-between mb-1">
+                    <span class="text-sm text-gray-600 dark:text-gray-400">Performance</span>
+                    <span class="text-sm font-medium">{{ scores.performance_score|int }}</span>
+                </div>
+                <div class="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
+                    <div class="h-2 rounded-full {% if scores.performance_score < 30 %}bg-red-500{% elif scores.performance_score < 50 %}bg-orange-500{% elif scores.performance_score < 70 %}bg-yellow-500{% else %}bg-green-500{% endif %}"
+                         style="width: {{ scores.performance_score }}%"></div>
+                </div>
+            </div>
+            <div>
+                <div class="flex justify-between mb-1">
+                    <span class="text-sm text-gray-600 dark:text-gray-400">Compliance</span>
+                    <span class="text-sm font-medium">{{ scores.compliance_score|int }}</span>
+                </div>
+                <div class="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
+                    <div class="h-2 rounded-full {% if scores.compliance_score < 30 %}bg-red-500{% elif scores.compliance_score < 50 %}bg-orange-500{% elif scores.compliance_score < 70 %}bg-yellow-500{% else %}bg-green-500{% endif %}"
+                         style="width: {{ scores.compliance_score }}%"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Financial Summary -->
+    <div class="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
+        <h3 class="text-lg font-semibold text-gray-800 dark:text-white mb-4">Financial Summary</h3>
+        <div class="space-y-3">
+            <div class="flex justify-between py-2 border-b dark:border-gray-700">
+                <span class="text-gray-600 dark:text-gray-400">Original Contract</span>
+                <span class="font-medium text-gray-800 dark:text-white">${{ '{:,.2f}'.format(contract.original_amount) }}</span>
+            </div>
+            <div class="flex justify-between py-2 border-b dark:border-gray-700">
+                <span class="text-gray-600 dark:text-gray-400">Change Orders</span>
+                <span class="font-medium {% if (contract.current_amount or contract.original_amount) > contract.original_amount %}text-red-600{% else %}text-gray-800 dark:text-white{% endif %}">
+                    {% if contract.current_amount and contract.current_amount > contract.original_amount %}
+                    +${{ '{:,.2f}'.format(contract.current_amount - contract.original_amount) }}
+                    {% else %}
+                    $0.00
+                    {% endif %}
+                </span>
+            </div>
+            <div class="flex justify-between py-2 border-b dark:border-gray-700">
+                <span class="text-gray-600 dark:text-gray-400">Current Contract</span>
+                <span class="font-bold text-gray-800 dark:text-white">${{ '{:,.2f}'.format(contract.current_amount or contract.original_amount) }}</span>
+            </div>
+            <div class="flex justify-between py-2 border-b dark:border-gray-700">
+                <span class="text-gray-600 dark:text-gray-400">Amount Paid</span>
+                <span class="font-medium text-green-600">${{ '{:,.2f}'.format(contract.amount_paid or 0) }}</span>
+            </div>
+            <div class="flex justify-between py-2">
+                <span class="text-gray-600 dark:text-gray-400">Remaining</span>
+                <span class="font-bold text-blue-600">${{ '{:,.2f}'.format((contract.current_amount or contract.original_amount) - (contract.amount_paid or 0)) }}</span>
+            </div>
+        </div>
+        <div class="mt-4">
+            <div class="flex justify-between mb-1 text-sm">
+                <span class="text-gray-500">Payment Progress</span>
+                <span class="text-gray-700 dark:text-gray-300">{{ '{:.1f}'.format(((contract.amount_paid or 0) / (contract.current_amount or contract.original_amount)) * 100) }}%</span>
+            </div>
+            <div class="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-3">
+                <div class="bg-green-500 h-3 rounded-full" style="width: {{ ((contract.amount_paid or 0) / (contract.current_amount or contract.original_amount)) * 100 }}%"></div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Tabs -->
+<div class="bg-white dark:bg-gray-800 rounded-lg shadow">
+    <div class="border-b dark:border-gray-700">
+        <nav class="flex space-x-8 px-6" aria-label="Tabs">
+            <button onclick="showTab('milestones')" id="tab-milestones"
+                    class="tab-btn py-4 px-1 border-b-2 border-blue-500 text-blue-600 font-medium text-sm">
+                Milestones ({{ milestones|length }})
+            </button>
+            <button onclick="showTab('changes')" id="tab-changes"
+                    class="tab-btn py-4 px-1 border-b-2 border-transparent text-gray-500 hover:text-gray-700 font-medium text-sm">
+                Change Orders ({{ change_orders|length }})
+            </button>
+            <button onclick="showTab('payments')" id="tab-payments"
+                    class="tab-btn py-4 px-1 border-b-2 border-transparent text-gray-500 hover:text-gray-700 font-medium text-sm">
+                Payments ({{ payments|length }})
+            </button>
+            <button onclick="showTab('issues')" id="tab-issues"
+                    class="tab-btn py-4 px-1 border-b-2 border-transparent text-gray-500 hover:text-gray-700 font-medium text-sm">
+                Issues ({{ issues|length }})
+            </button>
+            <button onclick="showTab('activity')" id="tab-activity"
+                    class="tab-btn py-4 px-1 border-b-2 border-transparent text-gray-500 hover:text-gray-700 font-medium text-sm">
+                Activity
+            </button>
+        </nav>
+    </div>
+
+    <!-- Milestones Tab -->
+    <div id="content-milestones" class="tab-content p-6">
+        <div class="flex justify-between items-center mb-4">
+            <h3 class="font-semibold text-gray-800 dark:text-white">Project Milestones</h3>
+            <button onclick="openAddMilestoneModal()" class="px-3 py-1.5 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700">
+                Add Milestone
+            </button>
+        </div>
+        {% if milestones %}
+        <div class="space-y-4">
+            {% for milestone in milestones %}
+            <div class="border dark:border-gray-700 rounded-lg p-4">
+                <div class="flex items-start justify-between">
+                    <div class="flex items-start space-x-3">
+                        <div class="mt-1">
+                            {% if milestone.status == 'Completed' %}
+                            <div class="w-6 h-6 bg-green-500 rounded-full flex items-center justify-center">
+                                <svg class="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+                                </svg>
+                            </div>
+                            {% elif milestone.status == 'In Progress' %}
+                            <div class="w-6 h-6 bg-blue-500 rounded-full flex items-center justify-center">
+                                <div class="w-2 h-2 bg-white rounded-full"></div>
+                            </div>
+                            {% elif milestone.status == 'Delayed' %}
+                            <div class="w-6 h-6 bg-red-500 rounded-full flex items-center justify-center">
+                                <svg class="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01"></path>
+                                </svg>
+                            </div>
+                            {% else %}
+                            <div class="w-6 h-6 bg-gray-300 dark:bg-gray-600 rounded-full"></div>
+                            {% endif %}
+                        </div>
+                        <div>
+                            <p class="font-medium text-gray-800 dark:text-white">{{ milestone.title }}</p>
+                            <p class="text-sm text-gray-500 dark:text-gray-400">{{ milestone.description }}</p>
+                        </div>
+                    </div>
+                    <div class="text-right">
+                        <span class="px-2 py-1 text-xs font-medium rounded
+                            {% if milestone.status == 'Completed' %}bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200
+                            {% elif milestone.status == 'In Progress' %}bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200
+                            {% elif milestone.status == 'Delayed' %}bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200
+                            {% else %}bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-200{% endif %}">
+                            {{ milestone.status }}
+                        </span>
+                        <p class="text-sm text-gray-500 dark:text-gray-400 mt-2">Due: {{ milestone.due_date }}</p>
+                        {% if milestone.payment_amount %}
+                        <p class="text-sm font-medium text-green-600 mt-1">${{ '{:,.0f}'.format(milestone.payment_amount) }}</p>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+        {% else %}
+        <p class="text-gray-500 dark:text-gray-400 text-center py-8">No milestones defined</p>
+        {% endif %}
+    </div>
+
+    <!-- Change Orders Tab -->
+    <div id="content-changes" class="tab-content p-6 hidden">
+        <div class="flex justify-between items-center mb-4">
+            <h3 class="font-semibold text-gray-800 dark:text-white">Change Orders</h3>
+            <button onclick="openAddChangeOrderModal()" class="px-3 py-1.5 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700">
+                Add Change Order
+            </button>
+        </div>
+        {% if change_orders %}
+        <div class="overflow-x-auto">
+            <table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+                <thead class="bg-gray-50 dark:bg-gray-700">
+                    <tr>
+                        <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">CO #</th>
+                        <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Description</th>
+                        <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Amount</th>
+                        <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Reason</th>
+                        <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Status</th>
+                        <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Date</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-gray-200 dark:divide-gray-700">
+                    {% for co in change_orders %}
+                    <tr class="hover:bg-gray-50 dark:hover:bg-gray-700">
+                        <td class="px-4 py-3 text-sm font-medium text-gray-800 dark:text-white">{{ co.change_order_number }}</td>
+                        <td class="px-4 py-3 text-sm text-gray-600 dark:text-gray-300">{{ co.description[:50] }}{% if co.description|length > 50 %}...{% endif %}</td>
+                        <td class="px-4 py-3 text-sm font-medium {% if co.amount > 0 %}text-red-600{% else %}text-green-600{% endif %}">
+                            {% if co.amount > 0 %}+{% endif %}${{ '{:,.0f}'.format(co.amount) }}
+                        </td>
+                        <td class="px-4 py-3">
+                            <span class="px-2 py-1 text-xs rounded bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-200">
+                                {{ co.reason }}
+                            </span>
+                        </td>
+                        <td class="px-4 py-3">
+                            <span class="px-2 py-1 text-xs font-medium rounded
+                                {% if co.status == 'Approved' %}bg-green-100 text-green-800
+                                {% elif co.status == 'Pending' %}bg-yellow-100 text-yellow-800
+                                {% else %}bg-red-100 text-red-800{% endif %}">
+                                {{ co.status }}
+                            </span>
+                        </td>
+                        <td class="px-4 py-3 text-sm text-gray-500 dark:text-gray-400">{{ co.submitted_date }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        <div class="mt-4 p-4 bg-gray-50 dark:bg-gray-700 rounded-lg">
+            <div class="flex justify-between text-sm">
+                <span class="text-gray-600 dark:text-gray-400">Total Change Order Amount:</span>
+                <span class="font-bold {% if total_co_amount > 0 %}text-red-600{% else %}text-green-600{% endif %}">
+                    {% if total_co_amount > 0 %}+{% endif %}${{ '{:,.0f}'.format(total_co_amount) }}
+                </span>
+            </div>
+        </div>
+        {% else %}
+        <p class="text-gray-500 dark:text-gray-400 text-center py-8">No change orders</p>
+        {% endif %}
+    </div>
+
+    <!-- Payments Tab -->
+    <div id="content-payments" class="tab-content p-6 hidden">
+        <div class="flex justify-between items-center mb-4">
+            <h3 class="font-semibold text-gray-800 dark:text-white">Payment History</h3>
+            <button onclick="openAddPaymentModal()" class="px-3 py-1.5 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700">
+                Record Payment
+            </button>
+        </div>
+        {% if payments %}
+        <div class="overflow-x-auto">
+            <table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+                <thead class="bg-gray-50 dark:bg-gray-700">
+                    <tr>
+                        <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Date</th>
+                        <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Amount</th>
+                        <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Type</th>
+                        <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Invoice #</th>
+                        <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Status</th>
+                        <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Description</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-gray-200 dark:divide-gray-700">
+                    {% for payment in payments %}
+                    <tr class="hover:bg-gray-50 dark:hover:bg-gray-700">
+                        <td class="px-4 py-3 text-sm text-gray-800 dark:text-white">{{ payment.payment_date }}</td>
+                        <td class="px-4 py-3 text-sm font-medium text-green-600">${{ '{:,.2f}'.format(payment.amount) }}</td>
+                        <td class="px-4 py-3 text-sm text-gray-600 dark:text-gray-300">{{ payment.payment_type }}</td>
+                        <td class="px-4 py-3 text-sm text-gray-600 dark:text-gray-300">{{ payment.invoice_number or '-' }}</td>
+                        <td class="px-4 py-3">
+                            <span class="px-2 py-1 text-xs font-medium rounded
+                                {% if payment.status == 'Paid' %}bg-green-100 text-green-800
+                                {% elif payment.status == 'Pending' %}bg-yellow-100 text-yellow-800
+                                {% else %}bg-gray-100 text-gray-800{% endif %}">
+                                {{ payment.status }}
+                            </span>
+                        </td>
+                        <td class="px-4 py-3 text-sm text-gray-500 dark:text-gray-400">{{ payment.description or '-' }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <p class="text-gray-500 dark:text-gray-400 text-center py-8">No payments recorded</p>
+        {% endif %}
+    </div>
+
+    <!-- Issues Tab -->
+    <div id="content-issues" class="tab-content p-6 hidden">
+        <div class="flex justify-between items-center mb-4">
+            <h3 class="font-semibold text-gray-800 dark:text-white">Issues & Concerns</h3>
+            <button onclick="openAddIssueModal()" class="px-3 py-1.5 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700">
+                Report Issue
+            </button>
+        </div>
+        {% if issues %}
+        <div class="space-y-4">
+            {% for issue in issues %}
+            <div class="border dark:border-gray-700 rounded-lg p-4
+                {% if issue.severity == 'Critical' %}border-l-4 border-l-red-500
+                {% elif issue.severity == 'High' %}border-l-4 border-l-orange-500
+                {% elif issue.severity == 'Medium' %}border-l-4 border-l-yellow-500
+                {% else %}border-l-4 border-l-gray-400{% endif %}">
+                <div class="flex items-start justify-between">
+                    <div>
+                        <div class="flex items-center space-x-2">
+                            <p class="font-medium text-gray-800 dark:text-white">{{ issue.title }}</p>
+                            <span class="px-2 py-0.5 text-xs font-medium rounded
+                                {% if issue.severity == 'Critical' %}bg-red-100 text-red-800
+                                {% elif issue.severity == 'High' %}bg-orange-100 text-orange-800
+                                {% elif issue.severity == 'Medium' %}bg-yellow-100 text-yellow-800
+                                {% else %}bg-gray-100 text-gray-800{% endif %}">
+                                {{ issue.severity }}
+                            </span>
+                        </div>
+                        <p class="text-sm text-gray-600 dark:text-gray-400 mt-1">{{ issue.description }}</p>
+                        <div class="flex items-center space-x-4 mt-2 text-xs text-gray-500">
+                            <span>Type: {{ issue.issue_type }}</span>
+                            <span>Reported: {{ issue.reported_date }}</span>
+                            {% if issue.assigned_to %}
+                            <span>Assigned: {{ issue.assigned_to }}</span>
+                            {% endif %}
+                        </div>
+                    </div>
+                    <div class="text-right">
+                        <span class="px-2 py-1 text-xs font-medium rounded
+                            {% if issue.status == 'Open' %}bg-red-100 text-red-800
+                            {% elif issue.status == 'In Progress' %}bg-blue-100 text-blue-800
+                            {% elif issue.status == 'Resolved' %}bg-green-100 text-green-800
+                            {% else %}bg-gray-100 text-gray-800{% endif %}">
+                            {{ issue.status }}
+                        </span>
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+        {% else %}
+        <p class="text-gray-500 dark:text-gray-400 text-center py-8">No issues reported</p>
+        {% endif %}
+    </div>
+
+    <!-- Activity Tab -->
+    <div id="content-activity" class="tab-content p-6 hidden">
+        <h3 class="font-semibold text-gray-800 dark:text-white mb-4">Activity Log</h3>
+        {% if audit_log %}
+        <div class="space-y-3">
+            {% for log in audit_log %}
+            <div class="flex items-start space-x-3 p-3 hover:bg-gray-50 dark:hover:bg-gray-700 rounded-lg">
+                <div class="p-2 bg-blue-100 dark:bg-blue-900 rounded-full">
+                    <svg class="w-4 h-4 text-blue-600 dark:text-blue-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path>
+                    </svg>
+                </div>
+                <div>
+                    <p class="text-sm text-gray-800 dark:text-white">
+                        <span class="font-medium">{{ log.changed_by or 'System' }}</span>
+                        {{ log.action|lower }}d
+                        {% if log.field_name %}{{ log.field_name }}{% endif %}
+                    </p>
+                    {% if log.old_value or log.new_value %}
+                    <p class="text-xs text-gray-500 dark:text-gray-400">
+                        {{ (log.old_value or '')[:30] }}{% if log.old_value and log.old_value|length > 30 %}...{% endif %} →
+                        {{ (log.new_value or '')[:30] }}{% if log.new_value and log.new_value|length > 30 %}...{% endif %}
+                    </p>
+                    {% endif %}
+                    <p class="text-xs text-gray-400 dark:text-gray-500">{{ log.changed_at }}</p>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+        {% else %}
+        <p class="text-gray-500 dark:text-gray-400 text-center py-8">No activity recorded</p>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    function showTab(tabName) {
+        // Hide all content
+        document.querySelectorAll('.tab-content').forEach(el => el.classList.add('hidden'));
+        // Show selected content
+        document.getElementById('content-' + tabName).classList.remove('hidden');
+
+        // Update tab styles
+        document.querySelectorAll('.tab-btn').forEach(btn => {
+            btn.classList.remove('border-blue-500', 'text-blue-600');
+            btn.classList.add('border-transparent', 'text-gray-500');
+        });
+        document.getElementById('tab-' + tabName).classList.add('border-blue-500', 'text-blue-600');
+        document.getElementById('tab-' + tabName).classList.remove('border-transparent', 'text-gray-500');
+    }
+
+    function openAddMilestoneModal() {
+        alert('Add milestone modal - to be implemented');
+    }
+
+    function openAddChangeOrderModal() {
+        alert('Add change order modal - to be implemented');
+    }
+
+    function openAddPaymentModal() {
+        alert('Add payment modal - to be implemented');
+    }
+
+    function openAddIssueModal() {
+        alert('Add issue modal - to be implemented');
+    }
+</script>
+{% endblock %}

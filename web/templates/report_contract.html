@@ -1,0 +1,320 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ title }}</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @media print {
+            .no-print { display: none !important; }
+            .page-break { page-break-before: always; }
+            body { font-size: 11pt; }
+        }
+        @page { margin: 0.75in; }
+    </style>
+</head>
+<body class="bg-white p-8">
+    <!-- Print Button -->
+    <div class="no-print mb-4 flex justify-between items-center">
+        <a href="{{ url_for('contract_detail', contract_id=contract.contract_id) }}" class="text-blue-600 hover:underline">
+            &larr; Back to Contract
+        </a>
+        <button onclick="window.print()" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">
+            Print Report
+        </button>
+    </div>
+
+    <!-- Header -->
+    <div class="border-b-2 border-gray-800 pb-4 mb-6">
+        <div class="flex justify-between items-start">
+            <div>
+                <h1 class="text-2xl font-bold text-gray-900">CONTRACT STATUS REPORT</h1>
+                <p class="text-gray-600">Generated: {{ generated_at }}</p>
+            </div>
+            <div class="text-right">
+                <p class="text-sm text-gray-500">Contract Number</p>
+                <p class="text-xl font-bold">{{ contract.contract_number }}</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Contract Summary -->
+    <div class="mb-8">
+        <h2 class="text-lg font-bold text-gray-900 border-b border-gray-300 pb-2 mb-4">CONTRACT SUMMARY</h2>
+        <div class="grid grid-cols-2 gap-x-8 gap-y-2">
+            <div>
+                <p class="text-sm text-gray-500">Title</p>
+                <p class="font-medium">{{ contract.title }}</p>
+            </div>
+            <div>
+                <p class="text-sm text-gray-500">Status</p>
+                <p class="font-medium">{{ contract.status }}</p>
+            </div>
+            <div>
+                <p class="text-sm text-gray-500">Vendor</p>
+                <p class="font-medium">{{ contract.vendor_name }}</p>
+            </div>
+            <div>
+                <p class="text-sm text-gray-500">Department</p>
+                <p class="font-medium">{{ contract.department }}</p>
+            </div>
+            <div>
+                <p class="text-sm text-gray-500">Contract Type</p>
+                <p class="font-medium">{{ contract.contract_type }}</p>
+            </div>
+            <div>
+                <p class="text-sm text-gray-500">Procurement Method</p>
+                <p class="font-medium">{{ contract.procurement_method or 'N/A' }}</p>
+            </div>
+            <div>
+                <p class="text-sm text-gray-500">Start Date</p>
+                <p class="font-medium">{{ contract.start_date }}</p>
+            </div>
+            <div>
+                <p class="text-sm text-gray-500">End Date</p>
+                <p class="font-medium">{{ contract.current_end_date or contract.end_date }}</p>
+            </div>
+        </div>
+        {% if contract.description %}
+        <div class="mt-4">
+            <p class="text-sm text-gray-500">Description</p>
+            <p class="text-gray-700">{{ contract.description }}</p>
+        </div>
+        {% endif %}
+    </div>
+
+    <!-- Financial Summary -->
+    <div class="mb-8">
+        <h2 class="text-lg font-bold text-gray-900 border-b border-gray-300 pb-2 mb-4">FINANCIAL SUMMARY</h2>
+        <table class="w-full">
+            <tr class="border-b">
+                <td class="py-2 text-gray-600">Original Contract Amount</td>
+                <td class="py-2 text-right font-medium">${{ '{:,.2f}'.format(contract.original_amount) }}</td>
+            </tr>
+            <tr class="border-b">
+                <td class="py-2 text-gray-600">Change Order Total</td>
+                <td class="py-2 text-right font-medium {% if (contract.current_amount or contract.original_amount) > contract.original_amount %}text-red-600{% endif %}">
+                    {% set co_total = (contract.current_amount or contract.original_amount) - contract.original_amount %}
+                    {% if co_total > 0 %}+{% endif %}${{ '{:,.2f}'.format(co_total) }}
+                </td>
+            </tr>
+            <tr class="border-b bg-gray-50">
+                <td class="py-2 font-medium text-gray-900">Current Contract Amount</td>
+                <td class="py-2 text-right font-bold text-gray-900">${{ '{:,.2f}'.format(contract.current_amount or contract.original_amount) }}</td>
+            </tr>
+            <tr class="border-b">
+                <td class="py-2 text-gray-600">Amount Paid to Date</td>
+                <td class="py-2 text-right font-medium text-green-600">${{ '{:,.2f}'.format(contract.total_paid or 0) }}</td>
+            </tr>
+            <tr class="border-b bg-gray-50">
+                <td class="py-2 font-medium text-gray-900">Remaining Balance</td>
+                <td class="py-2 text-right font-bold text-blue-600">${{ '{:,.2f}'.format((contract.current_amount or contract.original_amount) - (contract.total_paid or 0)) }}</td>
+            </tr>
+        </table>
+
+        {% set variance_pct = ((contract.current_amount or contract.original_amount) - contract.original_amount) / contract.original_amount * 100 if contract.original_amount else 0 %}
+        {% if variance_pct > 0 %}
+        <div class="mt-4 p-3 bg-red-50 border border-red-200 rounded">
+            <p class="text-red-800 font-medium">Cost Variance: +{{ '{:.1f}'.format(variance_pct) }}% over original contract</p>
+        </div>
+        {% endif %}
+    </div>
+
+    <!-- Health Scores -->
+    <div class="mb-8">
+        <h2 class="text-lg font-bold text-gray-900 border-b border-gray-300 pb-2 mb-4">PERFORMANCE METRICS</h2>
+        <div class="grid grid-cols-5 gap-4 text-center">
+            <div class="border rounded p-4">
+                <p class="text-3xl font-bold {% if contract.overall_health_score < 50 %}text-red-600{% elif contract.overall_health_score < 70 %}text-yellow-600{% else %}text-green-600{% endif %}">
+                    {{ contract.overall_health_score|int if contract.overall_health_score else 'N/A' }}
+                </p>
+                <p class="text-sm text-gray-600">Overall Health</p>
+            </div>
+            <div class="border rounded p-4">
+                <p class="text-3xl font-bold {% if contract.cost_variance_score < 50 %}text-red-600{% elif contract.cost_variance_score < 70 %}text-yellow-600{% else %}text-green-600{% endif %}">
+                    {{ contract.cost_variance_score|int if contract.cost_variance_score else 'N/A' }}
+                </p>
+                <p class="text-sm text-gray-600">Cost Variance</p>
+            </div>
+            <div class="border rounded p-4">
+                <p class="text-3xl font-bold {% if contract.schedule_variance_score < 50 %}text-red-600{% elif contract.schedule_variance_score < 70 %}text-yellow-600{% else %}text-green-600{% endif %}">
+                    {{ contract.schedule_variance_score|int if contract.schedule_variance_score else 'N/A' }}
+                </p>
+                <p class="text-sm text-gray-600">Schedule</p>
+            </div>
+            <div class="border rounded p-4">
+                <p class="text-3xl font-bold {% if contract.performance_score < 50 %}text-red-600{% elif contract.performance_score < 70 %}text-yellow-600{% else %}text-green-600{% endif %}">
+                    {{ contract.performance_score|int if contract.performance_score else 'N/A' }}
+                </p>
+                <p class="text-sm text-gray-600">Performance</p>
+            </div>
+            <div class="border rounded p-4">
+                <p class="text-3xl font-bold {% if contract.compliance_score < 50 %}text-red-600{% elif contract.compliance_score < 70 %}text-yellow-600{% else %}text-green-600{% endif %}">
+                    {{ contract.compliance_score|int if contract.compliance_score else 'N/A' }}
+                </p>
+                <p class="text-sm text-gray-600">Compliance</p>
+            </div>
+        </div>
+
+        <div class="mt-4">
+            <p class="text-sm text-gray-600">Percent Complete</p>
+            <div class="w-full bg-gray-200 rounded-full h-4 mt-1">
+                <div class="bg-blue-600 h-4 rounded-full" style="width: {{ contract.percent_complete or 0 }}%"></div>
+            </div>
+            <p class="text-right text-sm text-gray-600 mt-1">{{ contract.percent_complete or 0 }}% Complete</p>
+        </div>
+    </div>
+
+    <!-- Milestones -->
+    {% if milestones %}
+    <div class="mb-8 page-break">
+        <h2 class="text-lg font-bold text-gray-900 border-b border-gray-300 pb-2 mb-4">MILESTONES</h2>
+        <table class="w-full text-sm">
+            <thead class="bg-gray-100">
+                <tr>
+                    <th class="py-2 px-3 text-left">Milestone</th>
+                    <th class="py-2 px-3 text-left">Due Date</th>
+                    <th class="py-2 px-3 text-left">Status</th>
+                    <th class="py-2 px-3 text-right">Payment</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for m in milestones %}
+                <tr class="border-b">
+                    <td class="py-2 px-3">{{ m.title }}</td>
+                    <td class="py-2 px-3">{{ m.due_date }}</td>
+                    <td class="py-2 px-3">
+                        <span class="px-2 py-0.5 text-xs rounded
+                            {% if m.status == 'Completed' %}bg-green-100 text-green-800
+                            {% elif m.status == 'In Progress' %}bg-blue-100 text-blue-800
+                            {% elif m.status == 'Delayed' %}bg-red-100 text-red-800
+                            {% else %}bg-gray-100 text-gray-800{% endif %}">
+                            {{ m.status }}
+                        </span>
+                    </td>
+                    <td class="py-2 px-3 text-right">${{ '{:,.0f}'.format(m.payment_amount or 0) }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% endif %}
+
+    <!-- Change Orders -->
+    {% if change_orders %}
+    <div class="mb-8">
+        <h2 class="text-lg font-bold text-gray-900 border-b border-gray-300 pb-2 mb-4">CHANGE ORDERS</h2>
+        <table class="w-full text-sm">
+            <thead class="bg-gray-100">
+                <tr>
+                    <th class="py-2 px-3 text-left">CO #</th>
+                    <th class="py-2 px-3 text-left">Description</th>
+                    <th class="py-2 px-3 text-left">Reason</th>
+                    <th class="py-2 px-3 text-left">Status</th>
+                    <th class="py-2 px-3 text-right">Amount</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for co in change_orders %}
+                <tr class="border-b">
+                    <td class="py-2 px-3">{{ co.change_order_number }}</td>
+                    <td class="py-2 px-3">{{ co.description[:50] }}{% if co.description|length > 50 %}...{% endif %}</td>
+                    <td class="py-2 px-3">{{ co.reason }}</td>
+                    <td class="py-2 px-3">{{ co.status }}</td>
+                    <td class="py-2 px-3 text-right {% if co.amount > 0 %}text-red-600{% else %}text-green-600{% endif %}">
+                        {% if co.amount > 0 %}+{% endif %}${{ '{:,.0f}'.format(co.amount) }}
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+            <tfoot class="bg-gray-50">
+                <tr>
+                    <td colspan="4" class="py-2 px-3 font-medium text-right">Total Change Order Amount:</td>
+                    <td class="py-2 px-3 text-right font-bold {% if (contract.current_amount or contract.original_amount) > contract.original_amount %}text-red-600{% endif %}">
+                        {% set total_co = (contract.current_amount or contract.original_amount) - contract.original_amount %}
+                        {% if total_co > 0 %}+{% endif %}${{ '{:,.0f}'.format(total_co) }}
+                    </td>
+                </tr>
+            </tfoot>
+        </table>
+    </div>
+    {% endif %}
+
+    <!-- Issues -->
+    {% if issues %}
+    <div class="mb-8">
+        <h2 class="text-lg font-bold text-gray-900 border-b border-gray-300 pb-2 mb-4">OPEN ISSUES</h2>
+        <table class="w-full text-sm">
+            <thead class="bg-gray-100">
+                <tr>
+                    <th class="py-2 px-3 text-left">Issue</th>
+                    <th class="py-2 px-3 text-left">Type</th>
+                    <th class="py-2 px-3 text-left">Severity</th>
+                    <th class="py-2 px-3 text-left">Status</th>
+                    <th class="py-2 px-3 text-left">Reported</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for issue in issues %}
+                <tr class="border-b">
+                    <td class="py-2 px-3">{{ issue.title }}</td>
+                    <td class="py-2 px-3">{{ issue.issue_type }}</td>
+                    <td class="py-2 px-3">
+                        <span class="px-2 py-0.5 text-xs rounded
+                            {% if issue.severity == 'Critical' %}bg-red-100 text-red-800
+                            {% elif issue.severity == 'High' %}bg-orange-100 text-orange-800
+                            {% elif issue.severity == 'Medium' %}bg-yellow-100 text-yellow-800
+                            {% else %}bg-gray-100 text-gray-800{% endif %}">
+                            {{ issue.severity }}
+                        </span>
+                    </td>
+                    <td class="py-2 px-3">{{ issue.status }}</td>
+                    <td class="py-2 px-3">{{ issue.reported_date }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% endif %}
+
+    <!-- Vendor Information -->
+    {% if vendor %}
+    <div class="mb-8">
+        <h2 class="text-lg font-bold text-gray-900 border-b border-gray-300 pb-2 mb-4">VENDOR INFORMATION</h2>
+        <div class="grid grid-cols-2 gap-x-8 gap-y-2">
+            <div>
+                <p class="text-sm text-gray-500">Vendor Name</p>
+                <p class="font-medium">{{ vendor.name }}</p>
+            </div>
+            <div>
+                <p class="text-sm text-gray-500">Category</p>
+                <p class="font-medium">{{ vendor.category }}</p>
+            </div>
+            <div>
+                <p class="text-sm text-gray-500">Contact</p>
+                <p class="font-medium">{{ vendor.contact_name or 'N/A' }}</p>
+            </div>
+            <div>
+                <p class="text-sm text-gray-500">Phone</p>
+                <p class="font-medium">{{ vendor.contact_phone or 'N/A' }}</p>
+            </div>
+            <div>
+                <p class="text-sm text-gray-500">Insurance Expiry</p>
+                <p class="font-medium">{{ vendor.insurance_expiry or 'N/A' }}</p>
+            </div>
+            <div>
+                <p class="text-sm text-gray-500">License Expiry</p>
+                <p class="font-medium">{{ vendor.license_expiry or 'N/A' }}</p>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Footer -->
+    <div class="border-t-2 border-gray-800 pt-4 mt-8 text-center text-sm text-gray-500">
+        <p>Contract Oversight System - Confidential Report</p>
+        <p>Generated {{ generated_at }}</p>
+    </div>
+</body>
+</html>

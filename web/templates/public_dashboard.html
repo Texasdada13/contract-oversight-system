@@ -1,0 +1,357 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Public Contract Transparency - {{ jurisdiction_name }}</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.plot.ly/plotly-2.24.1.min.js"></script>
+</head>
+<body class="bg-gray-100 min-h-screen">
+    <!-- Header -->
+    <header class="bg-blue-900 text-white">
+        <div class="max-w-7xl mx-auto px-4 py-8">
+            <div class="flex items-center justify-between">
+                <div>
+                    <h1 class="text-3xl font-bold">{{ jurisdiction_name }}</h1>
+                    <p class="text-blue-200 mt-1">Public Contract Transparency Portal</p>
+                </div>
+                <div class="text-right">
+                    <p class="text-sm text-blue-200">Last Updated</p>
+                    <p class="font-medium">{{ last_updated }}</p>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <!-- Info Banner -->
+    <div class="bg-blue-800 text-white py-3">
+        <div class="max-w-7xl mx-auto px-4">
+            <p class="text-center text-sm">
+                This portal provides public access to contract and spending data in accordance with government transparency requirements.
+                For questions, contact <a href="mailto:contracts@example.gov" class="underline">contracts@example.gov</a>
+            </p>
+        </div>
+    </div>
+
+    <main class="max-w-7xl mx-auto px-4 py-8">
+        <!-- Key Statistics -->
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+            <div class="bg-white rounded-lg shadow p-6">
+                <div class="flex items-center">
+                    <div class="p-3 bg-blue-100 rounded-full">
+                        <svg class="w-8 h-8 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+                        </svg>
+                    </div>
+                    <div class="ml-4">
+                        <p class="text-sm text-gray-500">Active Contracts</p>
+                        <p class="text-2xl font-bold text-gray-900">{{ stats.active_contracts }}</p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="bg-white rounded-lg shadow p-6">
+                <div class="flex items-center">
+                    <div class="p-3 bg-green-100 rounded-full">
+                        <svg class="w-8 h-8 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                        </svg>
+                    </div>
+                    <div class="ml-4">
+                        <p class="text-sm text-gray-500">Total Contract Value</p>
+                        <p class="text-2xl font-bold text-gray-900">${{ '{:,.0f}'.format(stats.total_value) }}</p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="bg-white rounded-lg shadow p-6">
+                <div class="flex items-center">
+                    <div class="p-3 bg-purple-100 rounded-full">
+                        <svg class="w-8 h-8 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"></path>
+                        </svg>
+                    </div>
+                    <div class="ml-4">
+                        <p class="text-sm text-gray-500">Registered Vendors</p>
+                        <p class="text-2xl font-bold text-gray-900">{{ stats.vendor_count }}</p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="bg-white rounded-lg shadow p-6">
+                <div class="flex items-center">
+                    <div class="p-3 bg-yellow-100 rounded-full">
+                        <svg class="w-8 h-8 text-yellow-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path>
+                        </svg>
+                    </div>
+                    <div class="ml-4">
+                        <p class="text-sm text-gray-500">Year-to-Date Spending</p>
+                        <p class="text-2xl font-bold text-gray-900">${{ '{:,.0f}'.format(stats.ytd_spending) }}</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Charts Row -->
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+            <!-- Spending by Department -->
+            <div class="bg-white rounded-lg shadow p-6">
+                <h2 class="text-lg font-semibold text-gray-900 mb-4">Spending by Department</h2>
+                <div id="departmentChart" style="height: 300px;"></div>
+            </div>
+
+            <!-- Contract Status -->
+            <div class="bg-white rounded-lg shadow p-6">
+                <h2 class="text-lg font-semibold text-gray-900 mb-4">Contract Status Overview</h2>
+                <div id="statusChart" style="height: 300px;"></div>
+            </div>
+        </div>
+
+        <!-- Monthly Spending Trend -->
+        <div class="bg-white rounded-lg shadow p-6 mb-8">
+            <h2 class="text-lg font-semibold text-gray-900 mb-4">Monthly Spending Trend</h2>
+            <div id="trendChart" style="height: 300px;"></div>
+        </div>
+
+        <!-- Active Contracts List -->
+        <div class="bg-white rounded-lg shadow mb-8">
+            <div class="px-6 py-4 border-b flex justify-between items-center">
+                <h2 class="text-lg font-semibold text-gray-900">Active Contracts</h2>
+                <div class="flex space-x-2">
+                    <input type="text" id="contractSearch" placeholder="Search contracts..."
+                           class="px-3 py-1.5 border rounded-lg text-sm"
+                           onkeyup="filterContracts()">
+                    <select id="deptFilter" class="px-3 py-1.5 border rounded-lg text-sm" onchange="filterContracts()">
+                        <option value="">All Departments</option>
+                        {% for dept in departments %}
+                        <option value="{{ dept }}">{{ dept }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+            </div>
+            <div class="overflow-x-auto">
+                <table class="min-w-full divide-y divide-gray-200">
+                    <thead class="bg-gray-50">
+                        <tr>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Contract</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Vendor</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Department</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Original Value</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Current Value</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Variance</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Duration</th>
+                        </tr>
+                    </thead>
+                    <tbody id="contractsTable" class="bg-white divide-y divide-gray-200">
+                        {% for contract in contracts %}
+                        <tr class="contract-row hover:bg-gray-50"
+                            data-title="{{ contract.title|lower }}"
+                            data-vendor="{{ contract.vendor_name|lower }}"
+                            data-dept="{{ contract.department }}">
+                            <td class="px-6 py-4">
+                                <p class="font-medium text-gray-900">{{ contract.title }}</p>
+                                <p class="text-sm text-gray-500">{{ contract.contract_number }}</p>
+                            </td>
+                            <td class="px-6 py-4 text-sm text-gray-900">{{ contract.vendor_name }}</td>
+                            <td class="px-6 py-4">
+                                <span class="px-2 py-1 text-xs rounded-full bg-gray-100 text-gray-800">
+                                    {{ contract.department }}
+                                </span>
+                            </td>
+                            <td class="px-6 py-4 text-sm text-gray-900">${{ '{:,.0f}'.format(contract.original_amount) }}</td>
+                            <td class="px-6 py-4 text-sm font-medium text-gray-900">${{ '{:,.0f}'.format(contract.current_amount or contract.original_amount) }}</td>
+                            <td class="px-6 py-4 text-sm">
+                                {% set variance = ((contract.current_amount or contract.original_amount) - contract.original_amount) %}
+                                {% set variance_pct = (variance / contract.original_amount * 100) if contract.original_amount else 0 %}
+                                {% if variance > 0 %}
+                                <span class="text-red-600 font-medium">+${{ '{:,.0f}'.format(variance) }} (+{{ '{:.1f}'.format(variance_pct) }}%)</span>
+                                {% elif variance < 0 %}
+                                <span class="text-green-600 font-medium">${{ '{:,.0f}'.format(variance) }} ({{ '{:.1f}'.format(variance_pct) }}%)</span>
+                                {% else %}
+                                <span class="text-gray-500">No change</span>
+                                {% endif %}
+                            </td>
+                            <td class="px-6 py-4 text-sm text-gray-500">
+                                {{ contract.start_date }} - {{ contract.end_date }}
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- Vendor Directory -->
+        <div class="bg-white rounded-lg shadow mb-8">
+            <div class="px-6 py-4 border-b">
+                <h2 class="text-lg font-semibold text-gray-900">Registered Vendors</h2>
+            </div>
+            <div class="p-6">
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    {% for vendor in vendors %}
+                    <div class="border rounded-lg p-4 hover:bg-gray-50">
+                        <div class="flex items-start justify-between">
+                            <div>
+                                <p class="font-medium text-gray-900">{{ vendor.name }}</p>
+                                <p class="text-sm text-gray-500">{{ vendor.category }}</p>
+                            </div>
+                            <div class="flex space-x-1">
+                                {% if vendor.minority_owned %}
+                                <span class="px-1.5 py-0.5 text-xs bg-purple-100 text-purple-800 rounded">MBE</span>
+                                {% endif %}
+                                {% if vendor.woman_owned %}
+                                <span class="px-1.5 py-0.5 text-xs bg-pink-100 text-pink-800 rounded">WBE</span>
+                                {% endif %}
+                            </div>
+                        </div>
+                        <div class="mt-2 text-sm text-gray-600">
+                            <p>{{ vendor.active_contracts or 0 }} active contract(s)</p>
+                            <p class="font-medium text-gray-900">${{ '{:,.0f}'.format(vendor.total_contract_value or 0) }} total value</p>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+
+        <!-- Diversity Stats -->
+        <div class="bg-white rounded-lg shadow p-6 mb-8">
+            <h2 class="text-lg font-semibold text-gray-900 mb-4">Diversity & Inclusion in Contracting</h2>
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <div class="text-center">
+                    <p class="text-4xl font-bold text-purple-600">{{ diversity.mbe_pct|int }}%</p>
+                    <p class="text-gray-600">Minority-Owned Business Contracts</p>
+                    <p class="text-sm text-gray-500">${{ '{:,.0f}'.format(diversity.mbe_value) }} total value</p>
+                </div>
+                <div class="text-center">
+                    <p class="text-4xl font-bold text-pink-600">{{ diversity.wbe_pct|int }}%</p>
+                    <p class="text-gray-600">Woman-Owned Business Contracts</p>
+                    <p class="text-sm text-gray-500">${{ '{:,.0f}'.format(diversity.wbe_value) }} total value</p>
+                </div>
+                <div class="text-center">
+                    <p class="text-4xl font-bold text-blue-600">{{ diversity.local_pct|int }}%</p>
+                    <p class="text-gray-600">Local Business Contracts</p>
+                    <p class="text-sm text-gray-500">${{ '{:,.0f}'.format(diversity.local_value) }} total value</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Data Download -->
+        <div class="bg-blue-50 rounded-lg p-6 text-center">
+            <h2 class="text-lg font-semibold text-gray-900 mb-2">Open Data Access</h2>
+            <p class="text-gray-600 mb-4">Download contract data in machine-readable formats for analysis</p>
+            <div class="flex justify-center space-x-4">
+                <a href="/api/public/export?format=csv" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">
+                    Download CSV
+                </a>
+                <a href="/api/public/export?format=json" class="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700">
+                    Download JSON
+                </a>
+            </div>
+        </div>
+    </main>
+
+    <!-- Footer -->
+    <footer class="bg-gray-800 text-white py-8 mt-8">
+        <div class="max-w-7xl mx-auto px-4">
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-8">
+                <div>
+                    <h3 class="font-semibold mb-2">About This Portal</h3>
+                    <p class="text-gray-400 text-sm">This transparency portal is provided to promote public accountability in government contracting and spending.</p>
+                </div>
+                <div>
+                    <h3 class="font-semibold mb-2">Contact</h3>
+                    <p class="text-gray-400 text-sm">Procurement Office<br>contracts@example.gov<br>(555) 123-4567</p>
+                </div>
+                <div>
+                    <h3 class="font-semibold mb-2">Resources</h3>
+                    <ul class="text-gray-400 text-sm space-y-1">
+                        <li><a href="#" class="hover:text-white">Vendor Registration</a></li>
+                        <li><a href="#" class="hover:text-white">Bid Opportunities</a></li>
+                        <li><a href="#" class="hover:text-white">Procurement Policy</a></li>
+                    </ul>
+                </div>
+            </div>
+            <div class="border-t border-gray-700 mt-8 pt-4 text-center text-gray-500 text-sm">
+                &copy; {{ current_year }} {{ jurisdiction_name }}. All rights reserved.
+            </div>
+        </div>
+    </footer>
+
+    <script>
+        // Department Spending Chart
+        const deptData = {{ dept_spending | tojson | safe }};
+        if (Object.keys(deptData).length > 0) {
+            Plotly.newPlot('departmentChart', [{
+                type: 'pie',
+                labels: Object.keys(deptData),
+                values: Object.values(deptData),
+                hole: 0.4,
+                textinfo: 'label+percent',
+                marker: { colors: ['#3B82F6', '#10B981', '#F59E0B', '#EF4444', '#8B5CF6', '#EC4899'] }
+            }], {
+                margin: { t: 20, b: 20, l: 20, r: 20 },
+                showlegend: false
+            }, { responsive: true });
+        }
+
+        // Status Chart
+        const statusData = {{ status_distribution | tojson | safe }};
+        if (Object.keys(statusData).length > 0) {
+            Plotly.newPlot('statusChart', [{
+                type: 'bar',
+                x: Object.keys(statusData),
+                y: Object.values(statusData),
+                marker: {
+                    color: Object.keys(statusData).map(s => {
+                        if (s === 'Active') return '#10B981';
+                        if (s === 'Completed') return '#3B82F6';
+                        if (s === 'Draft') return '#6B7280';
+                        return '#EF4444';
+                    })
+                }
+            }], {
+                margin: { t: 20, b: 40, l: 40, r: 20 },
+                yaxis: { title: 'Number of Contracts' }
+            }, { responsive: true });
+        }
+
+        // Trend Chart
+        const trendData = {{ monthly_spending | tojson | safe }};
+        if (trendData.months && trendData.months.length > 0) {
+            Plotly.newPlot('trendChart', [{
+                type: 'scatter',
+                mode: 'lines+markers',
+                x: trendData.months,
+                y: trendData.amounts,
+                line: { color: '#3B82F6', width: 2 },
+                marker: { size: 8 }
+            }], {
+                margin: { t: 20, b: 40, l: 60, r: 20 },
+                xaxis: { title: 'Month' },
+                yaxis: { title: 'Spending ($)', tickformat: ',.0f' }
+            }, { responsive: true });
+        }
+
+        // Contract Search/Filter
+        function filterContracts() {
+            const searchTerm = document.getElementById('contractSearch').value.toLowerCase();
+            const deptFilter = document.getElementById('deptFilter').value;
+            const rows = document.querySelectorAll('.contract-row');
+
+            rows.forEach(row => {
+                const title = row.dataset.title;
+                const vendor = row.dataset.vendor;
+                const dept = row.dataset.dept;
+
+                const matchesSearch = title.includes(searchTerm) || vendor.includes(searchTerm);
+                const matchesDept = !deptFilter || dept === deptFilter;
+
+                row.style.display = (matchesSearch && matchesDept) ? '' : 'none';
+            });
+        }
+    </script>
+</body>
+</html>

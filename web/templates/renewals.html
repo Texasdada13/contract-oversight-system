@@ -1,0 +1,269 @@
+{% extends "base.html" %}
+
+{% block content %}
+<!-- Page Header -->
+<div class="flex items-center justify-between mb-6">
+    <div>
+        <h1 class="text-2xl font-bold text-gray-800 dark:text-white">Contract Renewals</h1>
+        <p class="text-gray-500 dark:text-gray-400">Track expiring contracts and manage renewals</p>
+    </div>
+    <div class="flex space-x-3">
+        <button onclick="exportRenewals()" class="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700">
+            Export List
+        </button>
+    </div>
+</div>
+
+<!-- Stats Cards -->
+<div class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+    <div class="bg-gradient-to-br from-red-500 to-red-600 rounded-lg shadow p-6 text-white">
+        <p class="text-red-100 text-sm">Expired</p>
+        <p class="text-3xl font-bold">{{ stats.expired_count }}</p>
+        <p class="text-red-200 text-sm mt-2">${{ '{:,.0f}'.format(stats.expired_value) }} value</p>
+    </div>
+    <div class="bg-gradient-to-br from-orange-500 to-orange-600 rounded-lg shadow p-6 text-white">
+        <p class="text-orange-100 text-sm">Expiring in 30 Days</p>
+        <p class="text-3xl font-bold">{{ stats.expiring_30_days }}</p>
+        <p class="text-orange-200 text-sm mt-2">Immediate attention</p>
+    </div>
+    <div class="bg-gradient-to-br from-yellow-500 to-yellow-600 rounded-lg shadow p-6 text-white">
+        <p class="text-yellow-100 text-sm">Expiring in 90 Days</p>
+        <p class="text-3xl font-bold">{{ stats.expiring_90_days }}</p>
+        <p class="text-yellow-200 text-sm mt-2">Plan renewal</p>
+    </div>
+    <div class="bg-gradient-to-br from-blue-500 to-blue-600 rounded-lg shadow p-6 text-white">
+        <p class="text-blue-100 text-sm">Total Expiring Value</p>
+        <p class="text-3xl font-bold">${{ '{:,.0f}'.format(stats.expiring_value) }}</p>
+        <p class="text-blue-200 text-sm mt-2">Next 90 days</p>
+    </div>
+</div>
+
+<!-- Expired Contracts -->
+{% if expired %}
+<div class="bg-white dark:bg-gray-800 rounded-lg shadow mb-8">
+    <div class="px-6 py-4 border-b dark:border-gray-700 bg-red-50 dark:bg-red-900/30">
+        <h3 class="text-lg font-semibold text-red-800 dark:text-red-200">Expired Contracts</h3>
+        <p class="text-sm text-red-600 dark:text-red-300">These contracts have already expired and require immediate action</p>
+    </div>
+    <div class="overflow-x-auto">
+        <table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+            <thead class="bg-gray-50 dark:bg-gray-700">
+                <tr>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Contract</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Vendor</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Department</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Expired On</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Days Overdue</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Value</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Action</th>
+                </tr>
+            </thead>
+            <tbody class="divide-y divide-gray-200 dark:divide-gray-700">
+                {% for contract in expired %}
+                <tr class="hover:bg-red-50 dark:hover:bg-red-900/20">
+                    <td class="px-6 py-4">
+                        <a href="{{ url_for('contract_detail', contract_id=contract.contract_id) }}" class="text-blue-600 hover:underline font-medium">
+                            {{ contract.title[:40] }}{% if contract.title|length > 40 %}...{% endif %}
+                        </a>
+                        <p class="text-xs text-gray-500">{{ contract.contract_number }}</p>
+                    </td>
+                    <td class="px-6 py-4 text-sm text-gray-600 dark:text-gray-300">{{ contract.vendor_name }}</td>
+                    <td class="px-6 py-4 text-sm text-gray-600 dark:text-gray-300">{{ contract.department }}</td>
+                    <td class="px-6 py-4 text-sm text-gray-600 dark:text-gray-300">{{ contract.end_date_formatted }}</td>
+                    <td class="px-6 py-4">
+                        <span class="px-2 py-1 text-xs font-medium rounded bg-red-100 text-red-800">
+                            {{ contract.days_until_expiry|abs }} days
+                        </span>
+                    </td>
+                    <td class="px-6 py-4 text-sm font-medium text-gray-800 dark:text-white">${{ '{:,.0f}'.format(contract.current_amount or contract.original_amount) }}</td>
+                    <td class="px-6 py-4">
+                        <button onclick="initiateRenewal('{{ contract.contract_id }}')" class="px-3 py-1 text-xs bg-red-600 text-white rounded hover:bg-red-700">
+                            Renew Now
+                        </button>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endif %}
+
+<!-- Expiring Soon (30 days) -->
+{% if expiring_soon %}
+<div class="bg-white dark:bg-gray-800 rounded-lg shadow mb-8">
+    <div class="px-6 py-4 border-b dark:border-gray-700 bg-orange-50 dark:bg-orange-900/30">
+        <h3 class="text-lg font-semibold text-orange-800 dark:text-orange-200">Expiring Within 30 Days</h3>
+        <p class="text-sm text-orange-600 dark:text-orange-300">Contracts requiring immediate attention</p>
+    </div>
+    <div class="overflow-x-auto">
+        <table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+            <thead class="bg-gray-50 dark:bg-gray-700">
+                <tr>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Contract</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Vendor</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Department</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Expires On</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Days Left</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Value</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Action</th>
+                </tr>
+            </thead>
+            <tbody class="divide-y divide-gray-200 dark:divide-gray-700">
+                {% for contract in expiring_soon %}
+                <tr class="hover:bg-orange-50 dark:hover:bg-orange-900/20">
+                    <td class="px-6 py-4">
+                        <a href="{{ url_for('contract_detail', contract_id=contract.contract_id) }}" class="text-blue-600 hover:underline font-medium">
+                            {{ contract.title[:40] }}{% if contract.title|length > 40 %}...{% endif %}
+                        </a>
+                        <p class="text-xs text-gray-500">{{ contract.contract_number }}</p>
+                    </td>
+                    <td class="px-6 py-4 text-sm text-gray-600 dark:text-gray-300">{{ contract.vendor_name }}</td>
+                    <td class="px-6 py-4 text-sm text-gray-600 dark:text-gray-300">{{ contract.department }}</td>
+                    <td class="px-6 py-4 text-sm text-gray-600 dark:text-gray-300">{{ contract.end_date_formatted }}</td>
+                    <td class="px-6 py-4">
+                        <span class="px-2 py-1 text-xs font-medium rounded bg-orange-100 text-orange-800">
+                            {{ contract.days_until_expiry }} days
+                        </span>
+                    </td>
+                    <td class="px-6 py-4 text-sm font-medium text-gray-800 dark:text-white">${{ '{:,.0f}'.format(contract.current_amount or contract.original_amount) }}</td>
+                    <td class="px-6 py-4">
+                        <button onclick="initiateRenewal('{{ contract.contract_id }}')" class="px-3 py-1 text-xs bg-orange-600 text-white rounded hover:bg-orange-700">
+                            Start Renewal
+                        </button>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endif %}
+
+<!-- Upcoming Renewals (30-90 days) -->
+{% if upcoming_renewals %}
+<div class="bg-white dark:bg-gray-800 rounded-lg shadow mb-8">
+    <div class="px-6 py-4 border-b dark:border-gray-700 bg-yellow-50 dark:bg-yellow-900/30">
+        <h3 class="text-lg font-semibold text-yellow-800 dark:text-yellow-200">Expiring Within 90 Days</h3>
+        <p class="text-sm text-yellow-600 dark:text-yellow-300">Plan ahead for these upcoming renewals</p>
+    </div>
+    <div class="overflow-x-auto">
+        <table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+            <thead class="bg-gray-50 dark:bg-gray-700">
+                <tr>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Contract</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Vendor</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Department</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Expires On</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Days Left</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Value</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Health</th>
+                </tr>
+            </thead>
+            <tbody class="divide-y divide-gray-200 dark:divide-gray-700">
+                {% for contract in upcoming_renewals %}
+                <tr class="hover:bg-yellow-50 dark:hover:bg-yellow-900/20">
+                    <td class="px-6 py-4">
+                        <a href="{{ url_for('contract_detail', contract_id=contract.contract_id) }}" class="text-blue-600 hover:underline font-medium">
+                            {{ contract.title[:40] }}{% if contract.title|length > 40 %}...{% endif %}
+                        </a>
+                        <p class="text-xs text-gray-500">{{ contract.contract_number }}</p>
+                    </td>
+                    <td class="px-6 py-4 text-sm text-gray-600 dark:text-gray-300">{{ contract.vendor_name }}</td>
+                    <td class="px-6 py-4 text-sm text-gray-600 dark:text-gray-300">{{ contract.department }}</td>
+                    <td class="px-6 py-4 text-sm text-gray-600 dark:text-gray-300">{{ contract.end_date_formatted }}</td>
+                    <td class="px-6 py-4">
+                        <span class="px-2 py-1 text-xs font-medium rounded bg-yellow-100 text-yellow-800">
+                            {{ contract.days_until_expiry }} days
+                        </span>
+                    </td>
+                    <td class="px-6 py-4 text-sm font-medium text-gray-800 dark:text-white">${{ '{:,.0f}'.format(contract.current_amount or contract.original_amount) }}</td>
+                    <td class="px-6 py-4">
+                        {% set health = contract.overall_health_score|int if contract.overall_health_score else 50 %}
+                        <span class="px-2 py-1 text-xs font-medium rounded
+                            {% if health < 50 %}bg-red-100 text-red-800
+                            {% elif health < 70 %}bg-yellow-100 text-yellow-800
+                            {% else %}bg-green-100 text-green-800{% endif %}">
+                            {{ health }}
+                        </span>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endif %}
+
+<!-- No Expiring Contracts -->
+{% if not expired and not expiring_soon and not upcoming_renewals %}
+<div class="bg-white dark:bg-gray-800 rounded-lg shadow p-12 text-center">
+    <svg class="w-16 h-16 mx-auto text-green-500 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+    </svg>
+    <h3 class="text-xl font-semibold text-gray-800 dark:text-white mb-2">No Contracts Expiring Soon</h3>
+    <p class="text-gray-500 dark:text-gray-400">All contracts are in good standing with no immediate renewals needed.</p>
+</div>
+{% endif %}
+
+<!-- Renewal Calendar -->
+<div class="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
+    <h3 class="text-lg font-semibold text-gray-800 dark:text-white mb-4">Renewal Timeline</h3>
+    <div id="renewalTimeline" style="height: 300px;"></div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    // Renewal Timeline Chart
+    const expired = {{ expired | tojson | safe }};
+    const expiringSoon = {{ expiring_soon | tojson | safe }};
+    const upcoming = {{ upcoming_renewals | tojson | safe }};
+
+    const allContracts = [
+        ...expired.map(c => ({ ...c, category: 'Expired' })),
+        ...expiringSoon.map(c => ({ ...c, category: 'Within 30 Days' })),
+        ...upcoming.map(c => ({ ...c, category: 'Within 90 Days' }))
+    ];
+
+    if (allContracts.length > 0) {
+        Plotly.newPlot('renewalTimeline', [{
+            type: 'scatter',
+            mode: 'markers',
+            x: allContracts.map(c => c.days_until_expiry),
+            y: allContracts.map(c => c.current_amount || c.original_amount),
+            text: allContracts.map(c => c.title),
+            marker: {
+                size: 12,
+                color: allContracts.map(c =>
+                    c.category === 'Expired' ? '#EF4444' :
+                    c.category === 'Within 30 Days' ? '#F97316' : '#EAB308'
+                )
+            },
+            hovertemplate: '<b>%{text}</b><br>Days: %{x}<br>Value: $%{y:,.0f}<extra></extra>'
+        }], {
+            margin: { t: 20, b: 50, l: 80, r: 20 },
+            xaxis: { title: 'Days Until Expiration', zeroline: true },
+            yaxis: { title: 'Contract Value ($)', tickformat: ',.0f' },
+            shapes: [{
+                type: 'line',
+                x0: 0, x1: 0,
+                y0: 0, y1: 1,
+                yref: 'paper',
+                line: { color: '#EF4444', width: 2, dash: 'dash' }
+            }]
+        }, { responsive: true });
+    } else {
+        document.getElementById('renewalTimeline').innerHTML = '<p class="text-center text-gray-500 py-12">No contracts to display</p>';
+    }
+
+    function initiateRenewal(contractId) {
+        alert('Renewal workflow initiated for contract: ' + contractId);
+        // In a real app, this would open a renewal form or workflow
+    }
+
+    function exportRenewals() {
+        window.print();
+    }
+</script>
+{% endblock %}

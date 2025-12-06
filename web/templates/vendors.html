@@ -1,0 +1,327 @@
+{% extends "base.html" %}
+
+{% block content %}
+<!-- Page Header -->
+<div class="flex flex-col md:flex-row md:items-center md:justify-between mb-6">
+    <div>
+        <h1 class="text-2xl font-bold text-gray-800 dark:text-white">Vendor Management</h1>
+        <p class="text-gray-500 dark:text-gray-400">Monitor vendor performance and compliance</p>
+    </div>
+    <div class="mt-4 md:mt-0">
+        <button onclick="openAddVendorModal()" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 flex items-center">
+            <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path>
+            </svg>
+            Add Vendor
+        </button>
+    </div>
+</div>
+
+<!-- Summary Stats -->
+<div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+    <div class="bg-white dark:bg-gray-800 rounded-lg shadow p-4 text-center">
+        <p class="text-2xl font-bold text-blue-600">{{ vendors|length }}</p>
+        <p class="text-sm text-gray-500 dark:text-gray-400">Total Vendors</p>
+    </div>
+    <div class="bg-white dark:bg-gray-800 rounded-lg shadow p-4 text-center">
+        <p class="text-2xl font-bold text-green-600">{{ active_count }}</p>
+        <p class="text-sm text-gray-500 dark:text-gray-400">Active</p>
+    </div>
+    <div class="bg-white dark:bg-gray-800 rounded-lg shadow p-4 text-center">
+        <p class="text-2xl font-bold text-yellow-600">{{ expiring_insurance }}</p>
+        <p class="text-sm text-gray-500 dark:text-gray-400">Insurance Expiring</p>
+    </div>
+    <div class="bg-white dark:bg-gray-800 rounded-lg shadow p-4 text-center">
+        <p class="text-2xl font-bold text-purple-600">{{ avg_score|int }}</p>
+        <p class="text-sm text-gray-500 dark:text-gray-400">Avg. Performance</p>
+    </div>
+</div>
+
+<!-- Filters -->
+<div class="bg-white dark:bg-gray-800 rounded-lg shadow mb-6 p-4">
+    <form method="GET" class="grid grid-cols-1 md:grid-cols-4 gap-4">
+        <div>
+            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Search</label>
+            <input type="text" name="search" value="{{ request.args.get('search', '') }}"
+                   placeholder="Vendor name..."
+                   class="w-full px-3 py-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 dark:text-white">
+        </div>
+        <div>
+            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Category</label>
+            <select name="category" class="w-full px-3 py-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 dark:text-white">
+                <option value="">All Categories</option>
+                {% for cat in categories %}
+                <option value="{{ cat }}" {% if request.args.get('category') == cat %}selected{% endif %}>{{ cat }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div>
+            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Status</label>
+            <select name="status" class="w-full px-3 py-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 dark:text-white">
+                <option value="">All Statuses</option>
+                <option value="Active" {% if request.args.get('status') == 'Active' %}selected{% endif %}>Active</option>
+                <option value="Inactive" {% if request.args.get('status') == 'Inactive' %}selected{% endif %}>Inactive</option>
+                <option value="Suspended" {% if request.args.get('status') == 'Suspended' %}selected{% endif %}>Suspended</option>
+            </select>
+        </div>
+        <div class="flex items-end">
+            <button type="submit" class="w-full px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">
+                Apply Filters
+            </button>
+        </div>
+    </form>
+</div>
+
+<!-- Vendors Grid -->
+<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+    {% for vendor in vendors %}
+    <div class="bg-white dark:bg-gray-800 rounded-lg shadow hover:shadow-lg transition-shadow cursor-pointer"
+         onclick="window.location='{{ url_for('vendor_detail', vendor_id=vendor.vendor_id) }}'">
+        <div class="p-6">
+            <div class="flex items-start justify-between mb-4">
+                <div>
+                    <h3 class="font-semibold text-gray-800 dark:text-white">{{ vendor.name }}</h3>
+                    <p class="text-sm text-gray-500 dark:text-gray-400">{{ vendor.category }}</p>
+                </div>
+                <span class="px-2 py-1 text-xs font-medium rounded-full
+                    {% if vendor.status == 'Active' %}bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200
+                    {% elif vendor.status == 'Inactive' %}bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-200
+                    {% else %}bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200{% endif %}">
+                    {{ vendor.status }}
+                </span>
+            </div>
+
+            <!-- Performance Score -->
+            <div class="mb-4">
+                <div class="flex items-center justify-between mb-1">
+                    <span class="text-sm text-gray-600 dark:text-gray-400">Performance Score</span>
+                    <span class="text-sm font-medium
+                        {% if vendor.performance_score and vendor.performance_score < 50 %}text-red-600
+                        {% elif vendor.performance_score and vendor.performance_score < 70 %}text-yellow-600
+                        {% else %}text-green-600{% endif %}">
+                        {{ vendor.performance_score|int if vendor.performance_score else '-' }}
+                    </span>
+                </div>
+                <div class="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
+                    <div class="h-2 rounded-full
+                        {% if vendor.performance_score and vendor.performance_score < 50 %}bg-red-500
+                        {% elif vendor.performance_score and vendor.performance_score < 70 %}bg-yellow-500
+                        {% else %}bg-green-500{% endif %}"
+                        style="width: {{ vendor.performance_score or 0 }}%"></div>
+                </div>
+            </div>
+
+            <!-- Stats -->
+            <div class="grid grid-cols-2 gap-4 mb-4 text-sm">
+                <div>
+                    <p class="text-gray-500 dark:text-gray-400">Active Contracts</p>
+                    <p class="font-medium text-gray-800 dark:text-white">{{ vendor.active_contracts or 0 }}</p>
+                </div>
+                <div>
+                    <p class="text-gray-500 dark:text-gray-400">Total Value</p>
+                    <p class="font-medium text-gray-800 dark:text-white">${{ '{:,.0f}'.format(vendor.total_contract_value or 0) }}</p>
+                </div>
+            </div>
+
+            <!-- Compliance Indicators -->
+            <div class="flex items-center space-x-2 text-xs">
+                {% if vendor.insurance_expiry %}
+                    {% set days_to_expiry = (vendor.insurance_expiry|string|replace('-', '')|int - now|string|replace('-', '')|int) // 10000 %}
+                    {% if days_to_expiry < 0 %}
+                    <span class="px-2 py-1 bg-red-100 text-red-800 rounded">Insurance Expired</span>
+                    {% elif days_to_expiry < 30 %}
+                    <span class="px-2 py-1 bg-yellow-100 text-yellow-800 rounded">Insurance Expiring</span>
+                    {% else %}
+                    <span class="px-2 py-1 bg-green-100 text-green-800 rounded">Insurance Valid</span>
+                    {% endif %}
+                {% endif %}
+                {% if vendor.minority_owned %}
+                <span class="px-2 py-1 bg-purple-100 text-purple-800 rounded">MBE</span>
+                {% endif %}
+                {% if vendor.woman_owned %}
+                <span class="px-2 py-1 bg-pink-100 text-pink-800 rounded">WBE</span>
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- Contact Info -->
+        <div class="px-6 py-3 bg-gray-50 dark:bg-gray-700 border-t dark:border-gray-600 text-sm">
+            <div class="flex items-center justify-between">
+                <span class="text-gray-600 dark:text-gray-400">{{ vendor.contact_name or 'No contact' }}</span>
+                <span class="text-gray-500 dark:text-gray-400">{{ vendor.contact_phone or '' }}</span>
+            </div>
+        </div>
+    </div>
+    {% else %}
+    <div class="col-span-full text-center py-12">
+        <p class="text-gray-500 dark:text-gray-400">No vendors found matching your criteria</p>
+    </div>
+    {% endfor %}
+</div>
+
+<!-- Add Vendor Modal -->
+<div id="addVendorModal" class="fixed inset-0 bg-black bg-opacity-50 hidden items-center justify-center z-50">
+    <div class="bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-2xl w-full mx-4 max-h-[90vh] overflow-y-auto">
+        <div class="px-6 py-4 border-b dark:border-gray-700 flex justify-between items-center">
+            <h3 class="text-lg font-semibold text-gray-800 dark:text-white">Add New Vendor</h3>
+            <button onclick="closeAddVendorModal()" class="text-gray-500 hover:text-gray-700 dark:text-gray-400">
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                </svg>
+            </button>
+        </div>
+        <form id="addVendorForm" class="p-6 space-y-4">
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Vendor Name *</label>
+                    <input type="text" name="name" required
+                           class="w-full px-3 py-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 dark:text-white">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Category *</label>
+                    <select name="category" required
+                            class="w-full px-3 py-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 dark:text-white">
+                        <option value="">Select Category</option>
+                        <option value="Construction">Construction</option>
+                        <option value="IT Services">IT Services</option>
+                        <option value="Professional Services">Professional Services</option>
+                        <option value="Security">Security</option>
+                        <option value="Maintenance">Maintenance</option>
+                        <option value="Supplies">Supplies</option>
+                        <option value="Transportation">Transportation</option>
+                        <option value="Other">Other</option>
+                    </select>
+                </div>
+            </div>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Tax ID</label>
+                    <input type="text" name="tax_id"
+                           class="w-full px-3 py-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 dark:text-white">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">DUNS Number</label>
+                    <input type="text" name="duns_number"
+                           class="w-full px-3 py-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 dark:text-white">
+                </div>
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Address</label>
+                <input type="text" name="address"
+                       class="w-full px-3 py-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 dark:text-white">
+            </div>
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">City</label>
+                    <input type="text" name="city"
+                           class="w-full px-3 py-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 dark:text-white">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">State</label>
+                    <input type="text" name="state"
+                           class="w-full px-3 py-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 dark:text-white">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">ZIP</label>
+                    <input type="text" name="zip_code"
+                           class="w-full px-3 py-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 dark:text-white">
+                </div>
+            </div>
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Contact Name</label>
+                    <input type="text" name="contact_name"
+                           class="w-full px-3 py-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 dark:text-white">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Phone</label>
+                    <input type="tel" name="contact_phone"
+                           class="w-full px-3 py-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 dark:text-white">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Email</label>
+                    <input type="email" name="contact_email"
+                           class="w-full px-3 py-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 dark:text-white">
+                </div>
+            </div>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Insurance Expiry</label>
+                    <input type="date" name="insurance_expiry"
+                           class="w-full px-3 py-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 dark:text-white">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">License Expiry</label>
+                    <input type="date" name="license_expiry"
+                           class="w-full px-3 py-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 dark:text-white">
+                </div>
+            </div>
+            <div class="flex items-center space-x-6">
+                <label class="flex items-center">
+                    <input type="checkbox" name="minority_owned" class="rounded border-gray-300 text-blue-600 mr-2">
+                    <span class="text-sm text-gray-700 dark:text-gray-300">Minority-Owned Business</span>
+                </label>
+                <label class="flex items-center">
+                    <input type="checkbox" name="woman_owned" class="rounded border-gray-300 text-blue-600 mr-2">
+                    <span class="text-sm text-gray-700 dark:text-gray-300">Woman-Owned Business</span>
+                </label>
+            </div>
+            <div class="flex justify-end space-x-3 pt-4">
+                <button type="button" onclick="closeAddVendorModal()"
+                        class="px-4 py-2 border rounded-lg text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700">
+                    Cancel
+                </button>
+                <button type="submit" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">
+                    Add Vendor
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    function openAddVendorModal() {
+        document.getElementById('addVendorModal').classList.remove('hidden');
+        document.getElementById('addVendorModal').classList.add('flex');
+    }
+
+    function closeAddVendorModal() {
+        document.getElementById('addVendorModal').classList.add('hidden');
+        document.getElementById('addVendorModal').classList.remove('flex');
+    }
+
+    document.getElementById('addVendorForm').addEventListener('submit', async function(e) {
+        e.preventDefault();
+        const formData = new FormData(this);
+        const data = Object.fromEntries(formData);
+        data.minority_owned = formData.has('minority_owned');
+        data.woman_owned = formData.has('woman_owned');
+
+        try {
+            const response = await fetch('/api/vendors', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(data)
+            });
+
+            if (response.ok) {
+                window.location.reload();
+            } else {
+                const error = await response.json();
+                alert('Error: ' + (error.error || 'Failed to add vendor'));
+            }
+        } catch (err) {
+            alert('Error adding vendor: ' + err.message);
+        }
+    });
+
+    // Close modal when clicking outside
+    document.getElementById('addVendorModal').addEventListener('click', function(e) {
+        if (e.target === this) {
+            closeAddVendorModal();
+        }
+    });
+</script>
+{% endblock %}

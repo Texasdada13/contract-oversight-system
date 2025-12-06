@@ -1,0 +1,303 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ title }}</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @media print {
+            .no-print { display: none !important; }
+            .page-break { page-break-before: always; }
+            body { font-size: 10pt; }
+        }
+        @page { margin: 0.5in; }
+    </style>
+</head>
+<body class="bg-white p-6">
+    <!-- Print Button -->
+    <div class="no-print mb-4 flex justify-between items-center">
+        <a href="{{ url_for('dashboard') }}" class="text-blue-600 hover:underline">
+            &larr; Back to Dashboard
+        </a>
+        <button onclick="window.print()" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">
+            Print Report
+        </button>
+    </div>
+
+    <!-- Header -->
+    <div class="border-b-2 border-gray-800 pb-4 mb-6">
+        <div class="flex justify-between items-start">
+            <div>
+                <h1 class="text-2xl font-bold text-gray-900">PORTFOLIO SUMMARY REPORT</h1>
+                <p class="text-gray-600">Contract Oversight System</p>
+            </div>
+            <div class="text-right">
+                <p class="text-sm text-gray-500">Report Generated</p>
+                <p class="font-bold">{{ generated_at }}</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Executive Summary -->
+    <div class="mb-8">
+        <h2 class="text-lg font-bold text-gray-900 border-b border-gray-300 pb-2 mb-4">EXECUTIVE SUMMARY</h2>
+        <div class="grid grid-cols-4 gap-4 text-center">
+            <div class="border rounded p-4">
+                <p class="text-3xl font-bold text-blue-600">{{ summary.total_contracts }}</p>
+                <p class="text-sm text-gray-600">Total Contracts</p>
+            </div>
+            <div class="border rounded p-4">
+                <p class="text-3xl font-bold text-green-600">${{ '{:,.0f}'.format(summary.total_value / 1000000) }}M</p>
+                <p class="text-sm text-gray-600">Total Value</p>
+            </div>
+            <div class="border rounded p-4">
+                <p class="text-3xl font-bold {% if summary.total_overrun > 0 %}text-red-600{% else %}text-green-600{% endif %}">
+                    {% if summary.total_overrun > 0 %}+{% endif %}${{ '{:,.0f}'.format(summary.total_overrun / 1000) }}K
+                </p>
+                <p class="text-sm text-gray-600">Cost Variance</p>
+            </div>
+            <div class="border rounded p-4">
+                <p class="text-3xl font-bold {% if summary.at_risk_count > 0 %}text-red-600{% else %}text-green-600{% endif %}">{{ summary.at_risk_count }}</p>
+                <p class="text-sm text-gray-600">At-Risk Contracts</p>
+            </div>
+        </div>
+
+        <div class="grid grid-cols-2 gap-8 mt-6">
+            <div>
+                <table class="w-full text-sm">
+                    <tr class="border-b">
+                        <td class="py-2 text-gray-600">Original Contract Value</td>
+                        <td class="py-2 text-right font-medium">${{ '{:,.0f}'.format(summary.original_value) }}</td>
+                    </tr>
+                    <tr class="border-b">
+                        <td class="py-2 text-gray-600">Current Contract Value</td>
+                        <td class="py-2 text-right font-medium">${{ '{:,.0f}'.format(summary.total_value) }}</td>
+                    </tr>
+                    <tr class="border-b">
+                        <td class="py-2 text-gray-600">Total Variance</td>
+                        <td class="py-2 text-right font-medium {% if summary.total_overrun > 0 %}text-red-600{% endif %}">
+                            {% if summary.total_overrun > 0 %}+{% endif %}${{ '{:,.0f}'.format(summary.total_overrun) }}
+                            ({% if summary.overrun_pct > 0 %}+{% endif %}{{ '{:.1f}'.format(summary.overrun_pct) }}%)
+                        </td>
+                    </tr>
+                    <tr class="border-b">
+                        <td class="py-2 text-gray-600">Amount Paid</td>
+                        <td class="py-2 text-right font-medium text-green-600">${{ '{:,.0f}'.format(summary.total_paid) }}</td>
+                    </tr>
+                    <tr>
+                        <td class="py-2 text-gray-600">Remaining</td>
+                        <td class="py-2 text-right font-medium text-blue-600">${{ '{:,.0f}'.format(summary.total_remaining) }}</td>
+                    </tr>
+                </table>
+            </div>
+            <div>
+                <table class="w-full text-sm">
+                    <tr class="border-b">
+                        <td class="py-2 text-gray-600">Active Contracts</td>
+                        <td class="py-2 text-right font-medium text-green-600">{{ summary.active_count }}</td>
+                    </tr>
+                    <tr class="border-b">
+                        <td class="py-2 text-gray-600">Completed Contracts</td>
+                        <td class="py-2 text-right font-medium text-blue-600">{{ summary.completed_count }}</td>
+                    </tr>
+                    <tr class="border-b">
+                        <td class="py-2 text-gray-600">Average Health Score</td>
+                        <td class="py-2 text-right font-medium
+                            {% if summary.avg_health_score < 50 %}text-red-600
+                            {% elif summary.avg_health_score < 70 %}text-yellow-600
+                            {% else %}text-green-600{% endif %}">
+                            {{ summary.avg_health_score|int }}
+                        </td>
+                    </tr>
+                    <tr class="border-b">
+                        <td class="py-2 text-gray-600">At-Risk Contracts</td>
+                        <td class="py-2 text-right font-medium {% if summary.at_risk_count > 0 %}text-red-600{% endif %}">
+                            {{ summary.at_risk_count }}
+                        </td>
+                    </tr>
+                    <tr>
+                        <td class="py-2 text-gray-600">Critical Contracts</td>
+                        <td class="py-2 text-right font-medium {% if summary.critical_count > 0 %}text-red-600{% endif %}">
+                            {{ summary.critical_count }}
+                        </td>
+                    </tr>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- Active Alerts -->
+    {% if alerts %}
+    <div class="mb-8">
+        <h2 class="text-lg font-bold text-gray-900 border-b border-gray-300 pb-2 mb-4">ACTIVE ALERTS ({{ alerts|length }})</h2>
+        <table class="w-full text-sm">
+            <thead class="bg-gray-100">
+                <tr>
+                    <th class="py-2 px-3 text-left">Severity</th>
+                    <th class="py-2 px-3 text-left">Alert</th>
+                    <th class="py-2 px-3 text-left">Contract</th>
+                    <th class="py-2 px-3 text-left">Vendor</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for alert in alerts %}
+                <tr class="border-b">
+                    <td class="py-2 px-3">
+                        <span class="px-2 py-0.5 text-xs rounded
+                            {% if alert.severity == 'Critical' %}bg-red-100 text-red-800
+                            {% elif alert.severity == 'High' %}bg-orange-100 text-orange-800
+                            {% elif alert.severity == 'Medium' %}bg-yellow-100 text-yellow-800
+                            {% else %}bg-gray-100 text-gray-800{% endif %}">
+                            {{ alert.severity }}
+                        </span>
+                    </td>
+                    <td class="py-2 px-3">{{ alert.title }}</td>
+                    <td class="py-2 px-3">{{ alert.contract_title[:30] }}{% if alert.contract_title|length > 30 %}...{% endif %}</td>
+                    <td class="py-2 px-3">{{ alert.vendor_name }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% endif %}
+
+    <!-- At-Risk Contracts -->
+    {% if at_risk %}
+    <div class="mb-8 page-break">
+        <h2 class="text-lg font-bold text-gray-900 border-b border-gray-300 pb-2 mb-4">AT-RISK CONTRACTS ({{ at_risk|length }})</h2>
+        <table class="w-full text-sm">
+            <thead class="bg-gray-100">
+                <tr>
+                    <th class="py-2 px-3 text-left">Contract</th>
+                    <th class="py-2 px-3 text-left">Vendor</th>
+                    <th class="py-2 px-3 text-left">Department</th>
+                    <th class="py-2 px-3 text-right">Value</th>
+                    <th class="py-2 px-3 text-right">Variance</th>
+                    <th class="py-2 px-3 text-center">Health</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for c in at_risk %}
+                <tr class="border-b">
+                    <td class="py-2 px-3">
+                        <p class="font-medium">{{ c.title[:30] }}{% if c.title|length > 30 %}...{% endif %}</p>
+                        <p class="text-xs text-gray-500">{{ c.contract_number }}</p>
+                    </td>
+                    <td class="py-2 px-3">{{ c.vendor_name }}</td>
+                    <td class="py-2 px-3">{{ c.department }}</td>
+                    <td class="py-2 px-3 text-right">${{ '{:,.0f}'.format(c.current_amount or c.original_amount) }}</td>
+                    <td class="py-2 px-3 text-right">
+                        {% set variance = (c.current_amount or c.original_amount) - c.original_amount %}
+                        <span class="{% if variance > 0 %}text-red-600{% endif %}">
+                            {% if variance > 0 %}+{% endif %}${{ '{:,.0f}'.format(variance) }}
+                        </span>
+                    </td>
+                    <td class="py-2 px-3 text-center">
+                        <span class="px-2 py-1 rounded font-bold
+                            {% if c.overall_health_score < 30 %}bg-red-100 text-red-800
+                            {% elif c.overall_health_score < 50 %}bg-orange-100 text-orange-800
+                            {% else %}bg-yellow-100 text-yellow-800{% endif %}">
+                            {{ c.overall_health_score|int }}
+                        </span>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% endif %}
+
+    <!-- All Contracts Summary -->
+    <div class="mb-8 page-break">
+        <h2 class="text-lg font-bold text-gray-900 border-b border-gray-300 pb-2 mb-4">ALL CONTRACTS</h2>
+        <table class="w-full text-xs">
+            <thead class="bg-gray-100">
+                <tr>
+                    <th class="py-2 px-2 text-left">Contract #</th>
+                    <th class="py-2 px-2 text-left">Title</th>
+                    <th class="py-2 px-2 text-left">Vendor</th>
+                    <th class="py-2 px-2 text-left">Dept</th>
+                    <th class="py-2 px-2 text-center">Status</th>
+                    <th class="py-2 px-2 text-right">Original</th>
+                    <th class="py-2 px-2 text-right">Current</th>
+                    <th class="py-2 px-2 text-right">Paid</th>
+                    <th class="py-2 px-2 text-center">Health</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for c in contracts %}
+                <tr class="border-b">
+                    <td class="py-1 px-2">{{ c.contract_number }}</td>
+                    <td class="py-1 px-2">{{ c.title[:25] }}{% if c.title|length > 25 %}...{% endif %}</td>
+                    <td class="py-1 px-2">{{ c.vendor_name[:15] }}{% if c.vendor_name|length > 15 %}...{% endif %}</td>
+                    <td class="py-1 px-2">{{ c.department[:10] }}</td>
+                    <td class="py-1 px-2 text-center">
+                        <span class="px-1 py-0.5 text-xs rounded
+                            {% if c.status == 'Active' %}bg-green-100 text-green-800
+                            {% elif c.status == 'Completed' %}bg-blue-100 text-blue-800
+                            {% else %}bg-gray-100 text-gray-800{% endif %}">
+                            {{ c.status }}
+                        </span>
+                    </td>
+                    <td class="py-1 px-2 text-right">${{ '{:,.0f}'.format(c.original_amount) }}</td>
+                    <td class="py-1 px-2 text-right">${{ '{:,.0f}'.format(c.current_amount or c.original_amount) }}</td>
+                    <td class="py-1 px-2 text-right">${{ '{:,.0f}'.format(c.total_paid or 0) }}</td>
+                    <td class="py-1 px-2 text-center">
+                        <span class="{% if c.overall_health_score and c.overall_health_score < 50 %}text-red-600 font-bold{% elif c.overall_health_score and c.overall_health_score < 70 %}text-yellow-600{% else %}text-green-600{% endif %}">
+                            {{ c.overall_health_score|int if c.overall_health_score else '-' }}
+                        </span>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    <!-- Distribution by Status -->
+    <div class="mb-8">
+        <h2 class="text-lg font-bold text-gray-900 border-b border-gray-300 pb-2 mb-4">DISTRIBUTION BY STATUS</h2>
+        <div class="grid grid-cols-4 gap-4">
+            {% for status, count in summary.status_distribution.items() %}
+            <div class="border rounded p-4 text-center">
+                <p class="text-2xl font-bold
+                    {% if status == 'Active' %}text-green-600
+                    {% elif status == 'Completed' %}text-blue-600
+                    {% elif status == 'Draft' %}text-gray-600
+                    {% else %}text-red-600{% endif %}">
+                    {{ count }}
+                </p>
+                <p class="text-sm text-gray-600">{{ status }}</p>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+
+    <!-- Distribution by Department -->
+    <div class="mb-8">
+        <h2 class="text-lg font-bold text-gray-900 border-b border-gray-300 pb-2 mb-4">DISTRIBUTION BY DEPARTMENT</h2>
+        <table class="w-full text-sm">
+            <thead class="bg-gray-100">
+                <tr>
+                    <th class="py-2 px-3 text-left">Department</th>
+                    <th class="py-2 px-3 text-right">Contracts</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for dept, count in summary.department_distribution.items() %}
+                <tr class="border-b">
+                    <td class="py-2 px-3">{{ dept }}</td>
+                    <td class="py-2 px-3 text-right font-medium">{{ count }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    <!-- Footer -->
+    <div class="border-t-2 border-gray-800 pt-4 mt-8 text-center text-sm text-gray-500">
+        <p>Contract Oversight System - Portfolio Summary Report</p>
+        <p>Generated {{ generated_at }} - Confidential</p>
+    </div>
+</body>
+</html>

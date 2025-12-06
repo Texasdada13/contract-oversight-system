@@ -1,0 +1,367 @@
+{% extends "base.html" %}
+
+{% block content %}
+<!-- Page Header -->
+<div class="flex items-center justify-between mb-6">
+    <div>
+        <h1 class="text-2xl font-bold text-gray-800 dark:text-white">Vendor Compliance Checker</h1>
+        <p class="text-gray-500 dark:text-gray-400">Monitor vendor certifications, insurance, and compliance status</p>
+    </div>
+    <div class="flex space-x-3">
+        <button onclick="sendComplianceReminders()" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">
+            Send Reminders
+        </button>
+        <button onclick="window.print()" class="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700">
+            Export Report
+        </button>
+    </div>
+</div>
+
+<!-- Summary Stats -->
+<div class="grid grid-cols-1 md:grid-cols-6 gap-4 mb-8">
+    <div class="bg-gradient-to-br from-green-500 to-green-600 rounded-lg shadow p-4 text-white">
+        <p class="text-green-100 text-xs">Fully Compliant</p>
+        <p class="text-3xl font-bold">{{ summary.compliant }}</p>
+    </div>
+    <div class="bg-gradient-to-br from-yellow-500 to-yellow-600 rounded-lg shadow p-4 text-white">
+        <p class="text-yellow-100 text-xs">Expiring Soon</p>
+        <p class="text-3xl font-bold">{{ summary.expiring_soon }}</p>
+    </div>
+    <div class="bg-gradient-to-br from-red-500 to-red-600 rounded-lg shadow p-4 text-white">
+        <p class="text-red-100 text-xs">Non-Compliant</p>
+        <p class="text-3xl font-bold">{{ summary.non_compliant }}</p>
+    </div>
+    <div class="bg-gradient-to-br from-orange-500 to-orange-600 rounded-lg shadow p-4 text-white">
+        <p class="text-orange-100 text-xs">Insurance Issues</p>
+        <p class="text-3xl font-bold">{{ summary.insurance_issues }}</p>
+    </div>
+    <div class="bg-gradient-to-br from-purple-500 to-purple-600 rounded-lg shadow p-4 text-white">
+        <p class="text-purple-100 text-xs">License Issues</p>
+        <p class="text-3xl font-bold">{{ summary.license_issues }}</p>
+    </div>
+    <div class="bg-gradient-to-br from-blue-500 to-blue-600 rounded-lg shadow p-4 text-white">
+        <p class="text-blue-100 text-xs">At Risk Value</p>
+        <p class="text-2xl font-bold">${{ '{:,.0f}'.format(summary.at_risk_value) }}</p>
+    </div>
+</div>
+
+<!-- Compliance Alerts -->
+{% if non_compliant_vendors %}
+<div class="bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-800 rounded-lg p-6 mb-8">
+    <div class="flex items-start">
+        <svg class="w-6 h-6 text-red-600 mr-3 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path>
+        </svg>
+        <div class="flex-1">
+            <h4 class="text-lg font-semibold text-red-800 dark:text-red-200">Immediate Action Required</h4>
+            <p class="text-red-600 dark:text-red-300 mt-1">
+                {{ summary.non_compliant }} vendor(s) have expired certifications or documentation. These vendors may not be eligible for new contracts.
+            </p>
+            <div class="mt-4 flex flex-wrap gap-2">
+                {% for vendor in non_compliant_vendors[:5] %}
+                <a href="{{ url_for('vendor_detail', vendor_id=vendor.vendor_id) }}"
+                   class="px-3 py-1 bg-red-100 dark:bg-red-800 text-red-800 dark:text-red-100 rounded-lg text-sm hover:bg-red-200 dark:hover:bg-red-700">
+                    {{ vendor.name }}
+                </a>
+                {% endfor %}
+                {% if non_compliant_vendors|length > 5 %}
+                <span class="px-3 py-1 text-red-600 text-sm">+{{ non_compliant_vendors|length - 5 }} more</span>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endif %}
+
+<!-- Compliance Charts -->
+<div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+    <div class="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
+        <h3 class="text-lg font-semibold text-gray-800 dark:text-white mb-4">Compliance Status Overview</h3>
+        <div id="complianceChart" style="height: 250px;"></div>
+    </div>
+    <div class="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
+        <h3 class="text-lg font-semibold text-gray-800 dark:text-white mb-4">Expiration Timeline</h3>
+        <div id="expirationChart" style="height: 250px;"></div>
+    </div>
+</div>
+
+<!-- Compliance Checklist -->
+<div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
+    <!-- Insurance Status -->
+    <div class="bg-white dark:bg-gray-800 rounded-lg shadow">
+        <div class="px-6 py-4 border-b dark:border-gray-700 flex justify-between items-center">
+            <h3 class="text-lg font-semibold text-gray-800 dark:text-white">Insurance Status</h3>
+            <span class="px-2 py-1 text-xs bg-orange-100 text-orange-800 rounded">{{ summary.insurance_issues }} Issues</span>
+        </div>
+        <div class="p-6 space-y-3 max-h-80 overflow-y-auto">
+            {% for vendor in compliance_data if vendor.insurance_status != 'Valid' %}
+            <div class="flex items-center justify-between p-3 bg-red-50 dark:bg-red-900/30 rounded-lg">
+                <div>
+                    <a href="{{ url_for('vendor_detail', vendor_id=vendor.vendor_id) }}" class="font-medium text-gray-800 dark:text-white hover:text-blue-600">
+                        {{ vendor.name }}
+                    </a>
+                    <p class="text-xs text-red-600">{{ vendor.insurance_status }}</p>
+                </div>
+                <span class="text-xs text-gray-500">{{ vendor.insurance_expiry or 'N/A' }}</span>
+            </div>
+            {% else %}
+            <div class="text-center text-gray-500 py-4">
+                <svg class="w-12 h-12 mx-auto mb-2 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                </svg>
+                <p>All vendors have valid insurance</p>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+
+    <!-- License Status -->
+    <div class="bg-white dark:bg-gray-800 rounded-lg shadow">
+        <div class="px-6 py-4 border-b dark:border-gray-700 flex justify-between items-center">
+            <h3 class="text-lg font-semibold text-gray-800 dark:text-white">License Status</h3>
+            <span class="px-2 py-1 text-xs bg-purple-100 text-purple-800 rounded">{{ summary.license_issues }} Issues</span>
+        </div>
+        <div class="p-6 space-y-3 max-h-80 overflow-y-auto">
+            {% for vendor in compliance_data if vendor.license_status != 'Valid' %}
+            <div class="flex items-center justify-between p-3 bg-purple-50 dark:bg-purple-900/30 rounded-lg">
+                <div>
+                    <a href="{{ url_for('vendor_detail', vendor_id=vendor.vendor_id) }}" class="font-medium text-gray-800 dark:text-white hover:text-blue-600">
+                        {{ vendor.name }}
+                    </a>
+                    <p class="text-xs text-purple-600">{{ vendor.license_status }}</p>
+                </div>
+                <span class="text-xs text-gray-500">{{ vendor.license_expiry or 'N/A' }}</span>
+            </div>
+            {% else %}
+            <div class="text-center text-gray-500 py-4">
+                <svg class="w-12 h-12 mx-auto mb-2 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                </svg>
+                <p>All vendors have valid licenses</p>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+
+    <!-- Expiring Soon -->
+    <div class="bg-white dark:bg-gray-800 rounded-lg shadow">
+        <div class="px-6 py-4 border-b dark:border-gray-700 flex justify-between items-center">
+            <h3 class="text-lg font-semibold text-gray-800 dark:text-white">Expiring Soon</h3>
+            <span class="px-2 py-1 text-xs bg-yellow-100 text-yellow-800 rounded">Next 30 Days</span>
+        </div>
+        <div class="p-6 space-y-3 max-h-80 overflow-y-auto">
+            {% for vendor in compliance_data if vendor.days_until_expiry and vendor.days_until_expiry <= 30 and vendor.days_until_expiry > 0 %}
+            <div class="flex items-center justify-between p-3 bg-yellow-50 dark:bg-yellow-900/30 rounded-lg">
+                <div>
+                    <a href="{{ url_for('vendor_detail', vendor_id=vendor.vendor_id) }}" class="font-medium text-gray-800 dark:text-white hover:text-blue-600">
+                        {{ vendor.name }}
+                    </a>
+                    <p class="text-xs text-yellow-600">{{ vendor.expiring_item }} expires in {{ vendor.days_until_expiry }} days</p>
+                </div>
+                <button onclick="sendReminder('{{ vendor.vendor_id }}')" class="text-xs text-blue-600 hover:text-blue-800">
+                    Send Reminder
+                </button>
+            </div>
+            {% else %}
+            <div class="text-center text-gray-500 py-4">
+                <svg class="w-12 h-12 mx-auto mb-2 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                </svg>
+                <p>No items expiring soon</p>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+</div>
+
+<!-- Full Compliance Table -->
+<div class="bg-white dark:bg-gray-800 rounded-lg shadow">
+    <div class="px-6 py-4 border-b dark:border-gray-700 flex justify-between items-center">
+        <h3 class="text-lg font-semibold text-gray-800 dark:text-white">All Vendors Compliance Status</h3>
+        <div class="flex space-x-2">
+            <input type="text" id="vendorSearch" placeholder="Search vendors..." onkeyup="filterVendors()"
+                class="px-3 py-2 border rounded-lg text-sm dark:bg-gray-700 dark:border-gray-600 dark:text-white">
+            <select id="statusFilter" onchange="filterVendors()"
+                class="px-3 py-2 border rounded-lg text-sm dark:bg-gray-700 dark:border-gray-600 dark:text-white">
+                <option value="">All Statuses</option>
+                <option value="compliant">Compliant</option>
+                <option value="expiring">Expiring Soon</option>
+                <option value="non-compliant">Non-Compliant</option>
+            </select>
+        </div>
+    </div>
+    <div class="overflow-x-auto">
+        <table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700" id="complianceTable">
+            <thead class="bg-gray-50 dark:bg-gray-700">
+                <tr>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Vendor</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Category</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Active Contracts</th>
+                    <th class="px-6 py-3 text-center text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Insurance</th>
+                    <th class="px-6 py-3 text-center text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">License</th>
+                    <th class="px-6 py-3 text-center text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Certifications</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Overall Status</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Actions</th>
+                </tr>
+            </thead>
+            <tbody class="divide-y divide-gray-200 dark:divide-gray-700">
+                {% for vendor in compliance_data %}
+                <tr class="hover:bg-gray-50 dark:hover:bg-gray-700 vendor-row"
+                    data-name="{{ vendor.name|lower }}"
+                    data-status="{{ vendor.compliance_status|lower }}">
+                    <td class="px-6 py-4">
+                        <a href="{{ url_for('vendor_detail', vendor_id=vendor.vendor_id) }}" class="font-medium text-blue-600 hover:underline">
+                            {{ vendor.name }}
+                        </a>
+                        <p class="text-xs text-gray-500">{{ vendor.contact_email }}</p>
+                    </td>
+                    <td class="px-6 py-4 text-sm text-gray-600 dark:text-gray-300">{{ vendor.category }}</td>
+                    <td class="px-6 py-4 text-sm text-gray-600 dark:text-gray-300">
+                        {{ vendor.active_contracts }}
+                        <span class="text-xs text-gray-400">(${{ '{:,.0f}'.format(vendor.contract_value) }})</span>
+                    </td>
+                    <td class="px-6 py-4 text-center">
+                        {% if vendor.insurance_status == 'Valid' %}
+                        <span class="px-2 py-1 text-xs font-medium rounded bg-green-100 text-green-800">Valid</span>
+                        <p class="text-xs text-gray-500 mt-1">{{ vendor.insurance_expiry }}</p>
+                        {% elif vendor.insurance_status == 'Expiring' %}
+                        <span class="px-2 py-1 text-xs font-medium rounded bg-yellow-100 text-yellow-800">Expiring</span>
+                        <p class="text-xs text-yellow-600 mt-1">{{ vendor.insurance_days }} days</p>
+                        {% else %}
+                        <span class="px-2 py-1 text-xs font-medium rounded bg-red-100 text-red-800">Expired</span>
+                        {% endif %}
+                    </td>
+                    <td class="px-6 py-4 text-center">
+                        {% if vendor.license_status == 'Valid' %}
+                        <span class="px-2 py-1 text-xs font-medium rounded bg-green-100 text-green-800">Valid</span>
+                        <p class="text-xs text-gray-500 mt-1">{{ vendor.license_expiry }}</p>
+                        {% elif vendor.license_status == 'Expiring' %}
+                        <span class="px-2 py-1 text-xs font-medium rounded bg-yellow-100 text-yellow-800">Expiring</span>
+                        <p class="text-xs text-yellow-600 mt-1">{{ vendor.license_days }} days</p>
+                        {% else %}
+                        <span class="px-2 py-1 text-xs font-medium rounded bg-red-100 text-red-800">Expired</span>
+                        {% endif %}
+                    </td>
+                    <td class="px-6 py-4 text-center">
+                        <div class="flex justify-center space-x-1">
+                            {% for cert in vendor.certifications[:3] %}
+                            <span class="w-2 h-2 rounded-full {% if cert.valid %}bg-green-500{% else %}bg-red-500{% endif %}"
+                                title="{{ cert.name }}: {% if cert.valid %}Valid{% else %}Expired{% endif %}"></span>
+                            {% endfor %}
+                        </div>
+                        <p class="text-xs text-gray-500">{{ vendor.cert_count }} total</p>
+                    </td>
+                    <td class="px-6 py-4">
+                        {% if vendor.compliance_status == 'Compliant' %}
+                        <span class="px-2 py-1 text-xs font-medium rounded bg-green-100 text-green-800">Compliant</span>
+                        {% elif vendor.compliance_status == 'Expiring' %}
+                        <span class="px-2 py-1 text-xs font-medium rounded bg-yellow-100 text-yellow-800">Expiring Soon</span>
+                        {% else %}
+                        <span class="px-2 py-1 text-xs font-medium rounded bg-red-100 text-red-800">Non-Compliant</span>
+                        {% endif %}
+                    </td>
+                    <td class="px-6 py-4">
+                        <div class="flex space-x-2">
+                            <button onclick="sendReminder('{{ vendor.vendor_id }}')" class="text-blue-600 hover:text-blue-800 text-sm">
+                                Remind
+                            </button>
+                            <button onclick="viewHistory('{{ vendor.vendor_id }}')" class="text-gray-600 hover:text-gray-800 text-sm">
+                                History
+                            </button>
+                        </div>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    // Compliance Status Chart
+    Plotly.newPlot('complianceChart', [{
+        type: 'pie',
+        labels: ['Compliant', 'Expiring Soon', 'Non-Compliant'],
+        values: [{{ summary.compliant }}, {{ summary.expiring_soon }}, {{ summary.non_compliant }}],
+        hole: 0.4,
+        marker: {
+            colors: ['#22C55E', '#EAB308', '#EF4444']
+        },
+        textinfo: 'label+value'
+    }], {
+        margin: { t: 20, b: 20, l: 20, r: 20 },
+        showlegend: false
+    }, { responsive: true });
+
+    // Expiration Timeline Chart
+    const expirationData = {{ expiration_timeline | tojson | safe }};
+    Plotly.newPlot('expirationChart', [{
+        type: 'bar',
+        x: expirationData.map(d => d.month),
+        y: expirationData.map(d => d.count),
+        marker: {
+            color: expirationData.map(d => d.count > 3 ? '#EF4444' : d.count > 0 ? '#EAB308' : '#22C55E')
+        }
+    }], {
+        margin: { t: 20, b: 80, l: 40, r: 20 },
+        yaxis: { title: 'Expiring Items' },
+        xaxis: { tickangle: -45 }
+    }, { responsive: true });
+
+    // Filter vendors
+    function filterVendors() {
+        const searchTerm = document.getElementById('vendorSearch').value.toLowerCase();
+        const statusFilter = document.getElementById('statusFilter').value;
+        const rows = document.querySelectorAll('.vendor-row');
+
+        rows.forEach(row => {
+            const name = row.dataset.name;
+            const status = row.dataset.status;
+
+            let showBySearch = name.includes(searchTerm);
+            let showByStatus = !statusFilter || status.includes(statusFilter);
+
+            row.style.display = (showBySearch && showByStatus) ? '' : 'none';
+        });
+    }
+
+    // Send reminder
+    function sendReminder(vendorId) {
+        if (confirm('Send compliance reminder to this vendor?')) {
+            fetch(`/api/vendor/${vendorId}/compliance-reminder`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' }
+            }).then(() => {
+                showNotification('Reminder sent successfully', 'success');
+            });
+        }
+    }
+
+    // Send bulk reminders
+    function sendComplianceReminders() {
+        if (confirm('Send compliance reminders to all vendors with expiring or expired documentation?')) {
+            showNotification('Sending reminders to {{ summary.expiring_soon + summary.non_compliant }} vendors...', 'info');
+            setTimeout(() => {
+                showNotification('All reminders sent successfully', 'success');
+            }, 2000);
+        }
+    }
+
+    // View compliance history
+    function viewHistory(vendorId) {
+        window.location.href = `/vendor/${vendorId}#compliance-history`;
+    }
+
+    function showNotification(message, type) {
+        const notification = document.createElement('div');
+        notification.className = `fixed bottom-4 right-4 px-6 py-3 rounded-lg shadow-lg text-white z-50 ${
+            type === 'success' ? 'bg-green-600' : type === 'error' ? 'bg-red-600' : 'bg-blue-600'
+        }`;
+        notification.textContent = message;
+        document.body.appendChild(notification);
+        setTimeout(() => notification.remove(), 3000);
+    }
+</script>
+{% endblock %}

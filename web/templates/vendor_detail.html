@@ -1,0 +1,287 @@
+{% extends "base.html" %}
+
+{% block content %}
+<!-- Breadcrumb -->
+<nav class="flex mb-6" aria-label="Breadcrumb">
+    <ol class="inline-flex items-center space-x-1 md:space-x-3">
+        <li><a href="{{ url_for('vendors_list') }}" class="text-gray-500 dark:text-gray-400 hover:text-blue-600">Vendors</a></li>
+        <li class="flex items-center">
+            <svg class="w-4 h-4 text-gray-400 mx-2" fill="currentColor" viewBox="0 0 20 20">
+                <path fill-rule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clip-rule="evenodd"></path>
+            </svg>
+            <span class="text-gray-800 dark:text-white font-medium">{{ vendor.name }}</span>
+        </li>
+    </ol>
+</nav>
+
+<!-- Vendor Header -->
+<div class="bg-white dark:bg-gray-800 rounded-lg shadow mb-6">
+    <div class="p-6">
+        <div class="flex flex-col md:flex-row md:items-start md:justify-between">
+            <div class="flex-1">
+                <div class="flex items-center space-x-3 mb-2">
+                    <h1 class="text-2xl font-bold text-gray-800 dark:text-white">{{ vendor.name }}</h1>
+                    <span class="px-3 py-1 text-sm font-medium rounded-full
+                        {% if vendor.status == 'Active' %}bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200
+                        {% elif vendor.status == 'Inactive' %}bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-200
+                        {% else %}bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200{% endif %}">
+                        {{ vendor.status }}
+                    </span>
+                </div>
+                <p class="text-gray-500 dark:text-gray-400">{{ vendor.category }}</p>
+
+                <!-- Certifications -->
+                <div class="flex items-center space-x-2 mt-3">
+                    {% if vendor.minority_owned %}
+                    <span class="px-2 py-1 text-xs bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200 rounded">Minority-Owned (MBE)</span>
+                    {% endif %}
+                    {% if vendor.woman_owned %}
+                    <span class="px-2 py-1 text-xs bg-pink-100 text-pink-800 dark:bg-pink-900 dark:text-pink-200 rounded">Woman-Owned (WBE)</span>
+                    {% endif %}
+                </div>
+
+                <!-- Contact Info -->
+                <div class="mt-4 grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+                    <div>
+                        <p class="text-gray-500 dark:text-gray-400">Contact</p>
+                        <p class="text-gray-800 dark:text-white">{{ vendor.contact_name or 'Not specified' }}</p>
+                        {% if vendor.contact_phone %}
+                        <p class="text-gray-600 dark:text-gray-300">{{ vendor.contact_phone }}</p>
+                        {% endif %}
+                        {% if vendor.contact_email %}
+                        <a href="mailto:{{ vendor.contact_email }}" class="text-blue-600 dark:text-blue-400 hover:underline">{{ vendor.contact_email }}</a>
+                        {% endif %}
+                    </div>
+                    <div>
+                        <p class="text-gray-500 dark:text-gray-400">Address</p>
+                        <p class="text-gray-800 dark:text-white">{{ vendor.address or 'Not specified' }}</p>
+                        {% if vendor.city %}
+                        <p class="text-gray-600 dark:text-gray-300">{{ vendor.city }}, {{ vendor.state }} {{ vendor.zip_code }}</p>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+
+            <!-- Performance Score Circle -->
+            <div class="mt-4 md:mt-0 md:ml-6 flex flex-col items-end">
+                <div class="relative w-24 h-24">
+                    <svg class="w-24 h-24 transform -rotate-90">
+                        <circle cx="48" cy="48" r="40" stroke="currentColor" stroke-width="8" fill="none"
+                                class="text-gray-200 dark:text-gray-700"></circle>
+                        <circle cx="48" cy="48" r="40" stroke="currentColor" stroke-width="8" fill="none"
+                                stroke-dasharray="{{ (performance_score * 251.2 / 100)|int }} 251.2"
+                                class="{% if performance_score < 50 %}text-red-500{% elif performance_score < 70 %}text-yellow-500{% else %}text-green-500{% endif %}"></circle>
+                    </svg>
+                    <div class="absolute inset-0 flex items-center justify-center">
+                        <span class="text-2xl font-bold {% if performance_score < 50 %}text-red-600{% elif performance_score < 70 %}text-yellow-600{% else %}text-green-600{% endif %}">{{ performance_score|int }}</span>
+                    </div>
+                </div>
+                <p class="text-sm text-gray-500 dark:text-gray-400 mt-1">Performance Score</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Stats and Compliance -->
+<div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
+    <!-- Contract Stats -->
+    <div class="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
+        <h3 class="text-lg font-semibold text-gray-800 dark:text-white mb-4">Contract Statistics</h3>
+        <div class="space-y-4">
+            <div class="flex justify-between py-2 border-b dark:border-gray-700">
+                <span class="text-gray-600 dark:text-gray-400">Total Contracts</span>
+                <span class="font-medium text-gray-800 dark:text-white">{{ stats.total_contracts }}</span>
+            </div>
+            <div class="flex justify-between py-2 border-b dark:border-gray-700">
+                <span class="text-gray-600 dark:text-gray-400">Active Contracts</span>
+                <span class="font-medium text-green-600">{{ stats.active_contracts }}</span>
+            </div>
+            <div class="flex justify-between py-2 border-b dark:border-gray-700">
+                <span class="text-gray-600 dark:text-gray-400">Completed</span>
+                <span class="font-medium text-blue-600">{{ stats.completed_contracts }}</span>
+            </div>
+            <div class="flex justify-between py-2 border-b dark:border-gray-700">
+                <span class="text-gray-600 dark:text-gray-400">Total Value</span>
+                <span class="font-bold text-gray-800 dark:text-white">${{ '{:,.0f}'.format(stats.total_value) }}</span>
+            </div>
+            <div class="flex justify-between py-2">
+                <span class="text-gray-600 dark:text-gray-400">Amount Paid</span>
+                <span class="font-medium text-green-600">${{ '{:,.0f}'.format(stats.total_paid) }}</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Performance Metrics -->
+    <div class="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
+        <h3 class="text-lg font-semibold text-gray-800 dark:text-white mb-4">Performance Metrics</h3>
+        <div class="space-y-4">
+            <div>
+                <div class="flex justify-between mb-1">
+                    <span class="text-sm text-gray-600 dark:text-gray-400">On-Time Delivery</span>
+                    <span class="text-sm font-medium">{{ metrics.on_time_pct|int }}%</span>
+                </div>
+                <div class="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
+                    <div class="h-2 rounded-full {% if metrics.on_time_pct < 70 %}bg-red-500{% elif metrics.on_time_pct < 85 %}bg-yellow-500{% else %}bg-green-500{% endif %}"
+                         style="width: {{ metrics.on_time_pct }}%"></div>
+                </div>
+            </div>
+            <div>
+                <div class="flex justify-between mb-1">
+                    <span class="text-sm text-gray-600 dark:text-gray-400">Budget Adherence</span>
+                    <span class="text-sm font-medium">{{ metrics.budget_adherence|int }}%</span>
+                </div>
+                <div class="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
+                    <div class="h-2 rounded-full {% if metrics.budget_adherence < 70 %}bg-red-500{% elif metrics.budget_adherence < 85 %}bg-yellow-500{% else %}bg-green-500{% endif %}"
+                         style="width: {{ metrics.budget_adherence }}%"></div>
+                </div>
+            </div>
+            <div>
+                <div class="flex justify-between mb-1">
+                    <span class="text-sm text-gray-600 dark:text-gray-400">Quality Score</span>
+                    <span class="text-sm font-medium">{{ metrics.quality_score|int }}</span>
+                </div>
+                <div class="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
+                    <div class="h-2 rounded-full {% if metrics.quality_score < 50 %}bg-red-500{% elif metrics.quality_score < 70 %}bg-yellow-500{% else %}bg-green-500{% endif %}"
+                         style="width: {{ metrics.quality_score }}%"></div>
+                </div>
+            </div>
+            <div class="pt-2 border-t dark:border-gray-700">
+                <div class="flex justify-between text-sm">
+                    <span class="text-gray-600 dark:text-gray-400">Total Change Orders</span>
+                    <span class="font-medium {% if metrics.total_change_orders > 10 %}text-red-600{% else %}text-gray-800 dark:text-white{% endif %}">{{ metrics.total_change_orders }}</span>
+                </div>
+                <div class="flex justify-between text-sm mt-2">
+                    <span class="text-gray-600 dark:text-gray-400">Open Issues</span>
+                    <span class="font-medium {% if metrics.open_issues > 0 %}text-red-600{% else %}text-green-600{% endif %}">{{ metrics.open_issues }}</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Compliance Status -->
+    <div class="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
+        <h3 class="text-lg font-semibold text-gray-800 dark:text-white mb-4">Compliance Status</h3>
+        <div class="space-y-4">
+            <!-- Insurance -->
+            <div class="p-3 rounded-lg border dark:border-gray-700
+                {% if not vendor.insurance_expiry %}bg-gray-50 dark:bg-gray-700
+                {% elif insurance_status == 'expired' %}bg-red-50 dark:bg-red-900/30 border-red-300
+                {% elif insurance_status == 'expiring' %}bg-yellow-50 dark:bg-yellow-900/30 border-yellow-300
+                {% else %}bg-green-50 dark:bg-green-900/30 border-green-300{% endif %}">
+                <div class="flex items-center justify-between">
+                    <div class="flex items-center">
+                        <svg class="w-5 h-5 mr-2 {% if insurance_status == 'valid' %}text-green-600{% elif insurance_status == 'expiring' %}text-yellow-600{% else %}text-red-600{% endif %}" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"></path>
+                        </svg>
+                        <span class="font-medium text-gray-800 dark:text-white">Insurance</span>
+                    </div>
+                    <span class="text-sm {% if insurance_status == 'valid' %}text-green-600{% elif insurance_status == 'expiring' %}text-yellow-600{% else %}text-red-600{% endif %}">
+                        {% if vendor.insurance_expiry %}{{ vendor.insurance_expiry }}{% else %}Not on file{% endif %}
+                    </span>
+                </div>
+            </div>
+
+            <!-- License -->
+            <div class="p-3 rounded-lg border dark:border-gray-700
+                {% if not vendor.license_expiry %}bg-gray-50 dark:bg-gray-700
+                {% elif license_status == 'expired' %}bg-red-50 dark:bg-red-900/30 border-red-300
+                {% elif license_status == 'expiring' %}bg-yellow-50 dark:bg-yellow-900/30 border-yellow-300
+                {% else %}bg-green-50 dark:bg-green-900/30 border-green-300{% endif %}">
+                <div class="flex items-center justify-between">
+                    <div class="flex items-center">
+                        <svg class="w-5 h-5 mr-2 {% if license_status == 'valid' %}text-green-600{% elif license_status == 'expiring' %}text-yellow-600{% else %}text-red-600{% endif %}" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+                        </svg>
+                        <span class="font-medium text-gray-800 dark:text-white">License</span>
+                    </div>
+                    <span class="text-sm {% if license_status == 'valid' %}text-green-600{% elif license_status == 'expiring' %}text-yellow-600{% else %}text-red-600{% endif %}">
+                        {% if vendor.license_expiry %}{{ vendor.license_expiry }}{% else %}Not on file{% endif %}
+                    </span>
+                </div>
+            </div>
+
+            <!-- Tax ID / DUNS -->
+            <div class="grid grid-cols-2 gap-3 pt-2">
+                <div class="text-sm">
+                    <p class="text-gray-500 dark:text-gray-400">Tax ID</p>
+                    <p class="font-medium text-gray-800 dark:text-white">{{ vendor.tax_id or 'Not provided' }}</p>
+                </div>
+                <div class="text-sm">
+                    <p class="text-gray-500 dark:text-gray-400">DUNS Number</p>
+                    <p class="font-medium text-gray-800 dark:text-white">{{ vendor.duns_number or 'Not provided' }}</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Contracts List -->
+<div class="bg-white dark:bg-gray-800 rounded-lg shadow">
+    <div class="px-6 py-4 border-b dark:border-gray-700">
+        <h3 class="text-lg font-semibold text-gray-800 dark:text-white">Contracts</h3>
+    </div>
+    <div class="overflow-x-auto">
+        <table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+            <thead class="bg-gray-50 dark:bg-gray-700">
+                <tr>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Contract</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Department</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Value</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Status</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Health</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Duration</th>
+                </tr>
+            </thead>
+            <tbody class="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
+                {% for contract in contracts %}
+                <tr class="hover:bg-gray-50 dark:hover:bg-gray-700 cursor-pointer"
+                    onclick="window.location='{{ url_for('contract_detail', contract_id=contract.contract_id) }}'">
+                    <td class="px-6 py-4">
+                        <p class="font-medium text-gray-800 dark:text-white">{{ contract.title[:40] }}{% if contract.title|length > 40 %}...{% endif %}</p>
+                        <p class="text-xs text-gray-500 dark:text-gray-400">{{ contract.contract_number }}</p>
+                    </td>
+                    <td class="px-6 py-4 text-sm text-gray-600 dark:text-gray-300">{{ contract.department }}</td>
+                    <td class="px-6 py-4">
+                        <p class="text-sm font-medium text-gray-800 dark:text-white">${{ '{:,.0f}'.format(contract.current_amount or contract.original_amount) }}</p>
+                        {% if contract.current_amount and contract.current_amount > contract.original_amount %}
+                        <p class="text-xs text-red-600">+${{ '{:,.0f}'.format(contract.current_amount - contract.original_amount) }}</p>
+                        {% endif %}
+                    </td>
+                    <td class="px-6 py-4">
+                        <span class="px-2 py-1 text-xs font-medium rounded-full
+                            {% if contract.status == 'Active' %}bg-green-100 text-green-800
+                            {% elif contract.status == 'Completed' %}bg-blue-100 text-blue-800
+                            {% else %}bg-gray-100 text-gray-800{% endif %}">
+                            {{ contract.status }}
+                        </span>
+                    </td>
+                    <td class="px-6 py-4">
+                        {% set health = contract.overall_health_score|int if contract.overall_health_score else 100 %}
+                        <div class="flex items-center">
+                            <div class="w-12 bg-gray-200 dark:bg-gray-600 rounded-full h-2 mr-2">
+                                <div class="h-2 rounded-full
+                                    {% if health < 30 %}bg-red-600
+                                    {% elif health < 50 %}bg-orange-500
+                                    {% elif health < 70 %}bg-yellow-500
+                                    {% else %}bg-green-500{% endif %}"
+                                    style="width: {{ health }}%"></div>
+                            </div>
+                            <span class="text-sm">{{ health }}</span>
+                        </div>
+                    </td>
+                    <td class="px-6 py-4 text-sm text-gray-500 dark:text-gray-400">
+                        {{ contract.start_date }} - {{ contract.end_date }}
+                    </td>
+                </tr>
+                {% else %}
+                <tr>
+                    <td colspan="6" class="px-6 py-12 text-center text-gray-500 dark:text-gray-400">
+                        No contracts found for this vendor
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,289 @@
+{% extends "base.html" %}
+
+{% block content %}
+<!-- Page Header -->
+<div class="flex items-center justify-between mb-6">
+    <div>
+        <h1 class="text-2xl font-bold text-gray-800 dark:text-white">Contract Timeline</h1>
+        <p class="text-gray-500 dark:text-gray-400">Visual timeline of all contracts</p>
+    </div>
+    <div class="flex space-x-3">
+        <select id="departmentFilter" onchange="filterTimeline()" class="px-3 py-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 dark:text-white">
+            <option value="">All Departments</option>
+            {% for dept in departments %}
+            <option value="{{ dept }}">{{ dept }}</option>
+            {% endfor %}
+        </select>
+        <select id="statusFilter" onchange="filterTimeline()" class="px-3 py-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 dark:text-white">
+            <option value="">All Statuses</option>
+            <option value="Active">Active</option>
+            <option value="Completed">Completed</option>
+            <option value="Draft">Draft</option>
+        </select>
+    </div>
+</div>
+
+<!-- Timeline Legend -->
+<div class="bg-white dark:bg-gray-800 rounded-lg shadow p-4 mb-6">
+    <div class="flex items-center space-x-6 text-sm">
+        <span class="font-medium text-gray-700 dark:text-gray-300">Legend:</span>
+        <div class="flex items-center">
+            <div class="w-4 h-4 bg-green-500 rounded mr-2"></div>
+            <span class="text-gray-600 dark:text-gray-400">On Track</span>
+        </div>
+        <div class="flex items-center">
+            <div class="w-4 h-4 bg-yellow-500 rounded mr-2"></div>
+            <span class="text-gray-600 dark:text-gray-400">Warning</span>
+        </div>
+        <div class="flex items-center">
+            <div class="w-4 h-4 bg-orange-500 rounded mr-2"></div>
+            <span class="text-gray-600 dark:text-gray-400">At Risk</span>
+        </div>
+        <div class="flex items-center">
+            <div class="w-4 h-4 bg-red-500 rounded mr-2"></div>
+            <span class="text-gray-600 dark:text-gray-400">Critical</span>
+        </div>
+        <div class="flex items-center">
+            <div class="w-4 h-4 bg-blue-500 rounded mr-2"></div>
+            <span class="text-gray-600 dark:text-gray-400">Completed</span>
+        </div>
+    </div>
+</div>
+
+<!-- Gantt Chart -->
+<div class="bg-white dark:bg-gray-800 rounded-lg shadow p-6 mb-6">
+    <div id="ganttChart" style="height: 500px;"></div>
+</div>
+
+<!-- Timeline List -->
+<div class="bg-white dark:bg-gray-800 rounded-lg shadow">
+    <div class="px-6 py-4 border-b dark:border-gray-700">
+        <h3 class="text-lg font-semibold text-gray-800 dark:text-white">Contract Schedule</h3>
+    </div>
+    <div class="overflow-x-auto">
+        <table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+            <thead class="bg-gray-50 dark:bg-gray-700">
+                <tr>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Contract</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Vendor</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Start</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">End</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Duration</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Progress</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Status</th>
+                </tr>
+            </thead>
+            <tbody class="divide-y divide-gray-200 dark:divide-gray-700" id="timelineTable">
+                {% for contract in contracts %}
+                <tr class="hover:bg-gray-50 dark:hover:bg-gray-700 contract-row"
+                    data-department="{{ contract.department }}"
+                    data-status="{{ contract.status }}">
+                    <td class="px-6 py-4">
+                        <a href="{{ url_for('contract_detail', contract_id=contract.contract_id) }}" class="font-medium text-blue-600 dark:text-blue-400 hover:underline">
+                            {{ contract.title[:35] }}{% if contract.title|length > 35 %}...{% endif %}
+                        </a>
+                        <p class="text-xs text-gray-500">{{ contract.department }}</p>
+                    </td>
+                    <td class="px-6 py-4 text-sm text-gray-600 dark:text-gray-300">{{ contract.vendor_name }}</td>
+                    <td class="px-6 py-4 text-sm text-gray-600 dark:text-gray-300">{{ contract.start_date }}</td>
+                    <td class="px-6 py-4 text-sm text-gray-600 dark:text-gray-300">{{ contract.current_end_date or contract.end_date }}</td>
+                    <td class="px-6 py-4 text-sm text-gray-600 dark:text-gray-300">
+                        {{ contract.duration_days }} days
+                    </td>
+                    <td class="px-6 py-4">
+                        <div class="flex items-center">
+                            <div class="w-24 bg-gray-200 dark:bg-gray-600 rounded-full h-2 mr-2">
+                                <div class="h-2 rounded-full
+                                    {% if contract.status == 'Completed' %}bg-blue-500
+                                    {% elif contract.overall_health_score < 30 %}bg-red-500
+                                    {% elif contract.overall_health_score < 50 %}bg-orange-500
+                                    {% elif contract.overall_health_score < 70 %}bg-yellow-500
+                                    {% else %}bg-green-500{% endif %}"
+                                    style="width: {{ contract.percent_complete or 0 }}%"></div>
+                            </div>
+                            <span class="text-sm">{{ contract.percent_complete or 0 }}%</span>
+                        </div>
+                    </td>
+                    <td class="px-6 py-4">
+                        <span class="px-2 py-1 text-xs font-medium rounded-full
+                            {% if contract.status == 'Active' %}bg-green-100 text-green-800
+                            {% elif contract.status == 'Completed' %}bg-blue-100 text-blue-800
+                            {% else %}bg-gray-100 text-gray-800{% endif %}">
+                            {{ contract.status }}
+                        </span>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- Upcoming Milestones -->
+<div class="bg-white dark:bg-gray-800 rounded-lg shadow mt-6">
+    <div class="px-6 py-4 border-b dark:border-gray-700">
+        <h3 class="text-lg font-semibold text-gray-800 dark:text-white">Upcoming Milestones (Next 30 Days)</h3>
+    </div>
+    <div class="p-6">
+        {% if upcoming_milestones %}
+        <div class="space-y-4">
+            {% for milestone in upcoming_milestones %}
+            <div class="flex items-center justify-between p-4 border dark:border-gray-700 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700">
+                <div class="flex items-center space-x-4">
+                    <div class="p-2 rounded-full
+                        {% if milestone.days_until <= 7 %}bg-red-100 dark:bg-red-900
+                        {% elif milestone.days_until <= 14 %}bg-yellow-100 dark:bg-yellow-900
+                        {% else %}bg-blue-100 dark:bg-blue-900{% endif %}">
+                        <svg class="w-5 h-5
+                            {% if milestone.days_until <= 7 %}text-red-600
+                            {% elif milestone.days_until <= 14 %}text-yellow-600
+                            {% else %}text-blue-600{% endif %}" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
+                        </svg>
+                    </div>
+                    <div>
+                        <p class="font-medium text-gray-800 dark:text-white">{{ milestone.title }}</p>
+                        <p class="text-sm text-gray-500 dark:text-gray-400">
+                            <a href="{{ url_for('contract_detail', contract_id=milestone.contract_id) }}" class="text-blue-600 hover:underline">
+                                {{ milestone.contract_title }}
+                            </a>
+                        </p>
+                    </div>
+                </div>
+                <div class="text-right">
+                    <p class="font-medium
+                        {% if milestone.days_until <= 7 %}text-red-600
+                        {% elif milestone.days_until <= 14 %}text-yellow-600
+                        {% else %}text-gray-800 dark:text-white{% endif %}">
+                        {% if milestone.days_until == 0 %}Today
+                        {% elif milestone.days_until == 1 %}Tomorrow
+                        {% else %}In {{ milestone.days_until }} days{% endif %}
+                    </p>
+                    <p class="text-sm text-gray-500">{{ milestone.due_date }}</p>
+                    {% if milestone.payment_amount %}
+                    <p class="text-sm font-medium text-green-600">${{ '{:,.0f}'.format(milestone.payment_amount) }}</p>
+                    {% endif %}
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+        {% else %}
+        <p class="text-center text-gray-500 dark:text-gray-400 py-8">No upcoming milestones in the next 30 days</p>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    // Contract data for Gantt chart
+    const contracts = {{ contracts | tojson | safe }};
+
+    // Build Gantt chart data
+    const ganttData = contracts.map(c => {
+        let color;
+        if (c.status === 'Completed') {
+            color = '#3B82F6';
+        } else if (c.overall_health_score < 30) {
+            color = '#EF4444';
+        } else if (c.overall_health_score < 50) {
+            color = '#F97316';
+        } else if (c.overall_health_score < 70) {
+            color = '#EAB308';
+        } else {
+            color = '#22C55E';
+        }
+
+        return {
+            x: [c.start_date, c.current_end_date || c.end_date],
+            y: [c.title.substring(0, 30) + (c.title.length > 30 ? '...' : '')],
+            type: 'bar',
+            orientation: 'h',
+            marker: { color: color },
+            hovertemplate: `<b>${c.title}</b><br>` +
+                           `Vendor: ${c.vendor_name}<br>` +
+                           `${c.start_date} to ${c.current_end_date || c.end_date}<br>` +
+                           `Progress: ${c.percent_complete || 0}%<br>` +
+                           `Health: ${Math.round(c.overall_health_score)}<extra></extra>`,
+            showlegend: false
+        };
+    });
+
+    // Create timeline bars using shapes
+    const today = new Date().toISOString().split('T')[0];
+
+    Plotly.newPlot('ganttChart', [{
+        type: 'scatter',
+        mode: 'markers',
+        x: contracts.map(c => c.start_date),
+        y: contracts.map(c => c.title.substring(0, 35)),
+        marker: { size: 0 },
+        showlegend: false
+    }], {
+        shapes: contracts.map((c, i) => {
+            let color;
+            if (c.status === 'Completed') {
+                color = '#3B82F6';
+            } else if (c.overall_health_score < 30) {
+                color = '#EF4444';
+            } else if (c.overall_health_score < 50) {
+                color = '#F97316';
+            } else if (c.overall_health_score < 70) {
+                color = '#EAB308';
+            } else {
+                color = '#22C55E';
+            }
+
+            return {
+                type: 'rect',
+                x0: c.start_date,
+                x1: c.current_end_date || c.end_date,
+                y0: i - 0.4,
+                y1: i + 0.4,
+                fillcolor: color,
+                opacity: 0.8,
+                line: { width: 0 }
+            };
+        }).concat([{
+            type: 'line',
+            x0: today,
+            x1: today,
+            y0: -1,
+            y1: contracts.length,
+            line: { color: '#EF4444', width: 2, dash: 'dash' }
+        }]),
+        annotations: [{
+            x: today,
+            y: contracts.length - 0.5,
+            text: 'Today',
+            showarrow: false,
+            font: { color: '#EF4444', size: 10 }
+        }],
+        margin: { t: 20, b: 40, l: 250, r: 20 },
+        xaxis: {
+            type: 'date',
+            title: 'Date'
+        },
+        yaxis: {
+            ticktext: contracts.map(c => c.title.substring(0, 35) + (c.title.length > 35 ? '...' : '')),
+            tickvals: contracts.map((c, i) => i),
+            automargin: true
+        }
+    }, { responsive: true });
+
+    function filterTimeline() {
+        const dept = document.getElementById('departmentFilter').value;
+        const status = document.getElementById('statusFilter').value;
+
+        document.querySelectorAll('.contract-row').forEach(row => {
+            const rowDept = row.dataset.department;
+            const rowStatus = row.dataset.status;
+
+            const matchDept = !dept || rowDept === dept;
+            const matchStatus = !status || rowStatus === status;
+
+            row.style.display = (matchDept && matchStatus) ? '' : 'none';
+        });
+    }
+</script>
+{% endblock %}

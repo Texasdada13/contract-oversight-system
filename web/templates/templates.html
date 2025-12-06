@@ -1,0 +1,476 @@
+{% extends "base.html" %}
+
+{% block content %}
+<!-- Page Header -->
+<div class="flex items-center justify-between mb-6">
+    <div>
+        <h1 class="text-2xl font-bold text-gray-800 dark:text-white">Contract Templates</h1>
+        <p class="text-gray-500 dark:text-gray-400">Pre-defined templates for common contract types</p>
+    </div>
+    <button onclick="openCreateTemplateModal()" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 flex items-center">
+        <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path>
+        </svg>
+        Create Template
+    </button>
+</div>
+
+<!-- Template Categories -->
+<div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
+    <button onclick="filterTemplates('all')" class="template-filter-btn active bg-blue-600 text-white px-4 py-3 rounded-lg text-center hover:bg-blue-700">
+        All Templates
+    </button>
+    <button onclick="filterTemplates('construction')" class="template-filter-btn bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 px-4 py-3 rounded-lg text-center hover:bg-gray-50 dark:hover:bg-gray-700 shadow">
+        Construction
+    </button>
+    <button onclick="filterTemplates('services')" class="template-filter-btn bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 px-4 py-3 rounded-lg text-center hover:bg-gray-50 dark:hover:bg-gray-700 shadow">
+        Services
+    </button>
+    <button onclick="filterTemplates('procurement')" class="template-filter-btn bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 px-4 py-3 rounded-lg text-center hover:bg-gray-50 dark:hover:bg-gray-700 shadow">
+        Procurement
+    </button>
+</div>
+
+<!-- Templates Grid -->
+<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6" id="templatesGrid">
+    <!-- Fixed Price Construction -->
+    <div class="template-card bg-white dark:bg-gray-800 rounded-lg shadow hover:shadow-lg transition-shadow" data-category="construction">
+        <div class="p-6">
+            <div class="flex items-start justify-between">
+                <div class="w-12 h-12 bg-blue-100 dark:bg-blue-900 rounded-lg flex items-center justify-center">
+                    <svg class="w-6 h-6 text-blue-600 dark:text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"></path>
+                    </svg>
+                </div>
+                <span class="px-2 py-1 text-xs bg-blue-100 text-blue-800 rounded">Construction</span>
+            </div>
+            <h3 class="text-lg font-semibold text-gray-800 dark:text-white mt-4">Fixed Price Construction</h3>
+            <p class="text-sm text-gray-500 dark:text-gray-400 mt-2">Standard fixed-price contract for building and renovation projects</p>
+            <div class="mt-4 space-y-2 text-sm">
+                <div class="flex justify-between text-gray-600 dark:text-gray-400">
+                    <span>Contract Type:</span>
+                    <span class="font-medium text-gray-800 dark:text-white">Fixed Price</span>
+                </div>
+                <div class="flex justify-between text-gray-600 dark:text-gray-400">
+                    <span>Default Milestones:</span>
+                    <span class="font-medium text-gray-800 dark:text-white">5</span>
+                </div>
+                <div class="flex justify-between text-gray-600 dark:text-gray-400">
+                    <span>Payment Schedule:</span>
+                    <span class="font-medium text-gray-800 dark:text-white">Milestone-based</span>
+                </div>
+            </div>
+            <div class="mt-6 flex space-x-2">
+                <button onclick="useTemplate('fixed-construction')" class="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">
+                    Use Template
+                </button>
+                <button onclick="previewTemplate('fixed-construction')" class="px-4 py-2 border rounded-lg text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700">
+                    Preview
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Time & Materials Construction -->
+    <div class="template-card bg-white dark:bg-gray-800 rounded-lg shadow hover:shadow-lg transition-shadow" data-category="construction">
+        <div class="p-6">
+            <div class="flex items-start justify-between">
+                <div class="w-12 h-12 bg-orange-100 dark:bg-orange-900 rounded-lg flex items-center justify-center">
+                    <svg class="w-6 h-6 text-orange-600 dark:text-orange-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                    </svg>
+                </div>
+                <span class="px-2 py-1 text-xs bg-orange-100 text-orange-800 rounded">Construction</span>
+            </div>
+            <h3 class="text-lg font-semibold text-gray-800 dark:text-white mt-4">Time & Materials</h3>
+            <p class="text-sm text-gray-500 dark:text-gray-400 mt-2">Flexible contract for projects with uncertain scope</p>
+            <div class="mt-4 space-y-2 text-sm">
+                <div class="flex justify-between text-gray-600 dark:text-gray-400">
+                    <span>Contract Type:</span>
+                    <span class="font-medium text-gray-800 dark:text-white">Time & Materials</span>
+                </div>
+                <div class="flex justify-between text-gray-600 dark:text-gray-400">
+                    <span>Default Milestones:</span>
+                    <span class="font-medium text-gray-800 dark:text-white">Monthly</span>
+                </div>
+                <div class="flex justify-between text-gray-600 dark:text-gray-400">
+                    <span>Payment Schedule:</span>
+                    <span class="font-medium text-gray-800 dark:text-white">Monthly invoicing</span>
+                </div>
+            </div>
+            <div class="mt-6 flex space-x-2">
+                <button onclick="useTemplate('tm-construction')" class="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">
+                    Use Template
+                </button>
+                <button onclick="previewTemplate('tm-construction')" class="px-4 py-2 border rounded-lg text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700">
+                    Preview
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Professional Services -->
+    <div class="template-card bg-white dark:bg-gray-800 rounded-lg shadow hover:shadow-lg transition-shadow" data-category="services">
+        <div class="p-6">
+            <div class="flex items-start justify-between">
+                <div class="w-12 h-12 bg-green-100 dark:bg-green-900 rounded-lg flex items-center justify-center">
+                    <svg class="w-6 h-6 text-green-600 dark:text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 13.255A23.931 23.931 0 0112 15c-3.183 0-6.22-.62-9-1.745M16 6V4a2 2 0 00-2-2h-4a2 2 0 00-2 2v2m4 6h.01M5 20h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"></path>
+                    </svg>
+                </div>
+                <span class="px-2 py-1 text-xs bg-green-100 text-green-800 rounded">Services</span>
+            </div>
+            <h3 class="text-lg font-semibold text-gray-800 dark:text-white mt-4">Professional Services</h3>
+            <p class="text-sm text-gray-500 dark:text-gray-400 mt-2">Consulting, legal, and professional service agreements</p>
+            <div class="mt-4 space-y-2 text-sm">
+                <div class="flex justify-between text-gray-600 dark:text-gray-400">
+                    <span>Contract Type:</span>
+                    <span class="font-medium text-gray-800 dark:text-white">Fixed Price</span>
+                </div>
+                <div class="flex justify-between text-gray-600 dark:text-gray-400">
+                    <span>Default Term:</span>
+                    <span class="font-medium text-gray-800 dark:text-white">12 months</span>
+                </div>
+                <div class="flex justify-between text-gray-600 dark:text-gray-400">
+                    <span>Payment Schedule:</span>
+                    <span class="font-medium text-gray-800 dark:text-white">Quarterly</span>
+                </div>
+            </div>
+            <div class="mt-6 flex space-x-2">
+                <button onclick="useTemplate('professional-services')" class="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">
+                    Use Template
+                </button>
+                <button onclick="previewTemplate('professional-services')" class="px-4 py-2 border rounded-lg text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700">
+                    Preview
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- IT Services -->
+    <div class="template-card bg-white dark:bg-gray-800 rounded-lg shadow hover:shadow-lg transition-shadow" data-category="services">
+        <div class="p-6">
+            <div class="flex items-start justify-between">
+                <div class="w-12 h-12 bg-purple-100 dark:bg-purple-900 rounded-lg flex items-center justify-center">
+                    <svg class="w-6 h-6 text-purple-600 dark:text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"></path>
+                    </svg>
+                </div>
+                <span class="px-2 py-1 text-xs bg-purple-100 text-purple-800 rounded">Services</span>
+            </div>
+            <h3 class="text-lg font-semibold text-gray-800 dark:text-white mt-4">IT Services & Support</h3>
+            <p class="text-sm text-gray-500 dark:text-gray-400 mt-2">Technology services, maintenance, and support contracts</p>
+            <div class="mt-4 space-y-2 text-sm">
+                <div class="flex justify-between text-gray-600 dark:text-gray-400">
+                    <span>Contract Type:</span>
+                    <span class="font-medium text-gray-800 dark:text-white">Service Level Agreement</span>
+                </div>
+                <div class="flex justify-between text-gray-600 dark:text-gray-400">
+                    <span>Default Term:</span>
+                    <span class="font-medium text-gray-800 dark:text-white">36 months</span>
+                </div>
+                <div class="flex justify-between text-gray-600 dark:text-gray-400">
+                    <span>Payment Schedule:</span>
+                    <span class="font-medium text-gray-800 dark:text-white">Monthly</span>
+                </div>
+            </div>
+            <div class="mt-6 flex space-x-2">
+                <button onclick="useTemplate('it-services')" class="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">
+                    Use Template
+                </button>
+                <button onclick="previewTemplate('it-services')" class="px-4 py-2 border rounded-lg text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700">
+                    Preview
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Equipment Purchase -->
+    <div class="template-card bg-white dark:bg-gray-800 rounded-lg shadow hover:shadow-lg transition-shadow" data-category="procurement">
+        <div class="p-6">
+            <div class="flex items-start justify-between">
+                <div class="w-12 h-12 bg-yellow-100 dark:bg-yellow-900 rounded-lg flex items-center justify-center">
+                    <svg class="w-6 h-6 text-yellow-600 dark:text-yellow-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z"></path>
+                    </svg>
+                </div>
+                <span class="px-2 py-1 text-xs bg-yellow-100 text-yellow-800 rounded">Procurement</span>
+            </div>
+            <h3 class="text-lg font-semibold text-gray-800 dark:text-white mt-4">Equipment Purchase</h3>
+            <p class="text-sm text-gray-500 dark:text-gray-400 mt-2">One-time purchase orders for equipment and supplies</p>
+            <div class="mt-4 space-y-2 text-sm">
+                <div class="flex justify-between text-gray-600 dark:text-gray-400">
+                    <span>Contract Type:</span>
+                    <span class="font-medium text-gray-800 dark:text-white">Purchase Order</span>
+                </div>
+                <div class="flex justify-between text-gray-600 dark:text-gray-400">
+                    <span>Payment Terms:</span>
+                    <span class="font-medium text-gray-800 dark:text-white">Net 30</span>
+                </div>
+                <div class="flex justify-between text-gray-600 dark:text-gray-400">
+                    <span>Warranty:</span>
+                    <span class="font-medium text-gray-800 dark:text-white">Standard included</span>
+                </div>
+            </div>
+            <div class="mt-6 flex space-x-2">
+                <button onclick="useTemplate('equipment-purchase')" class="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">
+                    Use Template
+                </button>
+                <button onclick="previewTemplate('equipment-purchase')" class="px-4 py-2 border rounded-lg text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700">
+                    Preview
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Blanket Purchase Agreement -->
+    <div class="template-card bg-white dark:bg-gray-800 rounded-lg shadow hover:shadow-lg transition-shadow" data-category="procurement">
+        <div class="p-6">
+            <div class="flex items-start justify-between">
+                <div class="w-12 h-12 bg-red-100 dark:bg-red-900 rounded-lg flex items-center justify-center">
+                    <svg class="w-6 h-6 text-red-600 dark:text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"></path>
+                    </svg>
+                </div>
+                <span class="px-2 py-1 text-xs bg-red-100 text-red-800 rounded">Procurement</span>
+            </div>
+            <h3 class="text-lg font-semibold text-gray-800 dark:text-white mt-4">Blanket Purchase Agreement</h3>
+            <p class="text-sm text-gray-500 dark:text-gray-400 mt-2">Framework for recurring purchases with set terms</p>
+            <div class="mt-4 space-y-2 text-sm">
+                <div class="flex justify-between text-gray-600 dark:text-gray-400">
+                    <span>Contract Type:</span>
+                    <span class="font-medium text-gray-800 dark:text-white">BPA</span>
+                </div>
+                <div class="flex justify-between text-gray-600 dark:text-gray-400">
+                    <span>Default Term:</span>
+                    <span class="font-medium text-gray-800 dark:text-white">12 months</span>
+                </div>
+                <div class="flex justify-between text-gray-600 dark:text-gray-400">
+                    <span>Order Type:</span>
+                    <span class="font-medium text-gray-800 dark:text-white">Call orders</span>
+                </div>
+            </div>
+            <div class="mt-6 flex space-x-2">
+                <button onclick="useTemplate('bpa')" class="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">
+                    Use Template
+                </button>
+                <button onclick="previewTemplate('bpa')" class="px-4 py-2 border rounded-lg text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700">
+                    Preview
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Create Template Modal -->
+<div id="createTemplateModal" class="fixed inset-0 bg-black bg-opacity-50 hidden items-center justify-center z-50">
+    <div class="bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-2xl w-full mx-4 max-h-[90vh] overflow-y-auto">
+        <div class="px-6 py-4 border-b dark:border-gray-700 flex justify-between items-center">
+            <h3 class="text-lg font-semibold text-gray-800 dark:text-white">Create Custom Template</h3>
+            <button onclick="closeCreateTemplateModal()" class="text-gray-500 hover:text-gray-700 dark:text-gray-400">
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                </svg>
+            </button>
+        </div>
+        <form id="createTemplateForm" class="p-6 space-y-4">
+            <div>
+                <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Template Name *</label>
+                <input type="text" name="name" required
+                       class="w-full px-3 py-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 dark:text-white">
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Category *</label>
+                <select name="category" required
+                        class="w-full px-3 py-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 dark:text-white">
+                    <option value="construction">Construction</option>
+                    <option value="services">Services</option>
+                    <option value="procurement">Procurement</option>
+                </select>
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Description</label>
+                <textarea name="description" rows="2"
+                          class="w-full px-3 py-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 dark:text-white"></textarea>
+            </div>
+            <div class="grid grid-cols-2 gap-4">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Contract Type</label>
+                    <select name="contract_type"
+                            class="w-full px-3 py-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 dark:text-white">
+                        <option value="Fixed Price">Fixed Price</option>
+                        <option value="Time & Materials">Time & Materials</option>
+                        <option value="Cost Plus">Cost Plus</option>
+                        <option value="Unit Price">Unit Price</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Default Department</label>
+                    <select name="department"
+                            class="w-full px-3 py-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 dark:text-white">
+                        <option value="">None</option>
+                        <option value="School Board">School Board</option>
+                        <option value="City Council">City Council</option>
+                        <option value="Public Works">Public Works</option>
+                        <option value="Parks & Recreation">Parks & Recreation</option>
+                    </select>
+                </div>
+            </div>
+            <div class="grid grid-cols-2 gap-4">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Default Duration (months)</label>
+                    <input type="number" name="duration_months" value="12"
+                           class="w-full px-3 py-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 dark:text-white">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Payment Schedule</label>
+                    <select name="payment_schedule"
+                            class="w-full px-3 py-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 dark:text-white">
+                        <option value="Milestone">Milestone-based</option>
+                        <option value="Monthly">Monthly</option>
+                        <option value="Quarterly">Quarterly</option>
+                        <option value="On Completion">On Completion</option>
+                    </select>
+                </div>
+            </div>
+            <div class="flex justify-end space-x-3 pt-4">
+                <button type="button" onclick="closeCreateTemplateModal()"
+                        class="px-4 py-2 border rounded-lg text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700">
+                    Cancel
+                </button>
+                <button type="submit" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">
+                    Create Template
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    // Template definitions
+    const templates = {
+        'fixed-construction': {
+            name: 'Fixed Price Construction',
+            contract_type: 'Fixed Price',
+            department: 'Public Works',
+            milestones: ['Design Complete', 'Foundation', 'Structure', 'Finishes', 'Final Inspection'],
+            payment_schedule: 'Milestone'
+        },
+        'tm-construction': {
+            name: 'Time & Materials Construction',
+            contract_type: 'Time & Materials',
+            department: 'Public Works',
+            milestones: [],
+            payment_schedule: 'Monthly'
+        },
+        'professional-services': {
+            name: 'Professional Services',
+            contract_type: 'Fixed Price',
+            department: 'Administration',
+            duration_months: 12,
+            payment_schedule: 'Quarterly'
+        },
+        'it-services': {
+            name: 'IT Services & Support',
+            contract_type: 'Time & Materials',
+            department: 'Administration',
+            duration_months: 36,
+            payment_schedule: 'Monthly'
+        },
+        'equipment-purchase': {
+            name: 'Equipment Purchase',
+            contract_type: 'Fixed Price',
+            department: '',
+            payment_schedule: 'On Completion'
+        },
+        'bpa': {
+            name: 'Blanket Purchase Agreement',
+            contract_type: 'Unit Price',
+            department: '',
+            duration_months: 12,
+            payment_schedule: 'Monthly'
+        }
+    };
+
+    function filterTemplates(category) {
+        // Update button styles
+        document.querySelectorAll('.template-filter-btn').forEach(btn => {
+            btn.classList.remove('active', 'bg-blue-600', 'text-white');
+            btn.classList.add('bg-white', 'dark:bg-gray-800', 'text-gray-700', 'dark:text-gray-300');
+        });
+        event.target.classList.add('active', 'bg-blue-600', 'text-white');
+        event.target.classList.remove('bg-white', 'dark:bg-gray-800', 'text-gray-700', 'dark:text-gray-300');
+
+        // Filter cards
+        document.querySelectorAll('.template-card').forEach(card => {
+            if (category === 'all' || card.dataset.category === category) {
+                card.style.display = '';
+            } else {
+                card.style.display = 'none';
+            }
+        });
+    }
+
+    function useTemplate(templateId) {
+        const template = templates[templateId];
+        if (!template) return;
+
+        // Store template in session storage and redirect to contracts page with create modal
+        sessionStorage.setItem('contractTemplate', JSON.stringify(template));
+        window.location.href = '/contracts?action=create';
+    }
+
+    function previewTemplate(templateId) {
+        const template = templates[templateId];
+        if (!template) return;
+
+        let preview = `Template: ${template.name}\n\n`;
+        preview += `Contract Type: ${template.contract_type}\n`;
+        preview += `Default Department: ${template.department || 'Not set'}\n`;
+        preview += `Payment Schedule: ${template.payment_schedule}\n`;
+
+        if (template.duration_months) {
+            preview += `Default Duration: ${template.duration_months} months\n`;
+        }
+
+        if (template.milestones && template.milestones.length > 0) {
+            preview += `\nDefault Milestones:\n`;
+            template.milestones.forEach((m, i) => {
+                preview += `  ${i + 1}. ${m}\n`;
+            });
+        }
+
+        alert(preview);
+    }
+
+    function openCreateTemplateModal() {
+        document.getElementById('createTemplateModal').classList.remove('hidden');
+        document.getElementById('createTemplateModal').classList.add('flex');
+    }
+
+    function closeCreateTemplateModal() {
+        document.getElementById('createTemplateModal').classList.add('hidden');
+        document.getElementById('createTemplateModal').classList.remove('flex');
+    }
+
+    document.getElementById('createTemplateModal').addEventListener('click', function(e) {
+        if (e.target === this) closeCreateTemplateModal();
+    });
+
+    document.getElementById('createTemplateForm').addEventListener('submit', function(e) {
+        e.preventDefault();
+        const formData = new FormData(this);
+        const template = Object.fromEntries(formData);
+
+        // Save to localStorage (in a real app, this would go to the database)
+        const customTemplates = JSON.parse(localStorage.getItem('customTemplates') || '[]');
+        customTemplates.push(template);
+        localStorage.setItem('customTemplates', JSON.stringify(customTemplates));
+
+        alert('Template created successfully!');
+        closeCreateTemplateModal();
+    });
+</script>
+{% endblock %}

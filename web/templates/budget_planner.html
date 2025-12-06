@@ -1,0 +1,347 @@
+{% extends "base.html" %}
+
+{% block content %}
+<!-- Page Header -->
+<div class="flex items-center justify-between mb-6">
+    <div>
+        <h1 class="text-2xl font-bold text-gray-800 dark:text-white">Budget Allocation Planner</h1>
+        <p class="text-gray-500 dark:text-gray-400">Plan and monitor budget allocation across departments</p>
+    </div>
+    <div class="flex space-x-3">
+        <button onclick="window.print()" class="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700">
+            Export Plan
+        </button>
+    </div>
+</div>
+
+<!-- Summary Stats -->
+<div class="grid grid-cols-1 md:grid-cols-6 gap-4 mb-8">
+    <div class="bg-gradient-to-br from-blue-500 to-blue-600 rounded-lg shadow p-4 text-white">
+        <p class="text-blue-100 text-xs">Total Budget</p>
+        <p class="text-2xl font-bold">${{ '{:,.0f}'.format(summary.total_budget) }}</p>
+    </div>
+    <div class="bg-gradient-to-br from-green-500 to-green-600 rounded-lg shadow p-4 text-white">
+        <p class="text-green-100 text-xs">Total Spent</p>
+        <p class="text-2xl font-bold">${{ '{:,.0f}'.format(summary.total_spent) }}</p>
+    </div>
+    <div class="bg-gradient-to-br from-purple-500 to-purple-600 rounded-lg shadow p-4 text-white">
+        <p class="text-purple-100 text-xs">Remaining</p>
+        <p class="text-2xl font-bold">${{ '{:,.0f}'.format(summary.remaining) }}</p>
+    </div>
+    <div class="bg-gradient-to-br from-orange-500 to-orange-600 rounded-lg shadow p-4 text-white">
+        <p class="text-orange-100 text-xs">Utilization</p>
+        <p class="text-2xl font-bold">{{ summary.utilization|int }}%</p>
+    </div>
+    <div class="bg-gradient-to-br from-red-500 to-red-600 rounded-lg shadow p-4 text-white">
+        <p class="text-red-100 text-xs">Monthly Burn</p>
+        <p class="text-2xl font-bold">${{ '{:,.0f}'.format(summary.monthly_burn) }}</p>
+    </div>
+    <div class="bg-gradient-to-br from-teal-500 to-teal-600 rounded-lg shadow p-4 text-white">
+        <p class="text-teal-100 text-xs">Months Remaining</p>
+        <p class="text-2xl font-bold">{{ summary.months_remaining|round(1) }}</p>
+    </div>
+</div>
+
+<!-- Budget Overview Chart -->
+<div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+    <div class="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
+        <h3 class="text-lg font-semibold text-gray-800 dark:text-white mb-4">Budget Utilization</h3>
+        <div id="utilizationChart" style="height: 250px;"></div>
+    </div>
+    <div class="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
+        <h3 class="text-lg font-semibold text-gray-800 dark:text-white mb-4">Spending Forecast</h3>
+        <div id="forecastChart" style="height: 250px;"></div>
+    </div>
+</div>
+
+<!-- Department Budget Allocation -->
+<div class="bg-white dark:bg-gray-800 rounded-lg shadow mb-8">
+    <div class="px-6 py-4 border-b dark:border-gray-700 flex justify-between items-center">
+        <h3 class="text-lg font-semibold text-gray-800 dark:text-white">Department Budget Allocation</h3>
+        <button onclick="openAllocationModal()" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm">
+            Adjust Allocations
+        </button>
+    </div>
+    <div class="overflow-x-auto">
+        <table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+            <thead class="bg-gray-50 dark:bg-gray-700">
+                <tr>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Department</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Allocated</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Spent</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Remaining</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Utilization</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Contracts</th>
+                </tr>
+            </thead>
+            <tbody class="divide-y divide-gray-200 dark:divide-gray-700">
+                {% for dept in dept_budgets %}
+                <tr class="hover:bg-gray-50 dark:hover:bg-gray-700">
+                    <td class="px-6 py-4 font-medium text-gray-800 dark:text-white">{{ dept.name }}</td>
+                    <td class="px-6 py-4 text-sm text-gray-600 dark:text-gray-300">${{ '{:,.0f}'.format(dept.allocated) }}</td>
+                    <td class="px-6 py-4 text-sm text-gray-600 dark:text-gray-300">${{ '{:,.0f}'.format(dept.spent) }}</td>
+                    <td class="px-6 py-4 text-sm font-medium
+                        {% if dept.remaining < 0 %}text-red-600{% else %}text-green-600{% endif %}">
+                        ${{ '{:,.0f}'.format(dept.remaining) }}
+                    </td>
+                    <td class="px-6 py-4">
+                        <div class="flex items-center">
+                            <div class="w-32 bg-gray-200 dark:bg-gray-600 rounded-full h-3 mr-3">
+                                <div class="h-3 rounded-full
+                                    {% if dept.utilization >= 90 %}bg-red-500
+                                    {% elif dept.utilization >= 70 %}bg-orange-500
+                                    {% elif dept.utilization >= 50 %}bg-yellow-500
+                                    {% else %}bg-green-500{% endif %}"
+                                    style="width: {{ [dept.utilization, 100]|min }}%"></div>
+                            </div>
+                            <span class="text-sm font-medium
+                                {% if dept.utilization >= 90 %}text-red-600
+                                {% elif dept.utilization >= 70 %}text-orange-600
+                                {% else %}text-gray-600 dark:text-gray-300{% endif %}">
+                                {{ dept.utilization|int }}%
+                            </span>
+                        </div>
+                    </td>
+                    <td class="px-6 py-4 text-sm text-gray-500">
+                        {{ dept.contract_count }} total
+                        <span class="text-gray-400">({{ dept.active_contracts }} active)</span>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- Budget Planning Tools -->
+<div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+    <!-- Scenario Planner -->
+    <div class="bg-white dark:bg-gray-800 rounded-lg shadow">
+        <div class="px-6 py-4 border-b dark:border-gray-700">
+            <h3 class="text-lg font-semibold text-gray-800 dark:text-white">Scenario Planner</h3>
+            <p class="text-sm text-gray-500">Model different budget scenarios</p>
+        </div>
+        <div class="p-6 space-y-4">
+            <div>
+                <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Budget Adjustment</label>
+                <div class="flex items-center space-x-4">
+                    <input type="range" id="budgetAdjust" min="-30" max="30" value="0" class="flex-1"
+                        oninput="updateScenario()">
+                    <span id="adjustValue" class="text-lg font-bold text-gray-800 dark:text-white w-16 text-right">0%</span>
+                </div>
+            </div>
+            <div class="p-4 bg-gray-50 dark:bg-gray-700 rounded-lg">
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <p class="text-xs text-gray-500">New Total Budget</p>
+                        <p id="newBudget" class="text-xl font-bold text-gray-800 dark:text-white">${{ '{:,.0f}'.format(summary.total_budget) }}</p>
+                    </div>
+                    <div>
+                        <p class="text-xs text-gray-500">Projected Runway</p>
+                        <p id="newRunway" class="text-xl font-bold text-gray-800 dark:text-white">{{ summary.months_remaining|round(1) }} months</p>
+                    </div>
+                </div>
+            </div>
+            <div class="grid grid-cols-3 gap-2">
+                <button onclick="setAdjustment(-20)" class="px-3 py-2 border rounded-lg text-sm hover:bg-gray-50 dark:hover:bg-gray-700">-20%</button>
+                <button onclick="setAdjustment(-10)" class="px-3 py-2 border rounded-lg text-sm hover:bg-gray-50 dark:hover:bg-gray-700">-10%</button>
+                <button onclick="setAdjustment(0)" class="px-3 py-2 border rounded-lg text-sm hover:bg-gray-50 dark:hover:bg-gray-700">Reset</button>
+                <button onclick="setAdjustment(10)" class="px-3 py-2 border rounded-lg text-sm hover:bg-gray-50 dark:hover:bg-gray-700">+10%</button>
+                <button onclick="setAdjustment(20)" class="px-3 py-2 border rounded-lg text-sm hover:bg-gray-50 dark:hover:bg-gray-700">+20%</button>
+                <button onclick="setAdjustment(30)" class="px-3 py-2 border rounded-lg text-sm hover:bg-gray-50 dark:hover:bg-gray-700">+30%</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Budget Alerts -->
+    <div class="bg-white dark:bg-gray-800 rounded-lg shadow">
+        <div class="px-6 py-4 border-b dark:border-gray-700">
+            <h3 class="text-lg font-semibold text-gray-800 dark:text-white">Budget Alerts</h3>
+            <p class="text-sm text-gray-500">Departments requiring attention</p>
+        </div>
+        <div class="p-6 space-y-3">
+            {% for dept in dept_budgets if dept.utilization >= 80 %}
+            <div class="p-4 rounded-lg
+                {% if dept.utilization >= 90 %}bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-800
+                {% else %}bg-yellow-50 dark:bg-yellow-900/30 border border-yellow-200 dark:border-yellow-800{% endif %}">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <p class="font-medium {% if dept.utilization >= 90 %}text-red-800 dark:text-red-200{% else %}text-yellow-800 dark:text-yellow-200{% endif %}">
+                            {{ dept.name }}
+                        </p>
+                        <p class="text-sm {% if dept.utilization >= 90 %}text-red-600 dark:text-red-300{% else %}text-yellow-600 dark:text-yellow-300{% endif %}">
+                            {{ dept.utilization|int }}% budget utilized - ${{ '{:,.0f}'.format(dept.remaining) }} remaining
+                        </p>
+                    </div>
+                    <span class="px-2 py-1 text-xs font-medium rounded
+                        {% if dept.utilization >= 90 %}bg-red-100 text-red-800{% else %}bg-yellow-100 text-yellow-800{% endif %}">
+                        {% if dept.utilization >= 90 %}Critical{% else %}Warning{% endif %}
+                    </span>
+                </div>
+            </div>
+            {% else %}
+            <div class="p-8 text-center text-gray-500">
+                <svg class="w-12 h-12 mx-auto mb-2 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                </svg>
+                <p>All departments within budget</p>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+</div>
+
+<!-- Monthly Forecast Table -->
+<div class="bg-white dark:bg-gray-800 rounded-lg shadow">
+    <div class="px-6 py-4 border-b dark:border-gray-700">
+        <h3 class="text-lg font-semibold text-gray-800 dark:text-white">12-Month Forecast</h3>
+    </div>
+    <div class="overflow-x-auto">
+        <table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+            <thead class="bg-gray-50 dark:bg-gray-700">
+                <tr>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Month</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Projected Spend</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Remaining Budget</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Status</th>
+                </tr>
+            </thead>
+            <tbody class="divide-y divide-gray-200 dark:divide-gray-700">
+                {% for month in forecast %}
+                <tr class="hover:bg-gray-50 dark:hover:bg-gray-700">
+                    <td class="px-6 py-4 font-medium text-gray-800 dark:text-white">{{ month.month }}</td>
+                    <td class="px-6 py-4 text-sm text-gray-600 dark:text-gray-300">${{ '{:,.0f}'.format(month.projected_spend) }}</td>
+                    <td class="px-6 py-4 text-sm font-medium
+                        {% if month.remaining <= 0 %}text-red-600{% else %}text-green-600{% endif %}">
+                        ${{ '{:,.0f}'.format(month.remaining) }}
+                    </td>
+                    <td class="px-6 py-4">
+                        {% if month.remaining <= 0 %}
+                        <span class="px-2 py-1 text-xs font-medium rounded bg-red-100 text-red-800">Budget Exhausted</span>
+                        {% elif month.remaining < summary.monthly_burn %}
+                        <span class="px-2 py-1 text-xs font-medium rounded bg-yellow-100 text-yellow-800">Low Balance</span>
+                        {% else %}
+                        <span class="px-2 py-1 text-xs font-medium rounded bg-green-100 text-green-800">On Track</span>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- Allocation Modal -->
+<div id="allocationModal" class="fixed inset-0 bg-black bg-opacity-50 hidden items-center justify-center z-50">
+    <div class="bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-2xl w-full mx-4 max-h-[90vh] overflow-y-auto">
+        <div class="px-6 py-4 border-b dark:border-gray-700 flex justify-between items-center">
+            <h3 class="text-lg font-semibold text-gray-800 dark:text-white">Adjust Budget Allocations</h3>
+            <button onclick="closeModal()" class="text-gray-400 hover:text-gray-600">
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                </svg>
+            </button>
+        </div>
+        <div class="p-6 space-y-4">
+            {% for dept in dept_budgets %}
+            <div class="flex items-center justify-between">
+                <div class="flex-1">
+                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">{{ dept.name }}</label>
+                    <p class="text-xs text-gray-500">Current: ${{ '{:,.0f}'.format(dept.allocated) }}</p>
+                </div>
+                <input type="number" value="{{ dept.allocated|int }}" step="10000"
+                    class="w-40 px-3 py-2 border rounded-lg text-right dark:bg-gray-700 dark:border-gray-600">
+            </div>
+            {% endfor %}
+            <div class="pt-4 border-t dark:border-gray-700">
+                <div class="flex justify-between items-center text-lg">
+                    <span class="font-medium text-gray-800 dark:text-white">Total Allocated:</span>
+                    <span class="font-bold text-gray-800 dark:text-white">${{ '{:,.0f}'.format(summary.total_budget) }}</span>
+                </div>
+            </div>
+        </div>
+        <div class="px-6 py-4 border-t dark:border-gray-700 flex justify-end space-x-3">
+            <button onclick="closeModal()" class="px-4 py-2 border rounded-lg hover:bg-gray-50 dark:border-gray-600 dark:hover:bg-gray-700">
+                Cancel
+            </button>
+            <button class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">
+                Save Changes
+            </button>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    const totalBudget = {{ summary.total_budget }};
+    const totalSpent = {{ summary.total_spent }};
+    const monthlyBurn = {{ summary.monthly_burn }};
+
+    // Utilization Chart
+    Plotly.newPlot('utilizationChart', [{
+        type: 'pie',
+        labels: ['Spent', 'Remaining'],
+        values: [totalSpent, totalBudget - totalSpent],
+        hole: 0.6,
+        marker: {
+            colors: ['#3B82F6', '#E5E7EB']
+        },
+        textinfo: 'none'
+    }], {
+        margin: { t: 20, b: 20, l: 20, r: 20 },
+        showlegend: true,
+        annotations: [{
+            text: '{{ summary.utilization|int }}%',
+            font: { size: 36, color: '#1F2937' },
+            showarrow: false
+        }]
+    }, { responsive: true });
+
+    // Forecast Chart
+    const forecastData = {{ forecast | tojson | safe }};
+    Plotly.newPlot('forecastChart', [{
+        type: 'scatter',
+        mode: 'lines+markers',
+        x: forecastData.map(f => f.month),
+        y: forecastData.map(f => f.remaining),
+        name: 'Remaining Budget',
+        line: { color: '#3B82F6', width: 2 },
+        fill: 'tozeroy',
+        fillcolor: 'rgba(59, 130, 246, 0.1)'
+    }], {
+        margin: { t: 20, b: 80, l: 80, r: 20 },
+        yaxis: { title: 'Remaining ($)', tickformat: ',.0f' },
+        xaxis: { tickangle: -45 }
+    }, { responsive: true });
+
+    // Scenario planner
+    function updateScenario() {
+        const adjust = parseInt(document.getElementById('budgetAdjust').value);
+        document.getElementById('adjustValue').textContent = (adjust >= 0 ? '+' : '') + adjust + '%';
+
+        const newBudget = totalBudget * (1 + adjust / 100);
+        const newRemaining = newBudget - totalSpent;
+        const newRunway = newRemaining / monthlyBurn;
+
+        document.getElementById('newBudget').textContent = '$' + newBudget.toLocaleString('en-US', { maximumFractionDigits: 0 });
+        document.getElementById('newRunway').textContent = newRunway.toFixed(1) + ' months';
+    }
+
+    function setAdjustment(value) {
+        document.getElementById('budgetAdjust').value = value;
+        updateScenario();
+    }
+
+    // Modal functions
+    function openAllocationModal() {
+        document.getElementById('allocationModal').classList.remove('hidden');
+        document.getElementById('allocationModal').classList.add('flex');
+    }
+
+    function closeModal() {
+        document.getElementById('allocationModal').classList.add('hidden');
+        document.getElementById('allocationModal').classList.remove('flex');
+    }
+</script>
+{% endblock %}

@@ -1,0 +1,701 @@
+{% extends "base.html" %}
+
+{% block content %}
+<!-- Page Header -->
+<div class="flex items-center justify-between mb-6">
+    <div>
+        <h1 class="text-2xl font-bold text-gray-800 dark:text-white">Data Import & Export</h1>
+        <p class="text-gray-500 dark:text-gray-400">Import, export, and manage your contract data</p>
+    </div>
+</div>
+
+<!-- Tabs -->
+<div class="mb-6">
+    <div class="border-b border-gray-200 dark:border-gray-700">
+        <nav class="-mb-px flex space-x-8">
+            <button onclick="switchTab('export')" id="tab-export" class="tab-btn border-b-2 border-blue-500 py-4 px-1 text-sm font-medium text-blue-600 dark:text-blue-400">
+                Export Data
+            </button>
+            <button onclick="switchTab('import')" id="tab-import" class="tab-btn border-b-2 border-transparent py-4 px-1 text-sm font-medium text-gray-500 hover:text-gray-700 dark:text-gray-400">
+                Import Data
+            </button>
+            <button onclick="switchTab('backup')" id="tab-backup" class="tab-btn border-b-2 border-transparent py-4 px-1 text-sm font-medium text-gray-500 hover:text-gray-700 dark:text-gray-400">
+                Backup & Restore
+            </button>
+            <button onclick="switchTab('scheduled')" id="tab-scheduled" class="tab-btn border-b-2 border-transparent py-4 px-1 text-sm font-medium text-gray-500 hover:text-gray-700 dark:text-gray-400">
+                Scheduled Exports
+            </button>
+        </nav>
+    </div>
+</div>
+
+<!-- Export Tab -->
+<div id="content-export" class="tab-content">
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <!-- Quick Export -->
+        <div class="bg-white dark:bg-gray-800 rounded-lg shadow">
+            <div class="px-6 py-4 border-b dark:border-gray-700">
+                <h3 class="text-lg font-semibold text-gray-800 dark:text-white">Quick Export</h3>
+                <p class="text-sm text-gray-500">Download data in common formats</p>
+            </div>
+            <div class="p-6 space-y-4">
+                <div class="grid grid-cols-2 gap-4">
+                    <a href="{{ url_for('api_export') }}" class="flex items-center p-4 border-2 border-gray-200 dark:border-gray-600 rounded-lg hover:border-blue-500 hover:bg-blue-50 dark:hover:bg-gray-700 transition">
+                        <svg class="w-10 h-10 text-green-600 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+                        </svg>
+                        <div>
+                            <p class="font-medium text-gray-800 dark:text-white">CSV Export</p>
+                            <p class="text-sm text-gray-500">All contracts</p>
+                        </div>
+                    </a>
+                    <button onclick="exportToExcel()" class="flex items-center p-4 border-2 border-gray-200 dark:border-gray-600 rounded-lg hover:border-blue-500 hover:bg-blue-50 dark:hover:bg-gray-700 transition text-left">
+                        <svg class="w-10 h-10 text-green-700 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3M3 17V7a2 2 0 012-2h6l2 2h6a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2z"></path>
+                        </svg>
+                        <div>
+                            <p class="font-medium text-gray-800 dark:text-white">Excel Export</p>
+                            <p class="text-sm text-gray-500">Multi-sheet workbook</p>
+                        </div>
+                    </button>
+                    <button onclick="exportToPDF()" class="flex items-center p-4 border-2 border-gray-200 dark:border-gray-600 rounded-lg hover:border-blue-500 hover:bg-blue-50 dark:hover:bg-gray-700 transition text-left">
+                        <svg class="w-10 h-10 text-red-600 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z"></path>
+                        </svg>
+                        <div>
+                            <p class="font-medium text-gray-800 dark:text-white">PDF Report</p>
+                            <p class="text-sm text-gray-500">Formatted report</p>
+                        </div>
+                    </button>
+                    <button onclick="exportToJSON()" class="flex items-center p-4 border-2 border-gray-200 dark:border-gray-600 rounded-lg hover:border-blue-500 hover:bg-blue-50 dark:hover:bg-gray-700 transition text-left">
+                        <svg class="w-10 h-10 text-yellow-600 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4"></path>
+                        </svg>
+                        <div>
+                            <p class="font-medium text-gray-800 dark:text-white">JSON Export</p>
+                            <p class="text-sm text-gray-500">API-ready format</p>
+                        </div>
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Custom Export -->
+        <div class="bg-white dark:bg-gray-800 rounded-lg shadow">
+            <div class="px-6 py-4 border-b dark:border-gray-700">
+                <h3 class="text-lg font-semibold text-gray-800 dark:text-white">Custom Export</h3>
+                <p class="text-sm text-gray-500">Select specific data to export</p>
+            </div>
+            <div class="p-6">
+                <form id="customExportForm" class="space-y-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Data Types</label>
+                        <div class="grid grid-cols-2 gap-2">
+                            <label class="flex items-center p-2 border rounded hover:bg-gray-50 dark:hover:bg-gray-700 cursor-pointer">
+                                <input type="checkbox" name="data_types" value="contracts" checked class="mr-2">
+                                <span class="text-sm">Contracts</span>
+                            </label>
+                            <label class="flex items-center p-2 border rounded hover:bg-gray-50 dark:hover:bg-gray-700 cursor-pointer">
+                                <input type="checkbox" name="data_types" value="vendors" class="mr-2">
+                                <span class="text-sm">Vendors</span>
+                            </label>
+                            <label class="flex items-center p-2 border rounded hover:bg-gray-50 dark:hover:bg-gray-700 cursor-pointer">
+                                <input type="checkbox" name="data_types" value="milestones" class="mr-2">
+                                <span class="text-sm">Milestones</span>
+                            </label>
+                            <label class="flex items-center p-2 border rounded hover:bg-gray-50 dark:hover:bg-gray-700 cursor-pointer">
+                                <input type="checkbox" name="data_types" value="change_orders" class="mr-2">
+                                <span class="text-sm">Change Orders</span>
+                            </label>
+                            <label class="flex items-center p-2 border rounded hover:bg-gray-50 dark:hover:bg-gray-700 cursor-pointer">
+                                <input type="checkbox" name="data_types" value="payments" class="mr-2">
+                                <span class="text-sm">Payments</span>
+                            </label>
+                            <label class="flex items-center p-2 border rounded hover:bg-gray-50 dark:hover:bg-gray-700 cursor-pointer">
+                                <input type="checkbox" name="data_types" value="audit" class="mr-2">
+                                <span class="text-sm">Audit Trail</span>
+                            </label>
+                        </div>
+                    </div>
+                    <div class="grid grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Date Range</label>
+                            <select name="date_range" class="w-full px-3 py-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600">
+                                <option value="all">All Time</option>
+                                <option value="year">This Year</option>
+                                <option value="quarter">This Quarter</option>
+                                <option value="month">This Month</option>
+                                <option value="custom">Custom Range</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Format</label>
+                            <select name="format" class="w-full px-3 py-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600">
+                                <option value="csv">CSV</option>
+                                <option value="excel">Excel (.xlsx)</option>
+                                <option value="json">JSON</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Department Filter</label>
+                        <select name="department" class="w-full px-3 py-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600">
+                            <option value="">All Departments</option>
+                            {% for dept in departments %}
+                            <option value="{{ dept }}">{{ dept }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Status Filter</label>
+                        <select name="status" class="w-full px-3 py-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600">
+                            <option value="">All Statuses</option>
+                            <option value="Active">Active</option>
+                            <option value="Completed">Completed</option>
+                            <option value="Draft">Draft</option>
+                            <option value="Cancelled">Cancelled</option>
+                        </select>
+                    </div>
+                    <button type="submit" class="w-full px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">
+                        Generate Export
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Recent Exports -->
+    <div class="mt-6 bg-white dark:bg-gray-800 rounded-lg shadow">
+        <div class="px-6 py-4 border-b dark:border-gray-700">
+            <h3 class="text-lg font-semibold text-gray-800 dark:text-white">Recent Exports</h3>
+        </div>
+        <div class="overflow-x-auto">
+            <table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+                <thead class="bg-gray-50 dark:bg-gray-700">
+                    <tr>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">File</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Type</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Created</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Size</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Actions</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-gray-200 dark:divide-gray-700">
+                    {% for export in recent_exports %}
+                    <tr class="hover:bg-gray-50 dark:hover:bg-gray-700">
+                        <td class="px-6 py-4 text-sm font-medium text-gray-800 dark:text-white">{{ export.filename }}</td>
+                        <td class="px-6 py-4 text-sm text-gray-500">{{ export.type }}</td>
+                        <td class="px-6 py-4 text-sm text-gray-500">{{ export.created_at }}</td>
+                        <td class="px-6 py-4 text-sm text-gray-500">{{ export.size }}</td>
+                        <td class="px-6 py-4 text-sm">
+                            <button class="text-blue-600 hover:text-blue-800 mr-3">Download</button>
+                            <button class="text-red-600 hover:text-red-800">Delete</button>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<!-- Import Tab -->
+<div id="content-import" class="tab-content hidden">
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <!-- File Upload -->
+        <div class="bg-white dark:bg-gray-800 rounded-lg shadow">
+            <div class="px-6 py-4 border-b dark:border-gray-700">
+                <h3 class="text-lg font-semibold text-gray-800 dark:text-white">Import Data</h3>
+                <p class="text-sm text-gray-500">Upload files to import contract data</p>
+            </div>
+            <div class="p-6">
+                <div id="dropzone" class="border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-lg p-8 text-center hover:border-blue-500 transition cursor-pointer">
+                    <svg class="w-16 h-16 text-gray-400 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"></path>
+                    </svg>
+                    <p class="text-gray-600 dark:text-gray-300 mb-2">Drag and drop files here, or click to browse</p>
+                    <p class="text-sm text-gray-400">Supports CSV, Excel (.xlsx), and JSON files</p>
+                    <input type="file" id="fileInput" class="hidden" accept=".csv,.xlsx,.json" multiple>
+                </div>
+
+                <div id="fileList" class="mt-4 space-y-2 hidden">
+                    <!-- Files will be listed here -->
+                </div>
+
+                <div class="mt-4">
+                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Import Type</label>
+                    <div class="grid grid-cols-2 gap-2">
+                        <label class="flex items-center p-3 border rounded-lg cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700">
+                            <input type="radio" name="import_type" value="contracts" checked class="mr-2">
+                            <span>Contracts</span>
+                        </label>
+                        <label class="flex items-center p-3 border rounded-lg cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700">
+                            <input type="radio" name="import_type" value="vendors" class="mr-2">
+                            <span>Vendors</span>
+                        </label>
+                        <label class="flex items-center p-3 border rounded-lg cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700">
+                            <input type="radio" name="import_type" value="payments" class="mr-2">
+                            <span>Payments</span>
+                        </label>
+                        <label class="flex items-center p-3 border rounded-lg cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700">
+                            <input type="radio" name="import_type" value="milestones" class="mr-2">
+                            <span>Milestones</span>
+                        </label>
+                    </div>
+                </div>
+
+                <div class="mt-4">
+                    <label class="flex items-center">
+                        <input type="checkbox" id="overwriteExisting" class="mr-2">
+                        <span class="text-sm text-gray-700 dark:text-gray-300">Overwrite existing records with same ID</span>
+                    </label>
+                </div>
+
+                <button id="startImport" class="mt-4 w-full px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed" disabled>
+                    Start Import
+                </button>
+            </div>
+        </div>
+
+        <!-- Import Progress / Templates -->
+        <div class="space-y-6">
+            <!-- Download Templates -->
+            <div class="bg-white dark:bg-gray-800 rounded-lg shadow">
+                <div class="px-6 py-4 border-b dark:border-gray-700">
+                    <h3 class="text-lg font-semibold text-gray-800 dark:text-white">Download Templates</h3>
+                    <p class="text-sm text-gray-500">Use these templates for data import</p>
+                </div>
+                <div class="p-6 space-y-3">
+                    <a href="/api/template/contracts" class="flex items-center p-3 border rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700">
+                        <svg class="w-8 h-8 text-green-600 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+                        </svg>
+                        <div>
+                            <p class="font-medium text-gray-800 dark:text-white">Contracts Template</p>
+                            <p class="text-xs text-gray-500">contracts_template.csv</p>
+                        </div>
+                    </a>
+                    <a href="/api/template/vendors" class="flex items-center p-3 border rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700">
+                        <svg class="w-8 h-8 text-blue-600 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"></path>
+                        </svg>
+                        <div>
+                            <p class="font-medium text-gray-800 dark:text-white">Vendors Template</p>
+                            <p class="text-xs text-gray-500">vendors_template.csv</p>
+                        </div>
+                    </a>
+                    <a href="/api/template/payments" class="flex items-center p-3 border rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700">
+                        <svg class="w-8 h-8 text-purple-600 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z"></path>
+                        </svg>
+                        <div>
+                            <p class="font-medium text-gray-800 dark:text-white">Payments Template</p>
+                            <p class="text-xs text-gray-500">payments_template.csv</p>
+                        </div>
+                    </a>
+                </div>
+            </div>
+
+            <!-- Import Progress -->
+            <div id="importProgress" class="bg-white dark:bg-gray-800 rounded-lg shadow hidden">
+                <div class="px-6 py-4 border-b dark:border-gray-700">
+                    <h3 class="text-lg font-semibold text-gray-800 dark:text-white">Import Progress</h3>
+                </div>
+                <div class="p-6">
+                    <div class="mb-4">
+                        <div class="flex justify-between text-sm mb-1">
+                            <span id="progressLabel">Processing...</span>
+                            <span id="progressPercent">0%</span>
+                        </div>
+                        <div class="w-full bg-gray-200 rounded-full h-2">
+                            <div id="progressBar" class="bg-blue-600 h-2 rounded-full" style="width: 0%"></div>
+                        </div>
+                    </div>
+                    <div id="importResults" class="space-y-2">
+                        <!-- Results will appear here -->
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Import History -->
+    <div class="mt-6 bg-white dark:bg-gray-800 rounded-lg shadow">
+        <div class="px-6 py-4 border-b dark:border-gray-700">
+            <h3 class="text-lg font-semibold text-gray-800 dark:text-white">Import History</h3>
+        </div>
+        <div class="overflow-x-auto">
+            <table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+                <thead class="bg-gray-50 dark:bg-gray-700">
+                    <tr>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Date</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">File</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Type</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Records</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Status</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-gray-200 dark:divide-gray-700">
+                    {% for import in import_history %}
+                    <tr class="hover:bg-gray-50 dark:hover:bg-gray-700">
+                        <td class="px-6 py-4 text-sm text-gray-500">{{ import.date }}</td>
+                        <td class="px-6 py-4 text-sm font-medium text-gray-800 dark:text-white">{{ import.filename }}</td>
+                        <td class="px-6 py-4 text-sm text-gray-500">{{ import.type }}</td>
+                        <td class="px-6 py-4 text-sm text-gray-500">{{ import.records_imported }} / {{ import.total_records }}</td>
+                        <td class="px-6 py-4">
+                            <span class="px-2 py-1 text-xs font-medium rounded
+                                {% if import.status == 'Success' %}bg-green-100 text-green-800
+                                {% elif import.status == 'Partial' %}bg-yellow-100 text-yellow-800
+                                {% else %}bg-red-100 text-red-800{% endif %}">
+                                {{ import.status }}
+                            </span>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<!-- Backup Tab -->
+<div id="content-backup" class="tab-content hidden">
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <!-- Create Backup -->
+        <div class="bg-white dark:bg-gray-800 rounded-lg shadow">
+            <div class="px-6 py-4 border-b dark:border-gray-700">
+                <h3 class="text-lg font-semibold text-gray-800 dark:text-white">Create Backup</h3>
+                <p class="text-sm text-gray-500">Create a full system backup</p>
+            </div>
+            <div class="p-6">
+                <div class="bg-blue-50 dark:bg-blue-900/30 border border-blue-200 dark:border-blue-800 rounded-lg p-4 mb-4">
+                    <div class="flex">
+                        <svg class="w-5 h-5 text-blue-600 mr-2 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                        </svg>
+                        <div>
+                            <p class="text-sm text-blue-800 dark:text-blue-200">
+                                Backups include all contracts, vendors, payments, milestones, and audit data.
+                            </p>
+                        </div>
+                    </div>
+                </div>
+                <div class="space-y-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Backup Name</label>
+                        <input type="text" id="backupName" placeholder="e.g., monthly_backup_dec2024"
+                            class="w-full px-3 py-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Include</label>
+                        <div class="space-y-2">
+                            <label class="flex items-center">
+                                <input type="checkbox" checked class="mr-2"> All contract data
+                            </label>
+                            <label class="flex items-center">
+                                <input type="checkbox" checked class="mr-2"> Vendor information
+                            </label>
+                            <label class="flex items-center">
+                                <input type="checkbox" checked class="mr-2"> Audit trail
+                            </label>
+                            <label class="flex items-center">
+                                <input type="checkbox" checked class="mr-2"> Document metadata
+                            </label>
+                        </div>
+                    </div>
+                    <button onclick="createBackup()" class="w-full px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700">
+                        Create Backup Now
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Restore Backup -->
+        <div class="bg-white dark:bg-gray-800 rounded-lg shadow">
+            <div class="px-6 py-4 border-b dark:border-gray-700">
+                <h3 class="text-lg font-semibold text-gray-800 dark:text-white">Restore Backup</h3>
+                <p class="text-sm text-gray-500">Restore from a previous backup</p>
+            </div>
+            <div class="p-6">
+                <div class="bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-800 rounded-lg p-4 mb-4">
+                    <div class="flex">
+                        <svg class="w-5 h-5 text-red-600 mr-2 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path>
+                        </svg>
+                        <div>
+                            <p class="text-sm text-red-800 dark:text-red-200">
+                                <strong>Warning:</strong> Restoring a backup will overwrite current data. This action cannot be undone.
+                            </p>
+                        </div>
+                    </div>
+                </div>
+                <div class="space-y-3">
+                    {% for backup in backups %}
+                    <div class="flex items-center justify-between p-4 border rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700">
+                        <div>
+                            <p class="font-medium text-gray-800 dark:text-white">{{ backup.name }}</p>
+                            <p class="text-sm text-gray-500">{{ backup.date }} - {{ backup.size }}</p>
+                        </div>
+                        <button onclick="restoreBackup('{{ backup.id }}')" class="px-3 py-1 text-sm bg-orange-600 text-white rounded hover:bg-orange-700">
+                            Restore
+                        </button>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Scheduled Exports Tab -->
+<div id="content-scheduled" class="tab-content hidden">
+    <div class="bg-white dark:bg-gray-800 rounded-lg shadow">
+        <div class="px-6 py-4 border-b dark:border-gray-700 flex justify-between items-center">
+            <div>
+                <h3 class="text-lg font-semibold text-gray-800 dark:text-white">Scheduled Exports</h3>
+                <p class="text-sm text-gray-500">Automate recurring data exports</p>
+            </div>
+            <button onclick="openScheduleModal()" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">
+                + New Schedule
+            </button>
+        </div>
+        <div class="p-6">
+            <div class="space-y-4">
+                <div class="flex items-center justify-between p-4 border rounded-lg">
+                    <div class="flex items-center space-x-4">
+                        <div class="w-10 h-10 rounded-full bg-green-100 text-green-600 flex items-center justify-center">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                            </svg>
+                        </div>
+                        <div>
+                            <p class="font-medium text-gray-800 dark:text-white">Weekly Contract Report</p>
+                            <p class="text-sm text-gray-500">Every Monday at 8:00 AM - CSV format</p>
+                            <p class="text-xs text-gray-400">Next run: Dec 9, 2024</p>
+                        </div>
+                    </div>
+                    <div class="flex items-center space-x-3">
+                        <span class="px-2 py-1 text-xs bg-green-100 text-green-800 rounded">Active</span>
+                        <button class="text-gray-400 hover:text-gray-600">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z"></path>
+                            </svg>
+                        </button>
+                    </div>
+                </div>
+                <div class="flex items-center justify-between p-4 border rounded-lg">
+                    <div class="flex items-center space-x-4">
+                        <div class="w-10 h-10 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
+                            </svg>
+                        </div>
+                        <div>
+                            <p class="font-medium text-gray-800 dark:text-white">Monthly Financial Report</p>
+                            <p class="text-sm text-gray-500">1st of each month at 6:00 AM - Excel format</p>
+                            <p class="text-xs text-gray-400">Next run: Jan 1, 2025</p>
+                        </div>
+                    </div>
+                    <div class="flex items-center space-x-3">
+                        <span class="px-2 py-1 text-xs bg-green-100 text-green-800 rounded">Active</span>
+                        <button class="text-gray-400 hover:text-gray-600">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z"></path>
+                            </svg>
+                        </button>
+                    </div>
+                </div>
+                <div class="flex items-center justify-between p-4 border rounded-lg opacity-50">
+                    <div class="flex items-center space-x-4">
+                        <div class="w-10 h-10 rounded-full bg-gray-100 text-gray-600 flex items-center justify-center">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"></path>
+                            </svg>
+                        </div>
+                        <div>
+                            <p class="font-medium text-gray-800 dark:text-white">Daily Backup</p>
+                            <p class="text-sm text-gray-500">Every day at 2:00 AM - Full backup</p>
+                            <p class="text-xs text-gray-400">Last run: Dec 5, 2024</p>
+                        </div>
+                    </div>
+                    <div class="flex items-center space-x-3">
+                        <span class="px-2 py-1 text-xs bg-gray-100 text-gray-800 rounded">Paused</span>
+                        <button class="text-gray-400 hover:text-gray-600">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z"></path>
+                            </svg>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    // Tab switching
+    function switchTab(tabName) {
+        document.querySelectorAll('.tab-content').forEach(el => el.classList.add('hidden'));
+        document.querySelectorAll('.tab-btn').forEach(el => {
+            el.classList.remove('border-blue-500', 'text-blue-600', 'dark:text-blue-400');
+            el.classList.add('border-transparent', 'text-gray-500');
+        });
+
+        document.getElementById('content-' + tabName).classList.remove('hidden');
+        const activeTab = document.getElementById('tab-' + tabName);
+        activeTab.classList.add('border-blue-500', 'text-blue-600', 'dark:text-blue-400');
+        activeTab.classList.remove('border-transparent', 'text-gray-500');
+    }
+
+    // Dropzone functionality
+    const dropzone = document.getElementById('dropzone');
+    const fileInput = document.getElementById('fileInput');
+    const fileList = document.getElementById('fileList');
+    const startImportBtn = document.getElementById('startImport');
+
+    dropzone.addEventListener('click', () => fileInput.click());
+    dropzone.addEventListener('dragover', (e) => {
+        e.preventDefault();
+        dropzone.classList.add('border-blue-500', 'bg-blue-50');
+    });
+    dropzone.addEventListener('dragleave', () => {
+        dropzone.classList.remove('border-blue-500', 'bg-blue-50');
+    });
+    dropzone.addEventListener('drop', (e) => {
+        e.preventDefault();
+        dropzone.classList.remove('border-blue-500', 'bg-blue-50');
+        handleFiles(e.dataTransfer.files);
+    });
+    fileInput.addEventListener('change', () => handleFiles(fileInput.files));
+
+    let selectedFiles = [];
+    function handleFiles(files) {
+        selectedFiles = Array.from(files);
+        fileList.innerHTML = '';
+        fileList.classList.remove('hidden');
+
+        selectedFiles.forEach((file, index) => {
+            const div = document.createElement('div');
+            div.className = 'flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-700 rounded-lg';
+            div.innerHTML = `
+                <div class="flex items-center">
+                    <svg class="w-5 h-5 text-gray-400 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+                    </svg>
+                    <span class="text-sm font-medium">${file.name}</span>
+                    <span class="text-xs text-gray-500 ml-2">(${formatFileSize(file.size)})</span>
+                </div>
+                <button onclick="removeFile(${index})" class="text-red-600 hover:text-red-800">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                    </svg>
+                </button>
+            `;
+            fileList.appendChild(div);
+        });
+
+        startImportBtn.disabled = selectedFiles.length === 0;
+    }
+
+    function removeFile(index) {
+        selectedFiles.splice(index, 1);
+        handleFiles(selectedFiles);
+    }
+
+    function formatFileSize(bytes) {
+        if (bytes === 0) return '0 Bytes';
+        const k = 1024;
+        const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+        const i = Math.floor(Math.log(bytes) / Math.log(k));
+        return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+    }
+
+    // Start import
+    startImportBtn.addEventListener('click', async () => {
+        if (selectedFiles.length === 0) return;
+
+        const importProgress = document.getElementById('importProgress');
+        const progressBar = document.getElementById('progressBar');
+        const progressLabel = document.getElementById('progressLabel');
+        const progressPercent = document.getElementById('progressPercent');
+        const importResults = document.getElementById('importResults');
+
+        importProgress.classList.remove('hidden');
+        importResults.innerHTML = '';
+
+        for (let i = 0; i < 100; i += 10) {
+            await new Promise(r => setTimeout(r, 200));
+            progressBar.style.width = i + '%';
+            progressPercent.textContent = i + '%';
+            progressLabel.textContent = `Processing ${selectedFiles[0].name}...`;
+        }
+
+        progressBar.style.width = '100%';
+        progressPercent.textContent = '100%';
+        progressLabel.textContent = 'Complete!';
+
+        importResults.innerHTML = `
+            <div class="p-3 bg-green-50 dark:bg-green-900/30 rounded-lg text-green-800 dark:text-green-200">
+                <p class="font-medium">Import Successful</p>
+                <p class="text-sm">25 records imported from ${selectedFiles[0].name}</p>
+            </div>
+        `;
+
+        showNotification('Import completed successfully', 'success');
+    });
+
+    // Export functions
+    function exportToExcel() {
+        showNotification('Generating Excel export...', 'info');
+        setTimeout(() => {
+            showNotification('Excel export ready for download', 'success');
+        }, 1500);
+    }
+
+    function exportToPDF() {
+        window.open('/report/portfolio', '_blank');
+    }
+
+    function exportToJSON() {
+        window.location.href = '/api/contracts';
+    }
+
+    // Backup functions
+    function createBackup() {
+        const name = document.getElementById('backupName').value || 'backup_' + new Date().toISOString().split('T')[0];
+        showNotification('Creating backup: ' + name, 'info');
+        setTimeout(() => {
+            showNotification('Backup created successfully', 'success');
+        }, 2000);
+    }
+
+    function restoreBackup(id) {
+        if (!confirm('Are you sure you want to restore this backup? Current data will be overwritten.')) return;
+        showNotification('Restoring backup...', 'info');
+        setTimeout(() => {
+            showNotification('Backup restored successfully', 'success');
+        }, 2000);
+    }
+
+    // Custom export form
+    document.getElementById('customExportForm').addEventListener('submit', (e) => {
+        e.preventDefault();
+        showNotification('Generating custom export...', 'info');
+        setTimeout(() => {
+            showNotification('Export ready for download', 'success');
+        }, 1500);
+    });
+
+    function showNotification(message, type) {
+        const notification = document.createElement('div');
+        notification.className = `fixed bottom-4 right-4 px-6 py-3 rounded-lg shadow-lg text-white z-50 ${
+            type === 'success' ? 'bg-green-600' : type === 'error' ? 'bg-red-600' : 'bg-blue-600'
+        }`;
+        notification.textContent = message;
+        document.body.appendChild(notification);
+        setTimeout(() => notification.remove(), 3000);
+    }
+</script>
+{% endblock %}

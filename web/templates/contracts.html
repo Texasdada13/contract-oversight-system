@@ -1,0 +1,659 @@
+{% extends "base.html" %}
+
+{% block content %}
+<!-- Page Header -->
+<div class="flex flex-col md:flex-row md:items-center md:justify-between mb-6">
+    <div>
+        <h1 class="text-2xl font-bold text-gray-800 dark:text-white">Contract Management</h1>
+        <p class="text-gray-500 dark:text-gray-400">Monitor and manage all government contracts</p>
+    </div>
+    <div class="mt-4 md:mt-0 flex space-x-3">
+        <button onclick="openAddContractModal()" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 flex items-center">
+            <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path>
+            </svg>
+            New Contract
+        </button>
+        <button onclick="exportContracts()" class="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 flex items-center">
+            <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+            </svg>
+            Export
+        </button>
+    </div>
+</div>
+
+<!-- Saved Searches -->
+<div class="bg-white dark:bg-gray-800 rounded-lg shadow mb-4 p-4">
+    <div class="flex items-center justify-between">
+        <div class="flex items-center space-x-2">
+            <span class="text-sm font-medium text-gray-700 dark:text-gray-300">Saved Searches:</span>
+            <div id="savedSearchesList" class="flex flex-wrap gap-2">
+                <!-- Populated by JavaScript -->
+            </div>
+        </div>
+        <button onclick="saveCurrentSearch()" class="text-sm text-blue-600 hover:text-blue-800 flex items-center">
+            <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path>
+            </svg>
+            Save Current Search
+        </button>
+    </div>
+</div>
+
+<!-- Filters -->
+<div class="bg-white dark:bg-gray-800 rounded-lg shadow mb-6 p-4">
+    <form method="GET" class="grid grid-cols-1 md:grid-cols-6 gap-4">
+        <div>
+            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Search</label>
+            <input type="text" name="search" id="searchInput" value="{{ request.args.get('search', '') }}"
+                   placeholder="Contract title or number..."
+                   class="w-full px-3 py-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 dark:text-white">
+        </div>
+        <div>
+            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Status</label>
+            <select name="status" id="statusFilter" class="w-full px-3 py-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 dark:text-white">
+                <option value="">All Statuses</option>
+                <option value="Active" {% if request.args.get('status') == 'Active' %}selected{% endif %}>Active</option>
+                <option value="Completed" {% if request.args.get('status') == 'Completed' %}selected{% endif %}>Completed</option>
+                <option value="Draft" {% if request.args.get('status') == 'Draft' %}selected{% endif %}>Draft</option>
+                <option value="Cancelled" {% if request.args.get('status') == 'Cancelled' %}selected{% endif %}>Cancelled</option>
+            </select>
+        </div>
+        <div>
+            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Department</label>
+            <select name="department" id="deptFilter" class="w-full px-3 py-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 dark:text-white">
+                <option value="">All Departments</option>
+                {% for dept in departments %}
+                <option value="{{ dept }}" {% if request.args.get('department') == dept %}selected{% endif %}>{{ dept }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div>
+            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Health</label>
+            <select name="health" id="healthFilter" class="w-full px-3 py-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 dark:text-white">
+                <option value="">All Health Scores</option>
+                <option value="critical" {% if request.args.get('health') == 'critical' %}selected{% endif %}>Critical (&lt;30)</option>
+                <option value="at_risk" {% if request.args.get('health') == 'at_risk' %}selected{% endif %}>At Risk (30-50)</option>
+                <option value="warning" {% if request.args.get('health') == 'warning' %}selected{% endif %}>Warning (50-70)</option>
+                <option value="healthy" {% if request.args.get('health') == 'healthy' %}selected{% endif %}>Healthy (&gt;70)</option>
+            </select>
+        </div>
+        <div class="flex items-end space-x-2">
+            <button type="submit" class="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">
+                Apply
+            </button>
+            <a href="{{ url_for('contracts_list') }}" class="px-4 py-2 border rounded-lg text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700">
+                Clear
+            </a>
+        </div>
+        <div class="flex items-end">
+            <select id="sortBy" onchange="applySorting()" class="w-full px-3 py-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 dark:text-white">
+                <option value="">Sort By...</option>
+                <option value="title_asc">Title (A-Z)</option>
+                <option value="title_desc">Title (Z-A)</option>
+                <option value="value_desc">Value (High-Low)</option>
+                <option value="value_asc">Value (Low-High)</option>
+                <option value="health_asc">Health (Low-High)</option>
+                <option value="health_desc">Health (High-Low)</option>
+                <option value="date_asc">End Date (Earliest)</option>
+                <option value="date_desc">End Date (Latest)</option>
+            </select>
+        </div>
+    </form>
+</div>
+
+<!-- Summary Stats -->
+<div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+    <div class="bg-white dark:bg-gray-800 rounded-lg shadow p-4 text-center">
+        <p class="text-2xl font-bold text-blue-600">{{ contracts|length }}</p>
+        <p class="text-sm text-gray-500 dark:text-gray-400">Total Shown</p>
+    </div>
+    <div class="bg-white dark:bg-gray-800 rounded-lg shadow p-4 text-center">
+        <p class="text-2xl font-bold text-green-600">${{ '{:,.0f}'.format(total_value) }}</p>
+        <p class="text-sm text-gray-500 dark:text-gray-400">Total Value</p>
+    </div>
+    <div class="bg-white dark:bg-gray-800 rounded-lg shadow p-4 text-center">
+        <p class="text-2xl font-bold text-red-600">{{ at_risk_count }}</p>
+        <p class="text-sm text-gray-500 dark:text-gray-400">At Risk</p>
+    </div>
+    <div class="bg-white dark:bg-gray-800 rounded-lg shadow p-4 text-center">
+        <p class="text-2xl font-bold text-orange-600">{{ overrun_count }}</p>
+        <p class="text-sm text-gray-500 dark:text-gray-400">Over Budget</p>
+    </div>
+</div>
+
+<!-- Bulk Actions Bar (hidden until contracts selected) -->
+<div id="bulkActionsBar" class="hidden bg-blue-600 text-white rounded-lg shadow mb-4 p-4">
+    <div class="flex items-center justify-between">
+        <div class="flex items-center space-x-4">
+            <span id="selectedCount">0 contracts selected</span>
+            <button onclick="clearSelection()" class="text-blue-200 hover:text-white underline text-sm">Clear</button>
+        </div>
+        <div class="flex space-x-3">
+            <button onclick="compareSelected()" class="px-4 py-2 bg-white text-blue-600 rounded-lg hover:bg-blue-50 font-medium">
+                Compare
+            </button>
+            <button onclick="bulkUpdateStatus()" class="px-4 py-2 bg-white text-blue-600 rounded-lg hover:bg-blue-50 font-medium">
+                Update Status
+            </button>
+            <button onclick="bulkExport()" class="px-4 py-2 bg-white text-blue-600 rounded-lg hover:bg-blue-50 font-medium">
+                Export
+            </button>
+            <button onclick="bulkAssignDepartment()" class="px-4 py-2 bg-white text-blue-600 rounded-lg hover:bg-blue-50 font-medium">
+                Assign Dept
+            </button>
+        </div>
+    </div>
+</div>
+
+<!-- Bulk Status Update Modal -->
+<div id="bulkStatusModal" class="fixed inset-0 bg-black bg-opacity-50 hidden items-center justify-center z-50">
+    <div class="bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-md w-full mx-4 p-6">
+        <h3 class="text-lg font-semibold text-gray-800 dark:text-white mb-4">Update Contract Status</h3>
+        <p class="text-sm text-gray-600 dark:text-gray-400 mb-4">Update status for <span id="bulkStatusCount">0</span> selected contracts</p>
+        <select id="bulkStatusSelect" class="w-full px-3 py-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 dark:text-white mb-4">
+            <option value="">Select New Status</option>
+            <option value="Active">Active</option>
+            <option value="Completed">Completed</option>
+            <option value="Draft">Draft</option>
+            <option value="Cancelled">Cancelled</option>
+            <option value="On Hold">On Hold</option>
+        </select>
+        <div class="flex justify-end space-x-3">
+            <button onclick="closeBulkStatusModal()" class="px-4 py-2 border rounded-lg text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700">
+                Cancel
+            </button>
+            <button onclick="applyBulkStatus()" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">
+                Apply
+            </button>
+        </div>
+    </div>
+</div>
+
+<!-- Bulk Department Assign Modal -->
+<div id="bulkDeptModal" class="fixed inset-0 bg-black bg-opacity-50 hidden items-center justify-center z-50">
+    <div class="bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-md w-full mx-4 p-6">
+        <h3 class="text-lg font-semibold text-gray-800 dark:text-white mb-4">Assign Department</h3>
+        <p class="text-sm text-gray-600 dark:text-gray-400 mb-4">Assign department for <span id="bulkDeptCount">0</span> selected contracts</p>
+        <select id="bulkDeptSelect" class="w-full px-3 py-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 dark:text-white mb-4">
+            <option value="">Select Department</option>
+            {% for dept in departments %}
+            <option value="{{ dept }}">{{ dept }}</option>
+            {% endfor %}
+        </select>
+        <div class="flex justify-end space-x-3">
+            <button onclick="closeBulkDeptModal()" class="px-4 py-2 border rounded-lg text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700">
+                Cancel
+            </button>
+            <button onclick="applyBulkDept()" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">
+                Apply
+            </button>
+        </div>
+    </div>
+</div>
+
+<!-- Contracts Table -->
+<div class="bg-white dark:bg-gray-800 rounded-lg shadow overflow-hidden">
+    <div class="overflow-x-auto">
+        <table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+            <thead class="bg-gray-50 dark:bg-gray-700">
+                <tr>
+                    <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                        <input type="checkbox" id="selectAll" onchange="toggleSelectAll()" class="rounded">
+                    </th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Contract</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Vendor</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Department</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Value</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Status</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Health</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">End Date</th>
+                    <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Actions</th>
+                </tr>
+            </thead>
+            <tbody class="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
+                {% for contract in contracts %}
+                <tr class="hover:bg-gray-50 dark:hover:bg-gray-700">
+                    <td class="px-4 py-4" onclick="event.stopPropagation()">
+                        <input type="checkbox" class="contract-checkbox rounded" data-contract-id="{{ contract.contract_id }}" onchange="updateSelection()">
+                    </td>
+                    <td class="px-6 py-4 cursor-pointer" onclick="window.location='{{ url_for('contract_detail', contract_id=contract.contract_id) }}'">
+                        <div class="flex items-center">
+                            <div>
+                                <p class="font-medium text-gray-800 dark:text-white">{{ contract.title[:40] }}{% if contract.title|length > 40 %}...{% endif %}</p>
+                                <p class="text-xs text-gray-500 dark:text-gray-400">{{ contract.contract_number }}</p>
+                            </div>
+                        </div>
+                    </td>
+                    <td class="px-6 py-4">
+                        <p class="text-sm text-gray-800 dark:text-white">{{ contract.vendor_name }}</p>
+                    </td>
+                    <td class="px-6 py-4">
+                        <span class="px-2 py-1 text-xs rounded-full bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-200">
+                            {{ contract.department }}
+                        </span>
+                    </td>
+                    <td class="px-6 py-4">
+                        <p class="text-sm font-medium text-gray-800 dark:text-white">${{ '{:,.0f}'.format(contract.current_amount or contract.original_amount) }}</p>
+                        {% if contract.current_amount and contract.current_amount > contract.original_amount %}
+                        <p class="text-xs text-red-600">
+                            +${{ '{:,.0f}'.format(contract.current_amount - contract.original_amount) }}
+                            <span class="text-red-500">({{ '{:.1f}'.format(((contract.current_amount - contract.original_amount) / contract.original_amount) * 100) }}%)</span>
+                        </p>
+                        {% endif %}
+                    </td>
+                    <td class="px-6 py-4">
+                        <span class="px-2 py-1 text-xs font-medium rounded-full
+                            {% if contract.status == 'Active' %}bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200
+                            {% elif contract.status == 'Completed' %}bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200
+                            {% elif contract.status == 'Draft' %}bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-200
+                            {% else %}bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200{% endif %}">
+                            {{ contract.status }}
+                        </span>
+                    </td>
+                    <td class="px-6 py-4">
+                        {% set health = contract.overall_health_score|int if contract.overall_health_score else 100 %}
+                        <div class="flex items-center">
+                            <div class="w-16 bg-gray-200 dark:bg-gray-600 rounded-full h-2 mr-2">
+                                <div class="h-2 rounded-full
+                                    {% if health < 30 %}bg-red-600
+                                    {% elif health < 50 %}bg-orange-500
+                                    {% elif health < 70 %}bg-yellow-500
+                                    {% else %}bg-green-500{% endif %}"
+                                    style="width: {{ health }}%"></div>
+                            </div>
+                            <span class="text-sm font-medium
+                                {% if health < 30 %}text-red-600
+                                {% elif health < 50 %}text-orange-600
+                                {% elif health < 70 %}text-yellow-600
+                                {% else %}text-green-600{% endif %}">
+                                {{ health }}
+                            </span>
+                        </div>
+                    </td>
+                    <td class="px-6 py-4">
+                        <p class="text-sm text-gray-800 dark:text-white">{{ contract.end_date }}</p>
+                        {% if contract.days_remaining is defined %}
+                        <p class="text-xs {% if contract.days_remaining < 30 %}text-red-600{% elif contract.days_remaining < 90 %}text-yellow-600{% else %}text-gray-500{% endif %}">
+                            {% if contract.days_remaining < 0 %}{{ -contract.days_remaining }} days overdue
+                            {% elif contract.days_remaining == 0 %}Ends today
+                            {% else %}{{ contract.days_remaining }} days left{% endif %}
+                        </p>
+                        {% endif %}
+                    </td>
+                    <td class="px-6 py-4 text-right" onclick="event.stopPropagation()">
+                        <div class="flex justify-end space-x-2">
+                            <a href="{{ url_for('contract_detail', contract_id=contract.contract_id) }}"
+                               class="text-blue-600 hover:text-blue-800 dark:text-blue-400">
+                                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"></path>
+                                </svg>
+                            </a>
+                            <button onclick="editContract('{{ contract.contract_id }}')"
+                                    class="text-gray-600 hover:text-gray-800 dark:text-gray-400">
+                                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path>
+                                </svg>
+                            </button>
+                        </div>
+                    </td>
+                </tr>
+                {% else %}
+                <tr>
+                    <td colspan="9" class="px-6 py-12 text-center text-gray-500 dark:text-gray-400">
+                        No contracts found matching your criteria
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- Add Contract Modal -->
+<div id="addContractModal" class="fixed inset-0 bg-black bg-opacity-50 hidden items-center justify-center z-50">
+    <div class="bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-2xl w-full mx-4 max-h-[90vh] overflow-y-auto">
+        <div class="px-6 py-4 border-b dark:border-gray-700 flex justify-between items-center">
+            <h3 class="text-lg font-semibold text-gray-800 dark:text-white">New Contract</h3>
+            <button onclick="closeAddContractModal()" class="text-gray-500 hover:text-gray-700 dark:text-gray-400">
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                </svg>
+            </button>
+        </div>
+        <form id="addContractForm" class="p-6 space-y-4">
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Contract Number *</label>
+                    <input type="text" name="contract_number" required
+                           class="w-full px-3 py-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 dark:text-white">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Vendor *</label>
+                    <select name="vendor_id" required
+                            class="w-full px-3 py-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 dark:text-white">
+                        <option value="">Select Vendor</option>
+                        {% for vendor in vendors %}
+                        <option value="{{ vendor.vendor_id }}">{{ vendor.name }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Title *</label>
+                <input type="text" name="title" required
+                       class="w-full px-3 py-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 dark:text-white">
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Description</label>
+                <textarea name="description" rows="3"
+                          class="w-full px-3 py-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 dark:text-white"></textarea>
+            </div>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Department *</label>
+                    <select name="department" required
+                            class="w-full px-3 py-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 dark:text-white">
+                        <option value="">Select Department</option>
+                        <option value="School Board">School Board</option>
+                        <option value="City Council">City Council</option>
+                        <option value="Public Works">Public Works</option>
+                        <option value="Parks & Recreation">Parks & Recreation</option>
+                        <option value="Administration">Administration</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Contract Type *</label>
+                    <select name="contract_type" required
+                            class="w-full px-3 py-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 dark:text-white">
+                        <option value="">Select Type</option>
+                        <option value="Fixed Price">Fixed Price</option>
+                        <option value="Time & Materials">Time & Materials</option>
+                        <option value="Cost Plus">Cost Plus</option>
+                        <option value="Unit Price">Unit Price</option>
+                    </select>
+                </div>
+            </div>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Original Amount *</label>
+                    <input type="number" name="original_amount" required step="0.01"
+                           class="w-full px-3 py-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 dark:text-white">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Funded Amount</label>
+                    <input type="number" name="funded_amount" step="0.01"
+                           class="w-full px-3 py-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 dark:text-white">
+                </div>
+            </div>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Start Date *</label>
+                    <input type="date" name="start_date" required
+                           class="w-full px-3 py-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 dark:text-white">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">End Date *</label>
+                    <input type="date" name="end_date" required
+                           class="w-full px-3 py-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 dark:text-white">
+                </div>
+            </div>
+            <div class="flex justify-end space-x-3 pt-4">
+                <button type="button" onclick="closeAddContractModal()"
+                        class="px-4 py-2 border rounded-lg text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700">
+                    Cancel
+                </button>
+                <button type="submit" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">
+                    Create Contract
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    // ====== Modal Functions ======
+    function openAddContractModal() {
+        document.getElementById('addContractModal').classList.remove('hidden');
+        document.getElementById('addContractModal').classList.add('flex');
+    }
+
+    function closeAddContractModal() {
+        document.getElementById('addContractModal').classList.add('hidden');
+        document.getElementById('addContractModal').classList.remove('flex');
+    }
+
+    document.getElementById('addContractModal').addEventListener('click', function(e) {
+        if (e.target === this) closeAddContractModal();
+    });
+
+    document.getElementById('addContractForm').addEventListener('submit', async function(e) {
+        e.preventDefault();
+        const formData = new FormData(this);
+        const data = Object.fromEntries(formData);
+        data.contract_id = 'CNT-' + Date.now();
+
+        try {
+            const response = await fetch('/api/contract', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(data)
+            });
+
+            if (response.ok) {
+                window.location.reload();
+            } else {
+                const error = await response.json();
+                alert('Error: ' + (error.error || 'Failed to create contract'));
+            }
+        } catch (err) {
+            alert('Error creating contract: ' + err.message);
+        }
+    });
+
+    function editContract(contractId) {
+        window.location.href = `/contract/${contractId}?edit=true`;
+    }
+
+    function exportContracts() {
+        window.location.href = '/api/export?' + window.location.search.substring(1);
+    }
+
+    // ====== Selection Management ======
+    let selectedContracts = new Set();
+
+    function updateSelection() {
+        selectedContracts.clear();
+        document.querySelectorAll('.contract-checkbox:checked').forEach(cb => {
+            selectedContracts.add(cb.dataset.contractId);
+        });
+        updateBulkActionsBar();
+    }
+
+    function toggleSelectAll() {
+        const selectAll = document.getElementById('selectAll').checked;
+        document.querySelectorAll('.contract-checkbox').forEach(cb => {
+            cb.checked = selectAll;
+        });
+        updateSelection();
+    }
+
+    function updateBulkActionsBar() {
+        const bar = document.getElementById('bulkActionsBar');
+        const countEl = document.getElementById('selectedCount');
+
+        if (selectedContracts.size > 0) {
+            bar.classList.remove('hidden');
+            countEl.textContent = `${selectedContracts.size} contract${selectedContracts.size > 1 ? 's' : ''} selected`;
+        } else {
+            bar.classList.add('hidden');
+        }
+    }
+
+    function clearSelection() {
+        document.querySelectorAll('.contract-checkbox').forEach(cb => {
+            cb.checked = false;
+        });
+        document.getElementById('selectAll').checked = false;
+        selectedContracts.clear();
+        updateBulkActionsBar();
+    }
+
+    // ====== Bulk Operations ======
+    function compareSelected() {
+        if (selectedContracts.size < 2) {
+            alert('Please select at least 2 contracts to compare');
+            return;
+        }
+        if (selectedContracts.size > 4) {
+            alert('You can compare up to 4 contracts at a time');
+            return;
+        }
+        const params = Array.from(selectedContracts).map(id => `contracts=${encodeURIComponent(id)}`).join('&');
+        window.location.href = `/compare?${params}`;
+    }
+
+    function bulkUpdateStatus() {
+        document.getElementById('bulkStatusCount').textContent = selectedContracts.size;
+        document.getElementById('bulkStatusModal').classList.remove('hidden');
+        document.getElementById('bulkStatusModal').classList.add('flex');
+    }
+
+    function closeBulkStatusModal() {
+        document.getElementById('bulkStatusModal').classList.add('hidden');
+        document.getElementById('bulkStatusModal').classList.remove('flex');
+    }
+
+    async function applyBulkStatus() {
+        const newStatus = document.getElementById('bulkStatusSelect').value;
+        if (!newStatus) {
+            alert('Please select a status');
+            return;
+        }
+
+        for (const contractId of selectedContracts) {
+            try {
+                await fetch(`/api/contract/${contractId}`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ status: newStatus })
+                });
+            } catch (err) {
+                console.error('Error updating contract:', err);
+            }
+        }
+        closeBulkStatusModal();
+        window.location.reload();
+    }
+
+    function bulkAssignDepartment() {
+        document.getElementById('bulkDeptCount').textContent = selectedContracts.size;
+        document.getElementById('bulkDeptModal').classList.remove('hidden');
+        document.getElementById('bulkDeptModal').classList.add('flex');
+    }
+
+    function closeBulkDeptModal() {
+        document.getElementById('bulkDeptModal').classList.add('hidden');
+        document.getElementById('bulkDeptModal').classList.remove('flex');
+    }
+
+    async function applyBulkDept() {
+        const newDept = document.getElementById('bulkDeptSelect').value;
+        if (!newDept) {
+            alert('Please select a department');
+            return;
+        }
+
+        for (const contractId of selectedContracts) {
+            try {
+                await fetch(`/api/contract/${contractId}`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ department: newDept })
+                });
+            } catch (err) {
+                console.error('Error updating contract:', err);
+            }
+        }
+        closeBulkDeptModal();
+        window.location.reload();
+    }
+
+    function bulkExport() {
+        const ids = Array.from(selectedContracts).join(',');
+        window.location.href = `/api/export?ids=${ids}`;
+    }
+
+    // ====== Saved Searches ======
+    function loadSavedSearches() {
+        const searches = JSON.parse(localStorage.getItem('savedSearches') || '[]');
+        const container = document.getElementById('savedSearchesList');
+        container.innerHTML = '';
+
+        if (searches.length === 0) {
+            container.innerHTML = '<span class="text-xs text-gray-400">No saved searches</span>';
+            return;
+        }
+
+        searches.forEach((search, index) => {
+            const tag = document.createElement('span');
+            tag.className = 'inline-flex items-center px-3 py-1 bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200 text-sm rounded-full cursor-pointer hover:bg-blue-200 dark:hover:bg-blue-800';
+            tag.innerHTML = `
+                <a href="?${search.params}" class="mr-1">${search.name}</a>
+                <button onclick="deleteSavedSearch(${index})" class="text-blue-600 hover:text-blue-800 ml-1">&times;</button>
+            `;
+            container.appendChild(tag);
+        });
+    }
+
+    function saveCurrentSearch() {
+        const params = window.location.search.substring(1);
+        if (!params) {
+            alert('No filters applied to save');
+            return;
+        }
+
+        const name = prompt('Enter a name for this search:');
+        if (!name) return;
+
+        const searches = JSON.parse(localStorage.getItem('savedSearches') || '[]');
+        searches.push({ name, params });
+        localStorage.setItem('savedSearches', JSON.stringify(searches));
+        loadSavedSearches();
+    }
+
+    function deleteSavedSearch(index) {
+        const searches = JSON.parse(localStorage.getItem('savedSearches') || '[]');
+        searches.splice(index, 1);
+        localStorage.setItem('savedSearches', JSON.stringify(searches));
+        loadSavedSearches();
+    }
+
+    // ====== Sorting ======
+    function applySorting() {
+        const sortBy = document.getElementById('sortBy').value;
+        if (!sortBy) return;
+
+        const currentParams = new URLSearchParams(window.location.search);
+        currentParams.set('sort', sortBy);
+        window.location.href = '?' + currentParams.toString();
+    }
+
+    // ====== Initialize ======
+    document.addEventListener('DOMContentLoaded', function() {
+        loadSavedSearches();
+    });
+
+    // Close modals on outside click
+    document.getElementById('bulkStatusModal').addEventListener('click', function(e) {
+        if (e.target === this) closeBulkStatusModal();
+    });
+    document.getElementById('bulkDeptModal').addEventListener('click', function(e) {
+        if (e.target === this) closeBulkDeptModal();
+    });
+</script>
+{% endblock %}

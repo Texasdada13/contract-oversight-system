@@ -1,0 +1,671 @@
+{% extends "base.html" %}
+
+{% block content %}
+<!-- Page Header -->
+<div class="flex items-center justify-between mb-6">
+    <div>
+        <h1 class="text-2xl font-bold text-gray-800 dark:text-white">Contract Approvals</h1>
+        <p class="text-gray-500 dark:text-gray-400">Manage contract approval workflows and pending requests</p>
+    </div>
+    <div class="flex space-x-3">
+        <button onclick="openNewRequestModal()" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">
+            <svg class="w-4 h-4 inline mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path>
+            </svg>
+            New Approval Request
+        </button>
+    </div>
+</div>
+
+<!-- Summary Stats -->
+<div class="grid grid-cols-1 md:grid-cols-5 gap-4 mb-8">
+    <div class="bg-gradient-to-br from-yellow-500 to-yellow-600 rounded-lg shadow p-4 text-white">
+        <p class="text-yellow-100 text-xs">Pending Approval</p>
+        <p class="text-3xl font-bold">{{ stats.pending }}</p>
+    </div>
+    <div class="bg-gradient-to-br from-blue-500 to-blue-600 rounded-lg shadow p-4 text-white">
+        <p class="text-blue-100 text-xs">In Review</p>
+        <p class="text-3xl font-bold">{{ stats.in_review }}</p>
+    </div>
+    <div class="bg-gradient-to-br from-green-500 to-green-600 rounded-lg shadow p-4 text-white">
+        <p class="text-green-100 text-xs">Approved</p>
+        <p class="text-3xl font-bold">{{ stats.approved }}</p>
+    </div>
+    <div class="bg-gradient-to-br from-red-500 to-red-600 rounded-lg shadow p-4 text-white">
+        <p class="text-red-100 text-xs">Rejected</p>
+        <p class="text-3xl font-bold">{{ stats.rejected }}</p>
+    </div>
+    <div class="bg-gradient-to-br from-purple-500 to-purple-600 rounded-lg shadow p-4 text-white">
+        <p class="text-purple-100 text-xs">Total Value Pending</p>
+        <p class="text-2xl font-bold">${{ '{:,.0f}'.format(stats.pending_value) }}</p>
+    </div>
+</div>
+
+<!-- Tabs -->
+<div class="mb-6">
+    <div class="border-b border-gray-200 dark:border-gray-700">
+        <nav class="-mb-px flex space-x-8">
+            <button onclick="switchTab('pending')" id="tab-pending" class="tab-btn border-b-2 border-blue-500 py-4 px-1 text-sm font-medium text-blue-600 dark:text-blue-400">
+                Pending Approvals ({{ stats.pending }})
+            </button>
+            <button onclick="switchTab('my-requests')" id="tab-my-requests" class="tab-btn border-b-2 border-transparent py-4 px-1 text-sm font-medium text-gray-500 hover:text-gray-700 dark:text-gray-400">
+                My Requests
+            </button>
+            <button onclick="switchTab('history')" id="tab-history" class="tab-btn border-b-2 border-transparent py-4 px-1 text-sm font-medium text-gray-500 hover:text-gray-700 dark:text-gray-400">
+                Approval History
+            </button>
+            <button onclick="switchTab('workflows')" id="tab-workflows" class="tab-btn border-b-2 border-transparent py-4 px-1 text-sm font-medium text-gray-500 hover:text-gray-700 dark:text-gray-400">
+                Workflow Settings
+            </button>
+        </nav>
+    </div>
+</div>
+
+<!-- Pending Approvals Tab -->
+<div id="content-pending" class="tab-content">
+    <div class="bg-white dark:bg-gray-800 rounded-lg shadow">
+        <div class="px-6 py-4 border-b dark:border-gray-700">
+            <h3 class="text-lg font-semibold text-gray-800 dark:text-white">Pending Your Approval</h3>
+        </div>
+        <div class="divide-y divide-gray-200 dark:divide-gray-700">
+            {% for request in pending_approvals %}
+            <div class="p-6 hover:bg-gray-50 dark:hover:bg-gray-700">
+                <div class="flex items-start justify-between">
+                    <div class="flex-1">
+                        <div class="flex items-center space-x-3">
+                            <span class="px-2 py-1 text-xs font-medium rounded
+                                {% if request.type == 'New Contract' %}bg-blue-100 text-blue-800
+                                {% elif request.type == 'Change Order' %}bg-purple-100 text-purple-800
+                                {% elif request.type == 'Budget Increase' %}bg-orange-100 text-orange-800
+                                {% elif request.type == 'Renewal' %}bg-green-100 text-green-800
+                                {% else %}bg-gray-100 text-gray-800{% endif %}">
+                                {{ request.type }}
+                            </span>
+                            <span class="text-sm text-gray-500">{{ request.request_id }}</span>
+                        </div>
+                        <h4 class="mt-2 text-lg font-medium text-gray-800 dark:text-white">
+                            <a href="{{ url_for('contract_detail', contract_id=request.contract_id) }}" class="hover:text-blue-600">
+                                {{ request.contract_title }}
+                            </a>
+                        </h4>
+                        <p class="mt-1 text-sm text-gray-600 dark:text-gray-400">{{ request.description }}</p>
+                        <div class="mt-3 flex items-center space-x-6 text-sm">
+                            <span class="text-gray-500">
+                                <strong>Requested by:</strong> {{ request.requested_by }}
+                            </span>
+                            <span class="text-gray-500">
+                                <strong>Date:</strong> {{ request.requested_at }}
+                            </span>
+                            <span class="text-gray-500">
+                                <strong>Amount:</strong> ${{ '{:,.0f}'.format(request.amount) }}
+                            </span>
+                        </div>
+                        <!-- Approval Chain -->
+                        <div class="mt-4">
+                            <p class="text-xs text-gray-500 mb-2">Approval Chain:</p>
+                            <div class="flex items-center space-x-2">
+                                {% for step in request.approval_chain %}
+                                <div class="flex items-center">
+                                    <div class="w-8 h-8 rounded-full flex items-center justify-center text-xs font-medium
+                                        {% if step.status == 'approved' %}bg-green-100 text-green-800
+                                        {% elif step.status == 'pending' %}bg-yellow-100 text-yellow-800
+                                        {% elif step.status == 'rejected' %}bg-red-100 text-red-800
+                                        {% else %}bg-gray-100 text-gray-600{% endif %}">
+                                        {% if step.status == 'approved' %}
+                                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+                                        </svg>
+                                        {% elif step.status == 'rejected' %}
+                                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                                        </svg>
+                                        {% else %}
+                                        {{ loop.index }}
+                                        {% endif %}
+                                    </div>
+                                    {% if not loop.last %}
+                                    <div class="w-8 h-0.5 {% if step.status == 'approved' %}bg-green-500{% else %}bg-gray-300{% endif %}"></div>
+                                    {% endif %}
+                                </div>
+                                {% endfor %}
+                            </div>
+                            <div class="flex items-center space-x-4 mt-1 text-xs text-gray-500">
+                                {% for step in request.approval_chain %}
+                                <span>{{ step.approver }}</span>
+                                {% endfor %}
+                            </div>
+                        </div>
+                    </div>
+                    <div class="flex flex-col space-y-2 ml-6">
+                        <button onclick="approveRequest('{{ request.request_id }}')"
+                            class="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 text-sm">
+                            Approve
+                        </button>
+                        <button onclick="openRejectModal('{{ request.request_id }}')"
+                            class="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 text-sm">
+                            Reject
+                        </button>
+                        <button onclick="requestMoreInfo('{{ request.request_id }}')"
+                            class="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 text-sm">
+                            Request Info
+                        </button>
+                    </div>
+                </div>
+            </div>
+            {% else %}
+            <div class="p-12 text-center">
+                <svg class="w-16 h-16 text-gray-300 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                </svg>
+                <p class="text-gray-500">No pending approvals</p>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+</div>
+
+<!-- My Requests Tab -->
+<div id="content-my-requests" class="tab-content hidden">
+    <div class="bg-white dark:bg-gray-800 rounded-lg shadow">
+        <div class="px-6 py-4 border-b dark:border-gray-700">
+            <h3 class="text-lg font-semibold text-gray-800 dark:text-white">My Submitted Requests</h3>
+        </div>
+        <div class="overflow-x-auto">
+            <table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+                <thead class="bg-gray-50 dark:bg-gray-700">
+                    <tr>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Request</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Type</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Contract</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Amount</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Status</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Date</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-gray-200 dark:divide-gray-700">
+                    {% for request in my_requests %}
+                    <tr class="hover:bg-gray-50 dark:hover:bg-gray-700">
+                        <td class="px-6 py-4 text-sm font-medium text-gray-800 dark:text-white">{{ request.request_id }}</td>
+                        <td class="px-6 py-4">
+                            <span class="px-2 py-1 text-xs font-medium rounded
+                                {% if request.type == 'New Contract' %}bg-blue-100 text-blue-800
+                                {% elif request.type == 'Change Order' %}bg-purple-100 text-purple-800
+                                {% else %}bg-gray-100 text-gray-800{% endif %}">
+                                {{ request.type }}
+                            </span>
+                        </td>
+                        <td class="px-6 py-4 text-sm text-gray-600 dark:text-gray-300">{{ request.contract_title }}</td>
+                        <td class="px-6 py-4 text-sm font-medium text-gray-800 dark:text-white">${{ '{:,.0f}'.format(request.amount) }}</td>
+                        <td class="px-6 py-4">
+                            <span class="px-2 py-1 text-xs font-medium rounded
+                                {% if request.status == 'Approved' %}bg-green-100 text-green-800
+                                {% elif request.status == 'Pending' %}bg-yellow-100 text-yellow-800
+                                {% elif request.status == 'Rejected' %}bg-red-100 text-red-800
+                                {% else %}bg-gray-100 text-gray-800{% endif %}">
+                                {{ request.status }}
+                            </span>
+                        </td>
+                        <td class="px-6 py-4 text-sm text-gray-500">{{ request.requested_at }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<!-- Approval History Tab -->
+<div id="content-history" class="tab-content hidden">
+    <div class="bg-white dark:bg-gray-800 rounded-lg shadow">
+        <div class="px-6 py-4 border-b dark:border-gray-700 flex justify-between items-center">
+            <h3 class="text-lg font-semibold text-gray-800 dark:text-white">Approval History</h3>
+            <div class="flex space-x-2">
+                <select id="historyFilter" onchange="filterHistory()" class="px-3 py-2 border rounded-lg text-sm dark:bg-gray-700 dark:border-gray-600 dark:text-white">
+                    <option value="">All Statuses</option>
+                    <option value="approved">Approved</option>
+                    <option value="rejected">Rejected</option>
+                </select>
+                <input type="date" id="historyDateFrom" onchange="filterHistory()" class="px-3 py-2 border rounded-lg text-sm dark:bg-gray-700 dark:border-gray-600 dark:text-white">
+                <input type="date" id="historyDateTo" onchange="filterHistory()" class="px-3 py-2 border rounded-lg text-sm dark:bg-gray-700 dark:border-gray-600 dark:text-white">
+            </div>
+        </div>
+        <div class="divide-y divide-gray-200 dark:divide-gray-700" id="historyList">
+            {% for item in approval_history %}
+            <div class="p-4 history-item" data-status="{{ item.status|lower }}" data-date="{{ item.decided_at }}">
+                <div class="flex items-center justify-between">
+                    <div class="flex items-center space-x-4">
+                        <div class="w-10 h-10 rounded-full flex items-center justify-center
+                            {% if item.status == 'Approved' %}bg-green-100 text-green-600
+                            {% else %}bg-red-100 text-red-600{% endif %}">
+                            {% if item.status == 'Approved' %}
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+                            </svg>
+                            {% else %}
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                            </svg>
+                            {% endif %}
+                        </div>
+                        <div>
+                            <p class="font-medium text-gray-800 dark:text-white">{{ item.contract_title }}</p>
+                            <p class="text-sm text-gray-500">{{ item.type }} - {{ item.status }} by {{ item.decided_by }}</p>
+                        </div>
+                    </div>
+                    <div class="text-right">
+                        <p class="font-medium text-gray-800 dark:text-white">${{ '{:,.0f}'.format(item.amount) }}</p>
+                        <p class="text-sm text-gray-500">{{ item.decided_at }}</p>
+                    </div>
+                </div>
+                {% if item.comments %}
+                <p class="mt-2 ml-14 text-sm text-gray-600 dark:text-gray-400 italic">"{{ item.comments }}"</p>
+                {% endif %}
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+</div>
+
+<!-- Workflow Settings Tab -->
+<div id="content-workflows" class="tab-content hidden">
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <!-- Approval Thresholds -->
+        <div class="bg-white dark:bg-gray-800 rounded-lg shadow">
+            <div class="px-6 py-4 border-b dark:border-gray-700">
+                <h3 class="text-lg font-semibold text-gray-800 dark:text-white">Approval Thresholds</h3>
+                <p class="text-sm text-gray-500">Set approval requirements based on contract value</p>
+            </div>
+            <div class="p-6 space-y-4">
+                <div class="p-4 bg-gray-50 dark:bg-gray-700 rounded-lg">
+                    <div class="flex justify-between items-center">
+                        <div>
+                            <p class="font-medium text-gray-800 dark:text-white">Tier 1: Up to $50,000</p>
+                            <p class="text-sm text-gray-500">Department Manager approval only</p>
+                        </div>
+                        <span class="px-2 py-1 text-xs bg-green-100 text-green-800 rounded">1 Approver</span>
+                    </div>
+                </div>
+                <div class="p-4 bg-gray-50 dark:bg-gray-700 rounded-lg">
+                    <div class="flex justify-between items-center">
+                        <div>
+                            <p class="font-medium text-gray-800 dark:text-white">Tier 2: $50,000 - $250,000</p>
+                            <p class="text-sm text-gray-500">Manager + Finance Director approval</p>
+                        </div>
+                        <span class="px-2 py-1 text-xs bg-yellow-100 text-yellow-800 rounded">2 Approvers</span>
+                    </div>
+                </div>
+                <div class="p-4 bg-gray-50 dark:bg-gray-700 rounded-lg">
+                    <div class="flex justify-between items-center">
+                        <div>
+                            <p class="font-medium text-gray-800 dark:text-white">Tier 3: $250,000 - $1,000,000</p>
+                            <p class="text-sm text-gray-500">Manager + Finance + Executive approval</p>
+                        </div>
+                        <span class="px-2 py-1 text-xs bg-orange-100 text-orange-800 rounded">3 Approvers</span>
+                    </div>
+                </div>
+                <div class="p-4 bg-gray-50 dark:bg-gray-700 rounded-lg">
+                    <div class="flex justify-between items-center">
+                        <div>
+                            <p class="font-medium text-gray-800 dark:text-white">Tier 4: Over $1,000,000</p>
+                            <p class="text-sm text-gray-500">Full chain + Board approval required</p>
+                        </div>
+                        <span class="px-2 py-1 text-xs bg-red-100 text-red-800 rounded">4 Approvers</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Approval Chain -->
+        <div class="bg-white dark:bg-gray-800 rounded-lg shadow">
+            <div class="px-6 py-4 border-b dark:border-gray-700">
+                <h3 class="text-lg font-semibold text-gray-800 dark:text-white">Default Approval Chain</h3>
+                <p class="text-sm text-gray-500">Standard approval workflow sequence</p>
+            </div>
+            <div class="p-6">
+                <div class="space-y-4">
+                    <div class="flex items-center space-x-4">
+                        <div class="w-10 h-10 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center font-bold">1</div>
+                        <div class="flex-1">
+                            <p class="font-medium text-gray-800 dark:text-white">Department Manager</p>
+                            <p class="text-sm text-gray-500">Initial review and department authorization</p>
+                        </div>
+                    </div>
+                    <div class="ml-5 border-l-2 border-blue-200 h-8"></div>
+                    <div class="flex items-center space-x-4">
+                        <div class="w-10 h-10 rounded-full bg-purple-100 text-purple-600 flex items-center justify-center font-bold">2</div>
+                        <div class="flex-1">
+                            <p class="font-medium text-gray-800 dark:text-white">Finance Director</p>
+                            <p class="text-sm text-gray-500">Budget verification and financial review</p>
+                        </div>
+                    </div>
+                    <div class="ml-5 border-l-2 border-purple-200 h-8"></div>
+                    <div class="flex items-center space-x-4">
+                        <div class="w-10 h-10 rounded-full bg-orange-100 text-orange-600 flex items-center justify-center font-bold">3</div>
+                        <div class="flex-1">
+                            <p class="font-medium text-gray-800 dark:text-white">Executive Director</p>
+                            <p class="text-sm text-gray-500">Executive authorization for major contracts</p>
+                        </div>
+                    </div>
+                    <div class="ml-5 border-l-2 border-orange-200 h-8"></div>
+                    <div class="flex items-center space-x-4">
+                        <div class="w-10 h-10 rounded-full bg-red-100 text-red-600 flex items-center justify-center font-bold">4</div>
+                        <div class="flex-1">
+                            <p class="font-medium text-gray-800 dark:text-white">Board of Directors</p>
+                            <p class="text-sm text-gray-500">Final approval for high-value contracts</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Delegation Settings -->
+        <div class="bg-white dark:bg-gray-800 rounded-lg shadow">
+            <div class="px-6 py-4 border-b dark:border-gray-700">
+                <h3 class="text-lg font-semibold text-gray-800 dark:text-white">Delegation Settings</h3>
+                <p class="text-sm text-gray-500">Configure temporary approval delegations</p>
+            </div>
+            <div class="p-6">
+                <div class="space-y-4">
+                    <div class="p-4 bg-gray-50 dark:bg-gray-700 rounded-lg flex justify-between items-center">
+                        <div>
+                            <p class="font-medium text-gray-800 dark:text-white">Finance Director</p>
+                            <p class="text-sm text-gray-500">Delegated to: Sarah Johnson</p>
+                            <p class="text-xs text-gray-400">Dec 1 - Dec 15, 2024</p>
+                        </div>
+                        <button class="text-red-600 hover:text-red-800 text-sm">Remove</button>
+                    </div>
+                    <button class="w-full px-4 py-3 border-2 border-dashed border-gray-300 rounded-lg text-gray-500 hover:border-blue-500 hover:text-blue-500">
+                        + Add Delegation
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Auto-approval Rules -->
+        <div class="bg-white dark:bg-gray-800 rounded-lg shadow">
+            <div class="px-6 py-4 border-b dark:border-gray-700">
+                <h3 class="text-lg font-semibold text-gray-800 dark:text-white">Auto-Approval Rules</h3>
+                <p class="text-sm text-gray-500">Automatic approvals for routine requests</p>
+            </div>
+            <div class="p-6 space-y-4">
+                <label class="flex items-center justify-between p-4 bg-gray-50 dark:bg-gray-700 rounded-lg cursor-pointer">
+                    <div>
+                        <p class="font-medium text-gray-800 dark:text-white">Recurring Payments</p>
+                        <p class="text-sm text-gray-500">Auto-approve scheduled payments under $10,000</p>
+                    </div>
+                    <input type="checkbox" checked class="w-5 h-5 text-blue-600 rounded">
+                </label>
+                <label class="flex items-center justify-between p-4 bg-gray-50 dark:bg-gray-700 rounded-lg cursor-pointer">
+                    <div>
+                        <p class="font-medium text-gray-800 dark:text-white">Contract Renewals (Same Terms)</p>
+                        <p class="text-sm text-gray-500">Auto-approve renewals at same or lower cost</p>
+                    </div>
+                    <input type="checkbox" class="w-5 h-5 text-blue-600 rounded">
+                </label>
+                <label class="flex items-center justify-between p-4 bg-gray-50 dark:bg-gray-700 rounded-lg cursor-pointer">
+                    <div>
+                        <p class="font-medium text-gray-800 dark:text-white">Minor Change Orders</p>
+                        <p class="text-sm text-gray-500">Auto-approve changes under 5% of contract value</p>
+                    </div>
+                    <input type="checkbox" class="w-5 h-5 text-blue-600 rounded">
+                </label>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- New Request Modal -->
+<div id="newRequestModal" class="fixed inset-0 bg-black bg-opacity-50 hidden items-center justify-center z-50">
+    <div class="bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-lg w-full mx-4">
+        <div class="px-6 py-4 border-b dark:border-gray-700 flex justify-between items-center">
+            <h3 class="text-lg font-semibold text-gray-800 dark:text-white">New Approval Request</h3>
+            <button onclick="closeModal('newRequestModal')" class="text-gray-400 hover:text-gray-600">
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                </svg>
+            </button>
+        </div>
+        <form id="newRequestForm" class="p-6 space-y-4">
+            <div>
+                <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Request Type</label>
+                <select name="type" required class="w-full px-3 py-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 dark:text-white">
+                    <option value="">Select type...</option>
+                    <option value="New Contract">New Contract</option>
+                    <option value="Change Order">Change Order</option>
+                    <option value="Budget Increase">Budget Increase</option>
+                    <option value="Renewal">Contract Renewal</option>
+                    <option value="Amendment">Contract Amendment</option>
+                </select>
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Related Contract</label>
+                <select name="contract_id" required class="w-full px-3 py-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 dark:text-white">
+                    <option value="">Select contract...</option>
+                    {% for contract in contracts %}
+                    <option value="{{ contract.contract_id }}">{{ contract.title }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Amount</label>
+                <input type="number" name="amount" required min="0" step="0.01"
+                    class="w-full px-3 py-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+                    placeholder="Enter amount">
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Description</label>
+                <textarea name="description" required rows="3"
+                    class="w-full px-3 py-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+                    placeholder="Describe the approval request..."></textarea>
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Justification</label>
+                <textarea name="justification" rows="2"
+                    class="w-full px-3 py-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+                    placeholder="Provide business justification..."></textarea>
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Attachments</label>
+                <input type="file" name="attachments" multiple
+                    class="w-full px-3 py-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 dark:text-white">
+            </div>
+            <div class="flex justify-end space-x-3 pt-4">
+                <button type="button" onclick="closeModal('newRequestModal')"
+                    class="px-4 py-2 border rounded-lg hover:bg-gray-50 dark:border-gray-600 dark:hover:bg-gray-700">
+                    Cancel
+                </button>
+                <button type="submit" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">
+                    Submit Request
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<!-- Reject Modal -->
+<div id="rejectModal" class="fixed inset-0 bg-black bg-opacity-50 hidden items-center justify-center z-50">
+    <div class="bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-md w-full mx-4">
+        <div class="px-6 py-4 border-b dark:border-gray-700">
+            <h3 class="text-lg font-semibold text-gray-800 dark:text-white">Reject Approval Request</h3>
+        </div>
+        <form id="rejectForm" class="p-6 space-y-4">
+            <input type="hidden" id="rejectRequestId" name="request_id">
+            <div>
+                <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Reason for Rejection</label>
+                <select name="reason" required class="w-full px-3 py-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 dark:text-white">
+                    <option value="">Select reason...</option>
+                    <option value="budget">Insufficient Budget</option>
+                    <option value="documentation">Missing Documentation</option>
+                    <option value="compliance">Compliance Issues</option>
+                    <option value="pricing">Pricing Concerns</option>
+                    <option value="vendor">Vendor Issues</option>
+                    <option value="other">Other</option>
+                </select>
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Comments</label>
+                <textarea name="comments" required rows="3"
+                    class="w-full px-3 py-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+                    placeholder="Provide detailed rejection reason..."></textarea>
+            </div>
+            <div class="flex justify-end space-x-3 pt-4">
+                <button type="button" onclick="closeModal('rejectModal')"
+                    class="px-4 py-2 border rounded-lg hover:bg-gray-50 dark:border-gray-600 dark:hover:bg-gray-700">
+                    Cancel
+                </button>
+                <button type="submit" class="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700">
+                    Confirm Rejection
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    // Tab switching
+    function switchTab(tabName) {
+        // Hide all content
+        document.querySelectorAll('.tab-content').forEach(el => el.classList.add('hidden'));
+        // Reset all tabs
+        document.querySelectorAll('.tab-btn').forEach(el => {
+            el.classList.remove('border-blue-500', 'text-blue-600', 'dark:text-blue-400');
+            el.classList.add('border-transparent', 'text-gray-500');
+        });
+
+        // Show selected content
+        document.getElementById('content-' + tabName).classList.remove('hidden');
+        // Activate tab
+        const activeTab = document.getElementById('tab-' + tabName);
+        activeTab.classList.add('border-blue-500', 'text-blue-600', 'dark:text-blue-400');
+        activeTab.classList.remove('border-transparent', 'text-gray-500');
+    }
+
+    // Modal functions
+    function openNewRequestModal() {
+        document.getElementById('newRequestModal').classList.remove('hidden');
+        document.getElementById('newRequestModal').classList.add('flex');
+    }
+
+    function openRejectModal(requestId) {
+        document.getElementById('rejectRequestId').value = requestId;
+        document.getElementById('rejectModal').classList.remove('hidden');
+        document.getElementById('rejectModal').classList.add('flex');
+    }
+
+    function closeModal(modalId) {
+        document.getElementById(modalId).classList.add('hidden');
+        document.getElementById(modalId).classList.remove('flex');
+    }
+
+    // Approval actions
+    async function approveRequest(requestId) {
+        if (!confirm('Are you sure you want to approve this request?')) return;
+
+        try {
+            const response = await fetch(`/api/approval/${requestId}/approve`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' }
+            });
+
+            if (response.ok) {
+                showNotification('Request approved successfully', 'success');
+                setTimeout(() => location.reload(), 1000);
+            } else {
+                showNotification('Failed to approve request', 'error');
+            }
+        } catch (error) {
+            showNotification('Error processing approval', 'error');
+        }
+    }
+
+    function requestMoreInfo(requestId) {
+        const info = prompt('What additional information do you need?');
+        if (info) {
+            // Send request for more info
+            fetch(`/api/approval/${requestId}/request-info`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ message: info })
+            }).then(() => {
+                showNotification('Information request sent', 'success');
+            });
+        }
+    }
+
+    // Form submissions
+    document.getElementById('newRequestForm').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const formData = new FormData(e.target);
+
+        try {
+            const response = await fetch('/api/approval/create', {
+                method: 'POST',
+                body: formData
+            });
+
+            if (response.ok) {
+                showNotification('Approval request submitted', 'success');
+                closeModal('newRequestModal');
+                setTimeout(() => location.reload(), 1000);
+            }
+        } catch (error) {
+            showNotification('Error submitting request', 'error');
+        }
+    });
+
+    document.getElementById('rejectForm').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const formData = new FormData(e.target);
+        const requestId = formData.get('request_id');
+
+        try {
+            const response = await fetch(`/api/approval/${requestId}/reject`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    reason: formData.get('reason'),
+                    comments: formData.get('comments')
+                })
+            });
+
+            if (response.ok) {
+                showNotification('Request rejected', 'success');
+                closeModal('rejectModal');
+                setTimeout(() => location.reload(), 1000);
+            }
+        } catch (error) {
+            showNotification('Error rejecting request', 'error');
+        }
+    });
+
+    // Filter history
+    function filterHistory() {
+        const statusFilter = document.getElementById('historyFilter').value;
+        const dateFrom = document.getElementById('historyDateFrom').value;
+        const dateTo = document.getElementById('historyDateTo').value;
+
+        document.querySelectorAll('.history-item').forEach(item => {
+            const itemStatus = item.dataset.status;
+            const itemDate = item.dataset.date;
+
+            let show = true;
+            if (statusFilter && itemStatus !== statusFilter) show = false;
+            if (dateFrom && itemDate < dateFrom) show = false;
+            if (dateTo && itemDate > dateTo) show = false;
+
+            item.style.display = show ? '' : 'none';
+        });
+    }
+
+    // Notification helper
+    function showNotification(message, type) {
+        const notification = document.createElement('div');
+        notification.className = `fixed bottom-4 right-4 px-6 py-3 rounded-lg shadow-lg text-white ${type === 'success' ? 'bg-green-600' : 'bg-red-600'}`;
+        notification.textContent = message;
+        document.body.appendChild(notification);
+        setTimeout(() => notification.remove(), 3000);
+    }
+</script>
+{% endblock %}
