@@ -1,0 +1,11 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(python:*)",
+      "Bash(set PYTHONPATH=c:Usersdada_OneDriveDocumentscontract-oversight-system)",
+      "Bash(curl:*)",
+      "Bash(powershell:*)",
+      "Bash(git add:*)"
+    ]
+  }
+}

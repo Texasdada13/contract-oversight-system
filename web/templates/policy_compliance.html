@@ -1,0 +1,301 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="space-y-6">
+    <!-- Header -->
+    <div class="flex justify-between items-center">
+        <div>
+            <h1 class="text-2xl font-bold text-gray-900 dark:text-white">Policy Compliance Dashboard</h1>
+            <p class="text-gray-600 dark:text-gray-400">M/WBE goals, local hiring, and policy requirement tracking</p>
+        </div>
+        <div class="flex space-x-3">
+            <select class="px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg dark:bg-gray-700">
+                <option>FY 2024-2025</option>
+                <option>FY 2023-2024</option>
+                <option>FY 2022-2023</option>
+            </select>
+            <button class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">
+                Export Report
+            </button>
+        </div>
+    </div>
+
+    <!-- M/WBE Goals Section -->
+    <div class="bg-white dark:bg-gray-800 rounded-xl shadow p-6">
+        <h2 class="text-lg font-semibold text-gray-900 dark:text-white mb-4">Minority/Women-Owned Business Enterprise (M/WBE) Goals</h2>
+        <p class="text-sm text-gray-600 dark:text-gray-400 mb-6">City policy requires {{ mwbe_goal }}% of contract value to be awarded to certified M/WBE vendors.</p>
+
+        <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+            <div class="bg-gray-50 dark:bg-gray-700 rounded-lg p-4">
+                <p class="text-sm text-gray-500 dark:text-gray-400">Total Contract Value</p>
+                <p class="text-2xl font-bold text-gray-900 dark:text-white">${{ "{:,.0f}".format(mwbe_stats.total_value) }}</p>
+            </div>
+            <div class="bg-gray-50 dark:bg-gray-700 rounded-lg p-4">
+                <p class="text-sm text-gray-500 dark:text-gray-400">M/WBE Awarded</p>
+                <p class="text-2xl font-bold text-green-600">${{ "{:,.0f}".format(mwbe_stats.mwbe_value) }}</p>
+            </div>
+            <div class="bg-gray-50 dark:bg-gray-700 rounded-lg p-4">
+                <p class="text-sm text-gray-500 dark:text-gray-400">Current Rate</p>
+                <p class="text-2xl font-bold {% if mwbe_stats.current_rate >= mwbe_goal %}text-green-600{% else %}text-yellow-600{% endif %}">{{ "%.1f"|format(mwbe_stats.current_rate) }}%</p>
+            </div>
+            <div class="bg-gray-50 dark:bg-gray-700 rounded-lg p-4">
+                <p class="text-sm text-gray-500 dark:text-gray-400">Goal</p>
+                <p class="text-2xl font-bold text-blue-600">{{ mwbe_goal }}%</p>
+            </div>
+        </div>
+
+        <!-- Progress Bar -->
+        <div class="mb-6">
+            <div class="flex justify-between text-sm mb-2">
+                <span class="text-gray-600 dark:text-gray-400">Progress toward {{ mwbe_goal }}% goal</span>
+                <span class="font-medium text-gray-900 dark:text-white">{{ "%.1f"|format(mwbe_stats.current_rate) }}%</span>
+            </div>
+            <div class="w-full bg-gray-200 dark:bg-gray-600 rounded-full h-4 relative">
+                <div class="h-4 rounded-full {% if mwbe_stats.current_rate >= mwbe_goal %}bg-green-500{% else %}bg-yellow-500{% endif %}" style="width: {{ [mwbe_stats.current_rate, 100]|min }}%"></div>
+                <div class="absolute top-0 left-0 h-4 border-r-2 border-blue-600" style="left: {{ mwbe_goal }}%"></div>
+            </div>
+        </div>
+
+        <!-- M/WBE Breakdown -->
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div class="border border-gray-200 dark:border-gray-700 rounded-lg p-4">
+                <div class="flex items-center justify-between mb-2">
+                    <span class="text-sm font-medium text-gray-700 dark:text-gray-300">MBE (Minority)</span>
+                    <span class="text-sm text-gray-600 dark:text-gray-400">Goal: 15%</span>
+                </div>
+                <p class="text-xl font-bold text-gray-900 dark:text-white">{{ "%.1f"|format(mwbe_breakdown.mbe) }}%</p>
+                <div class="w-full bg-gray-200 dark:bg-gray-600 rounded-full h-2 mt-2">
+                    <div class="bg-purple-500 h-2 rounded-full" style="width: {{ (mwbe_breakdown.mbe / 15 * 100)|min(100) }}%"></div>
+                </div>
+            </div>
+            <div class="border border-gray-200 dark:border-gray-700 rounded-lg p-4">
+                <div class="flex items-center justify-between mb-2">
+                    <span class="text-sm font-medium text-gray-700 dark:text-gray-300">WBE (Women)</span>
+                    <span class="text-sm text-gray-600 dark:text-gray-400">Goal: 10%</span>
+                </div>
+                <p class="text-xl font-bold text-gray-900 dark:text-white">{{ "%.1f"|format(mwbe_breakdown.wbe) }}%</p>
+                <div class="w-full bg-gray-200 dark:bg-gray-600 rounded-full h-2 mt-2">
+                    <div class="bg-pink-500 h-2 rounded-full" style="width: {{ (mwbe_breakdown.wbe / 10 * 100)|min(100) }}%"></div>
+                </div>
+            </div>
+            <div class="border border-gray-200 dark:border-gray-700 rounded-lg p-4">
+                <div class="flex items-center justify-between mb-2">
+                    <span class="text-sm font-medium text-gray-700 dark:text-gray-300">SBE (Small Business)</span>
+                    <span class="text-sm text-gray-600 dark:text-gray-400">Goal: 5%</span>
+                </div>
+                <p class="text-xl font-bold text-gray-900 dark:text-white">{{ "%.1f"|format(mwbe_breakdown.sbe) }}%</p>
+                <div class="w-full bg-gray-200 dark:bg-gray-600 rounded-full h-2 mt-2">
+                    <div class="bg-blue-500 h-2 rounded-full" style="width: {{ (mwbe_breakdown.sbe / 5 * 100)|min(100) }}%"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Local Hiring Requirements -->
+    <div class="bg-white dark:bg-gray-800 rounded-xl shadow p-6">
+        <h2 class="text-lg font-semibold text-gray-900 dark:text-white mb-4">Local Hiring Requirements</h2>
+        <p class="text-sm text-gray-600 dark:text-gray-400 mb-6">Projects over $1M require {{ local_hiring_goal }}% local workforce participation.</p>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div>
+                <div class="flex justify-between text-sm mb-2">
+                    <span class="text-gray-600 dark:text-gray-400">Qualifying Projects Meeting Goal</span>
+                    <span class="font-medium text-gray-900 dark:text-white">{{ local_hiring.projects_meeting_goal }} of {{ local_hiring.total_projects }}</span>
+                </div>
+                <div class="w-full bg-gray-200 dark:bg-gray-600 rounded-full h-4">
+                    <div class="bg-green-500 h-4 rounded-full" style="width: {{ local_hiring.compliance_rate }}%"></div>
+                </div>
+                <p class="text-sm text-gray-500 dark:text-gray-400 mt-2">{{ "%.1f"|format(local_hiring.compliance_rate) }}% compliance rate</p>
+            </div>
+
+            <div class="bg-gray-50 dark:bg-gray-700 rounded-lg p-4">
+                <h3 class="text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">Local Hire Statistics</h3>
+                <div class="space-y-2">
+                    <div class="flex justify-between">
+                        <span class="text-sm text-gray-600 dark:text-gray-400">Total Workers on Projects</span>
+                        <span class="font-medium text-gray-900 dark:text-white">{{ "{:,}".format(local_hiring.total_workers) }}</span>
+                    </div>
+                    <div class="flex justify-between">
+                        <span class="text-sm text-gray-600 dark:text-gray-400">Local Workers</span>
+                        <span class="font-medium text-green-600">{{ "{:,}".format(local_hiring.local_workers) }}</span>
+                    </div>
+                    <div class="flex justify-between">
+                        <span class="text-sm text-gray-600 dark:text-gray-400">Local Hire Percentage</span>
+                        <span class="font-medium {% if local_hiring.local_percentage >= local_hiring_goal %}text-green-600{% else %}text-yellow-600{% endif %}">{{ "%.1f"|format(local_hiring.local_percentage) }}%</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Projects Not Meeting Goal -->
+        {% if local_hiring.non_compliant_projects %}
+        <div class="mt-6">
+            <h3 class="text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">Projects Requiring Attention</h3>
+            <div class="bg-yellow-50 dark:bg-yellow-900 rounded-lg overflow-hidden">
+                <table class="min-w-full">
+                    <thead>
+                        <tr>
+                            <th class="px-4 py-2 text-left text-xs font-medium text-yellow-800 dark:text-yellow-200">Contract</th>
+                            <th class="px-4 py-2 text-left text-xs font-medium text-yellow-800 dark:text-yellow-200">Current Rate</th>
+                            <th class="px-4 py-2 text-left text-xs font-medium text-yellow-800 dark:text-yellow-200">Gap</th>
+                            <th class="px-4 py-2 text-left text-xs font-medium text-yellow-800 dark:text-yellow-200">Status</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for project in local_hiring.non_compliant_projects %}
+                        <tr class="border-t border-yellow-200 dark:border-yellow-700">
+                            <td class="px-4 py-2">
+                                <a href="/contract/{{ project.contract_id }}" class="text-sm text-yellow-800 dark:text-yellow-200 hover:underline">{{ project.title }}</a>
+                            </td>
+                            <td class="px-4 py-2 text-sm text-yellow-700 dark:text-yellow-300">{{ "%.1f"|format(project.current_rate) }}%</td>
+                            <td class="px-4 py-2 text-sm text-red-700 dark:text-red-300">-{{ "%.1f"|format(local_hiring_goal - project.current_rate) }}%</td>
+                            <td class="px-4 py-2">
+                                <span class="px-2 py-0.5 text-xs rounded bg-yellow-200 text-yellow-800">Action Required</span>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+        {% endif %}
+    </div>
+
+    <!-- Living Wage & Other Policies -->
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <!-- Living Wage Compliance -->
+        <div class="bg-white dark:bg-gray-800 rounded-xl shadow p-6">
+            <h2 class="text-lg font-semibold text-gray-900 dark:text-white mb-4">Living Wage Compliance</h2>
+            <p class="text-sm text-gray-600 dark:text-gray-400 mb-4">Minimum hourly rate: ${{ "{:.2f}".format(living_wage.minimum_rate) }}</p>
+
+            <div class="flex items-center justify-center mb-4">
+                <div class="relative w-32 h-32">
+                    <svg class="w-full h-full transform -rotate-90">
+                        <circle cx="64" cy="64" r="56" stroke-width="12" fill="none" class="stroke-gray-200 dark:stroke-gray-700"></circle>
+                        <circle cx="64" cy="64" r="56" stroke-width="12" fill="none" stroke-dasharray="{{ 352 * living_wage.compliance_rate / 100 }} 352" class="stroke-green-500"></circle>
+                    </svg>
+                    <div class="absolute inset-0 flex items-center justify-center">
+                        <span class="text-2xl font-bold text-gray-900 dark:text-white">{{ "%.0f"|format(living_wage.compliance_rate) }}%</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="text-center">
+                <p class="text-sm text-gray-600 dark:text-gray-400">{{ living_wage.compliant_contracts }} of {{ living_wage.total_contracts }} contracts compliant</p>
+            </div>
+
+            {% if living_wage.violations > 0 %}
+            <div class="mt-4 p-3 bg-red-50 dark:bg-red-900 rounded-lg">
+                <p class="text-sm text-red-800 dark:text-red-200">
+                    <strong>{{ living_wage.violations }}</strong> active violation(s) require attention
+                </p>
+            </div>
+            {% endif %}
+        </div>
+
+        <!-- Environmental Policy -->
+        <div class="bg-white dark:bg-gray-800 rounded-xl shadow p-6">
+            <h2 class="text-lg font-semibold text-gray-900 dark:text-white mb-4">Environmental Policy Compliance</h2>
+            <p class="text-sm text-gray-600 dark:text-gray-400 mb-4">Green procurement and sustainability requirements</p>
+
+            <div class="space-y-4">
+                <div>
+                    <div class="flex justify-between text-sm mb-1">
+                        <span class="text-gray-600 dark:text-gray-400">Recycled Materials Requirement</span>
+                        <span class="font-medium text-gray-900 dark:text-white">{{ "%.0f"|format(environmental.recycled_rate) }}% of 30%</span>
+                    </div>
+                    <div class="w-full bg-gray-200 dark:bg-gray-600 rounded-full h-3">
+                        <div class="bg-green-500 h-3 rounded-full" style="width: {{ (environmental.recycled_rate / 30 * 100)|min(100) }}%"></div>
+                    </div>
+                </div>
+
+                <div>
+                    <div class="flex justify-between text-sm mb-1">
+                        <span class="text-gray-600 dark:text-gray-400">Energy Efficient Equipment</span>
+                        <span class="font-medium text-gray-900 dark:text-white">{{ "%.0f"|format(environmental.energy_efficient_rate) }}% of 50%</span>
+                    </div>
+                    <div class="w-full bg-gray-200 dark:bg-gray-600 rounded-full h-3">
+                        <div class="bg-blue-500 h-3 rounded-full" style="width: {{ (environmental.energy_efficient_rate / 50 * 100)|min(100) }}%"></div>
+                    </div>
+                </div>
+
+                <div>
+                    <div class="flex justify-between text-sm mb-1">
+                        <span class="text-gray-600 dark:text-gray-400">Local Sourcing</span>
+                        <span class="font-medium text-gray-900 dark:text-white">{{ "%.0f"|format(environmental.local_sourcing_rate) }}% of 25%</span>
+                    </div>
+                    <div class="w-full bg-gray-200 dark:bg-gray-600 rounded-full h-3">
+                        <div class="bg-purple-500 h-3 rounded-full" style="width: {{ (environmental.local_sourcing_rate / 25 * 100)|min(100) }}%"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Policy Compliance by Department -->
+    <div class="bg-white dark:bg-gray-800 rounded-xl shadow p-6">
+        <h2 class="text-lg font-semibold text-gray-900 dark:text-white mb-4">Compliance by Department</h2>
+        <div class="overflow-x-auto">
+            <table class="min-w-full">
+                <thead>
+                    <tr class="border-b border-gray-200 dark:border-gray-700">
+                        <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Department</th>
+                        <th class="px-4 py-3 text-center text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">M/WBE</th>
+                        <th class="px-4 py-3 text-center text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Local Hire</th>
+                        <th class="px-4 py-3 text-center text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Living Wage</th>
+                        <th class="px-4 py-3 text-center text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Environmental</th>
+                        <th class="px-4 py-3 text-center text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Overall</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-gray-200 dark:divide-gray-700">
+                    {% for dept in department_compliance %}
+                    <tr class="hover:bg-gray-50 dark:hover:bg-gray-700">
+                        <td class="px-4 py-3 text-sm font-medium text-gray-900 dark:text-white">{{ dept.name }}</td>
+                        <td class="px-4 py-3 text-center">
+                            <span class="px-2 py-1 text-xs rounded-full
+                                {% if dept.mwbe >= mwbe_goal %}bg-green-100 text-green-800
+                                {% elif dept.mwbe >= mwbe_goal * 0.8 %}bg-yellow-100 text-yellow-800
+                                {% else %}bg-red-100 text-red-800{% endif %}">
+                                {{ "%.0f"|format(dept.mwbe) }}%
+                            </span>
+                        </td>
+                        <td class="px-4 py-3 text-center">
+                            <span class="px-2 py-1 text-xs rounded-full
+                                {% if dept.local_hire >= local_hiring_goal %}bg-green-100 text-green-800
+                                {% elif dept.local_hire >= local_hiring_goal * 0.8 %}bg-yellow-100 text-yellow-800
+                                {% else %}bg-red-100 text-red-800{% endif %}">
+                                {{ "%.0f"|format(dept.local_hire) }}%
+                            </span>
+                        </td>
+                        <td class="px-4 py-3 text-center">
+                            <span class="px-2 py-1 text-xs rounded-full
+                                {% if dept.living_wage >= 95 %}bg-green-100 text-green-800
+                                {% elif dept.living_wage >= 80 %}bg-yellow-100 text-yellow-800
+                                {% else %}bg-red-100 text-red-800{% endif %}">
+                                {{ "%.0f"|format(dept.living_wage) }}%
+                            </span>
+                        </td>
+                        <td class="px-4 py-3 text-center">
+                            <span class="px-2 py-1 text-xs rounded-full
+                                {% if dept.environmental >= 80 %}bg-green-100 text-green-800
+                                {% elif dept.environmental >= 60 %}bg-yellow-100 text-yellow-800
+                                {% else %}bg-red-100 text-red-800{% endif %}">
+                                {{ "%.0f"|format(dept.environmental) }}%
+                            </span>
+                        </td>
+                        <td class="px-4 py-3 text-center">
+                            <span class="px-2 py-1 text-xs font-medium rounded-full
+                                {% if dept.overall >= 85 %}bg-green-100 text-green-800
+                                {% elif dept.overall >= 70 %}bg-yellow-100 text-yellow-800
+                                {% else %}bg-red-100 text-red-800{% endif %}">
+                                {{ "%.0f"|format(dept.overall) }}%
+                            </span>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,439 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="space-y-6">
+    <!-- Header -->
+    <div class="flex justify-between items-center">
+        <div>
+            <h1 class="text-2xl font-bold text-gray-900 dark:text-white">Procurement Pipeline</h1>
+            <p class="text-gray-600 dark:text-gray-400">Track RFPs, bids, and procurement progress</p>
+        </div>
+        <button onclick="openNewProcurementModal()" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg flex items-center">
+            <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path>
+            </svg>
+            New Procurement
+        </button>
+    </div>
+
+    <!-- Pipeline Stats -->
+    <div class="grid grid-cols-1 md:grid-cols-6 gap-4">
+        <div class="bg-white dark:bg-gray-800 rounded-xl shadow p-4">
+            <p class="text-sm text-gray-500 dark:text-gray-400">Draft</p>
+            <p class="text-2xl font-bold text-gray-600">{{ stats.draft }}</p>
+        </div>
+        <div class="bg-white dark:bg-gray-800 rounded-xl shadow p-4">
+            <p class="text-sm text-gray-500 dark:text-gray-400">Posted</p>
+            <p class="text-2xl font-bold text-blue-600">{{ stats.posted }}</p>
+        </div>
+        <div class="bg-white dark:bg-gray-800 rounded-xl shadow p-4">
+            <p class="text-sm text-gray-500 dark:text-gray-400">Evaluation</p>
+            <p class="text-2xl font-bold text-yellow-600">{{ stats.evaluation }}</p>
+        </div>
+        <div class="bg-white dark:bg-gray-800 rounded-xl shadow p-4">
+            <p class="text-sm text-gray-500 dark:text-gray-400">Pending Award</p>
+            <p class="text-2xl font-bold text-purple-600">{{ stats.pending_award }}</p>
+        </div>
+        <div class="bg-white dark:bg-gray-800 rounded-xl shadow p-4">
+            <p class="text-sm text-gray-500 dark:text-gray-400">Awarded</p>
+            <p class="text-2xl font-bold text-green-600">{{ stats.awarded }}</p>
+        </div>
+        <div class="bg-white dark:bg-gray-800 rounded-xl shadow p-4">
+            <p class="text-sm text-gray-500 dark:text-gray-400">Est. Total Value</p>
+            <p class="text-2xl font-bold text-gray-900 dark:text-white">${{ "{:,.0f}".format(stats.total_value) }}</p>
+        </div>
+    </div>
+
+    <!-- Tabs -->
+    <div class="border-b border-gray-200 dark:border-gray-700">
+        <nav class="flex space-x-8">
+            <button onclick="showTab('pipeline')" id="tab-pipeline" class="tab-btn border-b-2 border-blue-500 text-blue-600 dark:text-blue-400 py-4 px-1 font-medium">
+                Pipeline View
+            </button>
+            <button onclick="showTab('calendar')" id="tab-calendar" class="tab-btn text-gray-500 hover:text-gray-700 dark:text-gray-400 py-4 px-1 font-medium">
+                Bid Calendar
+            </button>
+            <button onclick="showTab('outreach')" id="tab-outreach" class="tab-btn text-gray-500 hover:text-gray-700 dark:text-gray-400 py-4 px-1 font-medium">
+                Vendor Outreach
+            </button>
+            <button onclick="showTab('analytics')" id="tab-analytics" class="tab-btn text-gray-500 hover:text-gray-700 dark:text-gray-400 py-4 px-1 font-medium">
+                Bid Analytics
+            </button>
+        </nav>
+    </div>
+
+    <!-- Pipeline View Tab -->
+    <div id="content-pipeline" class="tab-content">
+        <!-- Kanban-style Pipeline -->
+        <div class="grid grid-cols-1 md:grid-cols-5 gap-4">
+            <!-- Draft Column -->
+            <div class="bg-gray-100 dark:bg-gray-700 rounded-xl p-4">
+                <div class="flex items-center justify-between mb-4">
+                    <h3 class="font-semibold text-gray-700 dark:text-gray-300">Draft</h3>
+                    <span class="px-2 py-1 text-xs bg-gray-300 dark:bg-gray-600 rounded-full">{{ pipeline.draft|length }}</span>
+                </div>
+                <div class="space-y-3">
+                    {% for item in pipeline.draft %}
+                    <div class="bg-white dark:bg-gray-800 rounded-lg p-4 shadow-sm cursor-pointer hover:shadow-md transition-shadow" onclick="openProcurementDetail('{{ item.id }}')">
+                        <p class="text-sm font-medium text-gray-900 dark:text-white">{{ item.title }}</p>
+                        <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">{{ item.type }}</p>
+                        <p class="text-sm font-semibold text-gray-700 dark:text-gray-300 mt-2">${{ "{:,.0f}".format(item.estimated_value) }}</p>
+                        <div class="flex items-center justify-between mt-3">
+                            <span class="text-xs text-gray-400">{{ item.department }}</span>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+
+            <!-- Posted Column -->
+            <div class="bg-blue-50 dark:bg-blue-900 rounded-xl p-4">
+                <div class="flex items-center justify-between mb-4">
+                    <h3 class="font-semibold text-blue-700 dark:text-blue-300">Posted</h3>
+                    <span class="px-2 py-1 text-xs bg-blue-200 dark:bg-blue-700 rounded-full">{{ pipeline.posted|length }}</span>
+                </div>
+                <div class="space-y-3">
+                    {% for item in pipeline.posted %}
+                    <div class="bg-white dark:bg-gray-800 rounded-lg p-4 shadow-sm cursor-pointer hover:shadow-md transition-shadow" onclick="openProcurementDetail('{{ item.id }}')">
+                        <p class="text-sm font-medium text-gray-900 dark:text-white">{{ item.title }}</p>
+                        <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">{{ item.type }}</p>
+                        <p class="text-sm font-semibold text-gray-700 dark:text-gray-300 mt-2">${{ "{:,.0f}".format(item.estimated_value) }}</p>
+                        <div class="flex items-center justify-between mt-3">
+                            <span class="text-xs text-blue-600">Closes: {{ item.close_date }}</span>
+                            <span class="text-xs text-gray-400">{{ item.bids_received }} bids</span>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+
+            <!-- Evaluation Column -->
+            <div class="bg-yellow-50 dark:bg-yellow-900 rounded-xl p-4">
+                <div class="flex items-center justify-between mb-4">
+                    <h3 class="font-semibold text-yellow-700 dark:text-yellow-300">Evaluation</h3>
+                    <span class="px-2 py-1 text-xs bg-yellow-200 dark:bg-yellow-700 rounded-full">{{ pipeline.evaluation|length }}</span>
+                </div>
+                <div class="space-y-3">
+                    {% for item in pipeline.evaluation %}
+                    <div class="bg-white dark:bg-gray-800 rounded-lg p-4 shadow-sm cursor-pointer hover:shadow-md transition-shadow" onclick="openProcurementDetail('{{ item.id }}')">
+                        <p class="text-sm font-medium text-gray-900 dark:text-white">{{ item.title }}</p>
+                        <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">{{ item.type }}</p>
+                        <p class="text-sm font-semibold text-gray-700 dark:text-gray-300 mt-2">${{ "{:,.0f}".format(item.estimated_value) }}</p>
+                        <div class="flex items-center justify-between mt-3">
+                            <span class="text-xs text-yellow-600">{{ item.bids_received }} bids</span>
+                            <span class="text-xs text-gray-400">{{ item.eval_progress }}% complete</span>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+
+            <!-- Pending Award Column -->
+            <div class="bg-purple-50 dark:bg-purple-900 rounded-xl p-4">
+                <div class="flex items-center justify-between mb-4">
+                    <h3 class="font-semibold text-purple-700 dark:text-purple-300">Pending Award</h3>
+                    <span class="px-2 py-1 text-xs bg-purple-200 dark:bg-purple-700 rounded-full">{{ pipeline.pending_award|length }}</span>
+                </div>
+                <div class="space-y-3">
+                    {% for item in pipeline.pending_award %}
+                    <div class="bg-white dark:bg-gray-800 rounded-lg p-4 shadow-sm cursor-pointer hover:shadow-md transition-shadow" onclick="openProcurementDetail('{{ item.id }}')">
+                        <p class="text-sm font-medium text-gray-900 dark:text-white">{{ item.title }}</p>
+                        <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">Recommended: {{ item.recommended_vendor }}</p>
+                        <p class="text-sm font-semibold text-gray-700 dark:text-gray-300 mt-2">${{ "{:,.0f}".format(item.recommended_amount) }}</p>
+                        <div class="flex items-center justify-between mt-3">
+                            <span class="text-xs text-purple-600">Board: {{ item.board_date }}</span>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+
+            <!-- Awarded Column -->
+            <div class="bg-green-50 dark:bg-green-900 rounded-xl p-4">
+                <div class="flex items-center justify-between mb-4">
+                    <h3 class="font-semibold text-green-700 dark:text-green-300">Awarded</h3>
+                    <span class="px-2 py-1 text-xs bg-green-200 dark:bg-green-700 rounded-full">{{ pipeline.awarded|length }}</span>
+                </div>
+                <div class="space-y-3">
+                    {% for item in pipeline.awarded %}
+                    <div class="bg-white dark:bg-gray-800 rounded-lg p-4 shadow-sm cursor-pointer hover:shadow-md transition-shadow" onclick="openProcurementDetail('{{ item.id }}')">
+                        <p class="text-sm font-medium text-gray-900 dark:text-white">{{ item.title }}</p>
+                        <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">{{ item.awarded_vendor }}</p>
+                        <p class="text-sm font-semibold text-green-600 mt-2">${{ "{:,.0f}".format(item.awarded_amount) }}</p>
+                        <div class="flex items-center justify-between mt-3">
+                            <span class="text-xs text-green-600">{{ item.award_date }}</span>
+                            <a href="/contract/{{ item.contract_id }}" class="text-xs text-blue-600 hover:text-blue-800">View Contract</a>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Bid Calendar Tab -->
+    <div id="content-calendar" class="tab-content hidden">
+        <div class="bg-white dark:bg-gray-800 rounded-xl shadow p-6">
+            <h3 class="text-lg font-semibold text-gray-900 dark:text-white mb-4">Upcoming Bid Events</h3>
+            <div class="space-y-4">
+                {% for event in bid_calendar %}
+                <div class="flex items-start space-x-4 p-4 border border-gray-200 dark:border-gray-700 rounded-lg">
+                    <div class="flex-shrink-0 w-16 text-center">
+                        <p class="text-sm font-bold text-blue-600">{{ event.month }}</p>
+                        <p class="text-2xl font-bold text-gray-900 dark:text-white">{{ event.day }}</p>
+                        <p class="text-xs text-gray-500">{{ event.time }}</p>
+                    </div>
+                    <div class="flex-1">
+                        <div class="flex items-center space-x-2">
+                            <span class="px-2 py-0.5 text-xs rounded-full
+                                {% if event.type == 'Bid Opening' %}bg-blue-100 text-blue-800
+                                {% elif event.type == 'Pre-Bid Meeting' %}bg-yellow-100 text-yellow-800
+                                {% elif event.type == 'RFP Due' %}bg-purple-100 text-purple-800
+                                {% else %}bg-gray-100 text-gray-800{% endif %}">
+                                {{ event.type }}
+                            </span>
+                        </div>
+                        <h4 class="mt-1 text-sm font-medium text-gray-900 dark:text-white">{{ event.title }}</h4>
+                        <p class="text-sm text-gray-500 dark:text-gray-400">{{ event.location }}</p>
+                    </div>
+                    <div class="text-right">
+                        <p class="text-sm font-semibold text-gray-900 dark:text-white">${{ "{:,.0f}".format(event.estimated_value) }}</p>
+                        <button class="mt-2 text-sm text-blue-600 hover:text-blue-800">View Details</button>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+
+    <!-- Vendor Outreach Tab -->
+    <div id="content-outreach" class="tab-content hidden">
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <div class="bg-white dark:bg-gray-800 rounded-xl shadow p-6">
+                <h3 class="text-lg font-semibold text-gray-900 dark:text-white mb-4">Recent Outreach Activity</h3>
+                <div class="space-y-3">
+                    {% for outreach in vendor_outreach %}
+                    <div class="flex items-center justify-between p-3 border border-gray-200 dark:border-gray-700 rounded-lg">
+                        <div>
+                            <p class="text-sm font-medium text-gray-900 dark:text-white">{{ outreach.vendor_name }}</p>
+                            <p class="text-xs text-gray-500 dark:text-gray-400">{{ outreach.procurement_title }}</p>
+                        </div>
+                        <div class="text-right">
+                            <span class="px-2 py-1 text-xs rounded-full
+                                {% if outreach.status == 'Invited' %}bg-blue-100 text-blue-800
+                                {% elif outreach.status == 'Responded' %}bg-green-100 text-green-800
+                                {% elif outreach.status == 'Declined' %}bg-red-100 text-red-800
+                                {% else %}bg-gray-100 text-gray-800{% endif %}">
+                                {{ outreach.status }}
+                            </span>
+                            <p class="text-xs text-gray-400 mt-1">{{ outreach.date }}</p>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+
+            <div class="bg-white dark:bg-gray-800 rounded-xl shadow p-6">
+                <h3 class="text-lg font-semibold text-gray-900 dark:text-white mb-4">Outreach Statistics</h3>
+                <div class="space-y-4">
+                    <div class="flex justify-between items-center">
+                        <span class="text-sm text-gray-600 dark:text-gray-400">Vendors Invited</span>
+                        <span class="text-lg font-bold text-gray-900 dark:text-white">{{ outreach_stats.invited }}</span>
+                    </div>
+                    <div class="flex justify-between items-center">
+                        <span class="text-sm text-gray-600 dark:text-gray-400">Responses Received</span>
+                        <span class="text-lg font-bold text-green-600">{{ outreach_stats.responded }}</span>
+                    </div>
+                    <div class="flex justify-between items-center">
+                        <span class="text-sm text-gray-600 dark:text-gray-400">Response Rate</span>
+                        <span class="text-lg font-bold text-blue-600">{{ "%.1f"|format(outreach_stats.response_rate) }}%</span>
+                    </div>
+                    <div class="flex justify-between items-center">
+                        <span class="text-sm text-gray-600 dark:text-gray-400">M/WBE Vendors Invited</span>
+                        <span class="text-lg font-bold text-purple-600">{{ outreach_stats.mwbe_invited }}</span>
+                    </div>
+                </div>
+
+                <div class="mt-6">
+                    <button class="w-full px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">
+                        Send Outreach Invitations
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Bid Analytics Tab -->
+    <div id="content-analytics" class="tab-content hidden">
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <div class="bg-white dark:bg-gray-800 rounded-xl shadow p-6">
+                <h3 class="text-lg font-semibold text-gray-900 dark:text-white mb-4">Bid Competition Analysis</h3>
+                <div id="bidCompetitionChart" class="h-64"></div>
+            </div>
+
+            <div class="bg-white dark:bg-gray-800 rounded-xl shadow p-6">
+                <h3 class="text-lg font-semibold text-gray-900 dark:text-white mb-4">Average Savings by Procurement Type</h3>
+                <div class="space-y-4">
+                    {% for type_stat in procurement_analytics %}
+                    <div>
+                        <div class="flex justify-between text-sm mb-1">
+                            <span class="text-gray-700 dark:text-gray-300">{{ type_stat.type }}</span>
+                            <span class="font-medium text-green-600">{{ "%.1f"|format(type_stat.savings_pct) }}% savings</span>
+                        </div>
+                        <div class="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-3">
+                            <div class="bg-green-500 h-3 rounded-full" style="width: {{ type_stat.savings_pct * 2 }}%"></div>
+                        </div>
+                        <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">Avg. {{ type_stat.avg_bids }} bids per solicitation</p>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+
+        <div class="bg-white dark:bg-gray-800 rounded-xl shadow p-6 mt-6">
+            <h3 class="text-lg font-semibold text-gray-900 dark:text-white mb-4">Historical Bid Data</h3>
+            <div class="overflow-x-auto">
+                <table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+                    <thead>
+                        <tr>
+                            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Solicitation</th>
+                            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Type</th>
+                            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Bids</th>
+                            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Est. Value</th>
+                            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Awarded</th>
+                            <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Savings</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-gray-200 dark:divide-gray-700">
+                        {% for bid in historical_bids %}
+                        <tr class="hover:bg-gray-50 dark:hover:bg-gray-700">
+                            <td class="px-4 py-3 text-sm text-gray-900 dark:text-white">{{ bid.title }}</td>
+                            <td class="px-4 py-3 text-sm text-gray-600 dark:text-gray-400">{{ bid.type }}</td>
+                            <td class="px-4 py-3 text-sm text-gray-600 dark:text-gray-400">{{ bid.bid_count }}</td>
+                            <td class="px-4 py-3 text-sm text-gray-600 dark:text-gray-400">${{ "{:,.0f}".format(bid.estimated_value) }}</td>
+                            <td class="px-4 py-3 text-sm font-medium text-gray-900 dark:text-white">${{ "{:,.0f}".format(bid.awarded_value) }}</td>
+                            <td class="px-4 py-3">
+                                <span class="text-sm font-medium text-green-600">{{ "%.1f"|format(bid.savings_pct) }}%</span>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- New Procurement Modal -->
+<div id="newProcurementModal" class="fixed inset-0 bg-black bg-opacity-50 hidden z-50 flex items-center justify-center">
+    <div class="bg-white dark:bg-gray-800 rounded-xl shadow-xl max-w-2xl w-full mx-4 max-h-[90vh] overflow-y-auto">
+        <div class="p-6 border-b dark:border-gray-700">
+            <div class="flex justify-between items-center">
+                <h3 class="text-xl font-semibold text-gray-900 dark:text-white">New Procurement</h3>
+                <button onclick="closeNewProcurementModal()" class="text-gray-400 hover:text-gray-600">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                    </svg>
+                </button>
+            </div>
+        </div>
+        <form class="p-6 space-y-4">
+            <div>
+                <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Title</label>
+                <input type="text" class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg dark:bg-gray-700" placeholder="Enter procurement title">
+            </div>
+            <div class="grid grid-cols-2 gap-4">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Type</label>
+                    <select class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg dark:bg-gray-700">
+                        <option>RFP (Request for Proposal)</option>
+                        <option>RFQ (Request for Quote)</option>
+                        <option>IFB (Invitation for Bid)</option>
+                        <option>Sole Source</option>
+                        <option>Cooperative Purchase</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Department</label>
+                    <select class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg dark:bg-gray-700">
+                        <option>Public Works</option>
+                        <option>Education</option>
+                        <option>IT Services</option>
+                        <option>Parks & Recreation</option>
+                        <option>Administration</option>
+                    </select>
+                </div>
+            </div>
+            <div class="grid grid-cols-2 gap-4">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Estimated Value</label>
+                    <input type="number" class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg dark:bg-gray-700" placeholder="0.00">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Posting Date</label>
+                    <input type="date" class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg dark:bg-gray-700">
+                </div>
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Description</label>
+                <textarea rows="3" class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg dark:bg-gray-700"></textarea>
+            </div>
+            <div class="flex justify-end space-x-3 pt-4">
+                <button type="button" onclick="closeNewProcurementModal()" class="px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700">
+                    Cancel
+                </button>
+                <button type="submit" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">
+                    Create Procurement
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    function showTab(tabName) {
+        document.querySelectorAll('.tab-content').forEach(el => el.classList.add('hidden'));
+        document.querySelectorAll('.tab-btn').forEach(el => {
+            el.classList.remove('border-b-2', 'border-blue-500', 'text-blue-600', 'dark:text-blue-400');
+            el.classList.add('text-gray-500');
+        });
+        document.getElementById('content-' + tabName).classList.remove('hidden');
+        const activeTab = document.getElementById('tab-' + tabName);
+        activeTab.classList.add('border-b-2', 'border-blue-500', 'text-blue-600', 'dark:text-blue-400');
+        activeTab.classList.remove('text-gray-500');
+
+        if (tabName === 'analytics') {
+            initBidChart();
+        }
+    }
+
+    function initBidChart() {
+        Plotly.newPlot('bidCompetitionChart', [{
+            x: ['Q1', 'Q2', 'Q3', 'Q4'],
+            y: [4.2, 5.1, 4.8, 5.5],
+            type: 'bar',
+            name: 'Avg Bids per Solicitation',
+            marker: { color: '#3B82F6' }
+        }], {
+            margin: { t: 20, b: 40, l: 50, r: 20 },
+            paper_bgcolor: 'transparent',
+            plot_bgcolor: 'transparent',
+            yaxis: { gridcolor: '#e5e7eb', title: 'Average Bids' }
+        }, { responsive: true });
+    }
+
+    function openNewProcurementModal() {
+        document.getElementById('newProcurementModal').classList.remove('hidden');
+    }
+
+    function closeNewProcurementModal() {
+        document.getElementById('newProcurementModal').classList.add('hidden');
+    }
+
+    function openProcurementDetail(id) {
+        alert('Opening procurement details for: ' + id);
+    }
+</script>
+{% endblock %}

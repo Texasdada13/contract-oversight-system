@@ -211,12 +211,25 @@ def contract_detail(contract_id):
     change_orders = db.get_change_orders(contract_id)
     payments = db.get_payments(contract_id)
     comments = db.get_comments(contract_id)
-    history = db.get_audit_log(table_name='contracts', record_id=contract_id, limit=20)
+    audit_log = db.get_audit_log(table_name='contracts', record_id=contract_id, limit=20)
+    issues = db.get_issues(contract_id=contract_id)
 
     # Get vendor info if exists
     vendor = None
     if contract.get('vendor_id'):
         vendor = db.get_vendor(contract['vendor_id'])
+
+    # Extract scores for template
+    health_score = contract.get('overall_health_score', 50)
+    scores = {
+        'cost_variance_score': contract.get('cost_variance_score', 50),
+        'schedule_variance_score': contract.get('schedule_variance_score', 50),
+        'performance_score': contract.get('performance_score', 50),
+        'compliance_score': contract.get('compliance_score', 50)
+    }
+
+    # Calculate total change order amount
+    total_co_amount = sum(co.get('amount', 0) for co in change_orders)
 
     return render_template('contract_detail.html',
                           contract=contract,
@@ -224,8 +237,12 @@ def contract_detail(contract_id):
                           change_orders=change_orders,
                           payments=payments,
                           comments=comments,
-                          history=history,
+                          audit_log=audit_log,
+                          issues=issues,
                           vendor=vendor,
+                          health_score=health_score,
+                          scores=scores,
+                          total_co_amount=total_co_amount,
                           title=contract.get('title', 'Contract Detail'))
 
 
@@ -239,16 +256,45 @@ def vendors_list():
 
     vendors = current_vendors.to_dict('records') if current_vendors is not None else []
 
-    # Add contract counts
+    # Add contract counts and metrics
+    performance_scores = []
     for vendor in vendors:
         contracts = db.get_vendor_contracts(vendor['vendor_id'])
         vendor['contract_count'] = len(contracts)
         vendor['total_value'] = sum(c.get('current_amount', 0) or 0 for c in contracts)
         metrics = vendor_scorer.get_vendor_metrics(vendor, contracts)
         vendor.update(metrics)
+        if 'performance_score' in vendor:
+            performance_scores.append(vendor['performance_score'])
+
+    # Calculate summary stats for template
+    active_count = sum(1 for v in vendors if v.get('status') == 'Active')
+
+    # Check insurance expiring (within 30 days)
+    from datetime import datetime, timedelta
+    today = datetime.now().date()
+    expiring_threshold = today + timedelta(days=30)
+    expiring_insurance = 0
+    for v in vendors:
+        if v.get('insurance_expiry'):
+            try:
+                exp_date = datetime.strptime(str(v['insurance_expiry']), '%Y-%m-%d').date()
+                if today <= exp_date <= expiring_threshold:
+                    expiring_insurance += 1
+            except:
+                pass
+
+    avg_score = sum(performance_scores) / len(performance_scores) if performance_scores else 0
+
+    # Get unique categories
+    categories = list(set(v.get('category', '') for v in vendors if v.get('category')))
 
     return render_template('vendors.html',
                           vendors=vendors,
+                          active_count=active_count,
+                          expiring_insurance=expiring_insurance,
+                          avg_score=avg_score,
+                          categories=categories,
                           title='Vendor Management')
 
 
@@ -263,9 +309,48 @@ def vendor_detail(vendor_id):
     metrics = vendor_scorer.get_vendor_metrics(vendor, contracts)
     vendor.update(metrics)
 
+    # Calculate stats for template
+    stats = {
+        'total_contracts': len(contracts),
+        'active_contracts': sum(1 for c in contracts if c.get('status') == 'Active'),
+        'completed_contracts': sum(1 for c in contracts if c.get('status') == 'Completed'),
+        'total_value': sum(c.get('current_amount', 0) or 0 for c in contracts),
+        'total_paid': sum(c.get('total_paid', 0) or 0 for c in contracts)
+    }
+
+    # Performance score
+    performance_score = vendor.get('performance_score', 70)
+
+    # Check insurance/license status
+    from datetime import datetime, timedelta
+    today = datetime.now().date()
+    expiring_threshold = today + timedelta(days=30)
+
+    def get_status(expiry_date_str):
+        if not expiry_date_str:
+            return 'missing'
+        try:
+            exp_date = datetime.strptime(str(expiry_date_str), '%Y-%m-%d').date()
+            if exp_date < today:
+                return 'expired'
+            elif exp_date <= expiring_threshold:
+                return 'expiring'
+            else:
+                return 'valid'
+        except:
+            return 'missing'
+
+    insurance_status = get_status(vendor.get('insurance_expiry'))
+    license_status = get_status(vendor.get('license_expiry'))
+
     return render_template('vendor_detail.html',
                           vendor=vendor,
                           contracts=contracts,
+                          stats=stats,
+                          metrics=metrics,
+                          performance_score=performance_score,
+                          insurance_status=insurance_status,
+                          license_status=license_status,
                           title=vendor.get('vendor_name', 'Vendor Detail'))
 
 
@@ -280,8 +365,14 @@ def alerts_page():
     contracts_list = current_contracts.to_dict('records') if current_contracts is not None else []
     alerts = alert_generator.generate_alerts(contracts_list)
 
-    # Get open issues from database
+    # Get open issues from database and enrich with contract title
     issues = db.get_issues(status='Open')
+    for issue in issues:
+        if issue.get('contract_id'):
+            contract = db.get_contract(issue['contract_id'])
+            issue['contract_title'] = contract.get('title', 'Unknown') if contract else 'Unknown'
+        else:
+            issue['contract_title'] = 'N/A'
 
     return render_template('alerts.html',
                           alerts=alerts,
@@ -588,7 +679,7 @@ def analytics_dashboard():
                 metrics = vendor_scorer.get_vendor_metrics(vendor.to_dict(), contracts)
                 vendor_rankings.append({
                     'vendor_id': vendor['vendor_id'],
-                    'name': vendor['name'],
+                    'name': vendor.get('vendor_name', vendor.get('name', 'Unknown')),
                     'contract_count': len(contracts),
                     'total_value': sum(c.get('current_amount', 0) or 0 for c in contracts),
                     'performance_score': metrics.get('performance_score', 50),
@@ -880,21 +971,30 @@ def timeline_view():
 
     # Get all milestones
     all_milestones = []
+    today = datetime.now().date()
     for contract in contracts:
         milestones = db.get_milestones(contract['contract_id'])
         for m in milestones:
             m['contract_title'] = contract['title']
             m['contract_id'] = contract['contract_id']
+            # Calculate days_until for template
+            if m.get('due_date'):
+                try:
+                    due = datetime.strptime(m['due_date'], '%Y-%m-%d').date()
+                    m['days_until'] = (due - today).days
+                except:
+                    m['days_until'] = 999
+            else:
+                m['days_until'] = 999
             all_milestones.append(m)
 
     # Sort by due date
     all_milestones.sort(key=lambda x: x.get('due_date', '9999-12-31'))
 
     # Upcoming milestones (next 30 days)
-    today = datetime.now()
     upcoming = [m for m in all_milestones
                 if m.get('due_date') and m.get('status') != 'Completed'
-                and datetime.strptime(m['due_date'], '%Y-%m-%d') <= today + timedelta(days=30)]
+                and m.get('days_until', 999) <= 30]
 
     # Get departments for filter
     departments = df['department'].unique().tolist() if 'department' in df.columns else []
@@ -981,7 +1081,7 @@ def spending_dashboard():
             total = sum(c.get('total_paid', 0) or 0 for c in contracts)
             if total > 0:
                 top_vendors.append({
-                    'name': vendor['name'],
+                    'name': vendor.get('vendor_name', vendor.get('name', 'Unknown')),
                     'spent': total
                 })
         top_vendors.sort(key=lambda x: x['spent'], reverse=True)
@@ -1156,7 +1256,7 @@ def vendor_performance_dashboard():
 
             vendor_data.append({
                 'vendor_id': vendor['vendor_id'],
-                'name': vendor['name'],
+                'name': vendor.get('vendor_name', vendor.get('name', 'Unknown')),
                 'category': vendor.get('category', 'General'),
                 'contract_count': len(contracts),
                 'active_contracts': len([c for c in contracts if c.get('status') == 'Active']),
@@ -1694,7 +1794,7 @@ def vendor_compliance_page():
 
         compliance_data.append({
             'vendor_id': vendor['vendor_id'],
-            'name': vendor['name'],
+            'name': vendor.get('vendor_name', vendor.get('name', 'Unknown')),
             'category': vendor.get('category', 'General'),
             'contact_email': vendor.get('email', 'N/A'),
             'active_contracts': len([c for c in contracts if c.get('status') == 'Active']),
@@ -1851,6 +1951,487 @@ def api_export_activity_log():
         as_attachment=True,
         download_name=f'activity_log_{datetime.now().strftime("%Y%m%d")}.csv'
     )
+
+
+# ==========================
+# GOVERNANCE FEATURES
+# ==========================
+
+@app.route('/meetings')
+def meetings_page():
+    """Council and board meetings management."""
+    # Sample data for meetings
+    upcoming_meetings = [
+        {
+            'id': 'MTG-001',
+            'title': 'Regular City Council Meeting',
+            'type': 'Regular',
+            'date': 'December 12, 2024',
+            'time': '6:00 PM',
+            'location': 'City Hall, Council Chambers',
+            'agenda_items': [
+                {'number': '1.', 'title': 'Call to Order', 'type': 'Procedural', 'requires_vote': False, 'contract_id': None},
+                {'number': '2.', 'title': 'Approval of Minutes', 'type': 'Consent', 'requires_vote': True, 'contract_id': None},
+                {'number': '3.', 'title': 'School Renovation Contract Approval', 'type': 'Action', 'requires_vote': True, 'contract_id': 'CNT-001'},
+                {'number': '4.', 'title': 'Budget Amendment #3', 'type': 'Action', 'requires_vote': True, 'contract_id': None},
+                {'number': '5.', 'title': 'Public Comments', 'type': 'Public Input', 'requires_vote': False, 'contract_id': None},
+            ],
+            'contract_items': [
+                {'contract_id': 'CNT-001', 'title': 'School Renovation Project', 'vendor_name': 'BuildRight Construction', 'amount': 2500000},
+                {'contract_id': 'CNT-007', 'title': 'IT Infrastructure Upgrade', 'vendor_name': 'TechSolutions Inc', 'amount': 450000}
+            ]
+        },
+        {
+            'id': 'MTG-002',
+            'title': 'School Board Work Session',
+            'type': 'Special',
+            'date': 'December 15, 2024',
+            'time': '4:00 PM',
+            'location': 'Administration Building, Room 200',
+            'agenda_items': [
+                {'number': '1.', 'title': 'ESSER Grant Spending Review', 'type': 'Discussion', 'requires_vote': False, 'contract_id': None},
+                {'number': '2.', 'title': 'Facilities Master Plan Update', 'type': 'Presentation', 'requires_vote': False, 'contract_id': None},
+            ],
+            'contract_items': []
+        }
+    ]
+
+    # Calendar days (sample)
+    calendar_days = []
+    for i in range(1, 32):
+        day = {
+            'number': i,
+            'is_today': i == 5,
+            'events': []
+        }
+        if i == 12:
+            day['events'].append({'title': 'Council Meeting', 'type': 'Regular'})
+        if i == 15:
+            day['events'].append({'title': 'Work Session', 'type': 'Special'})
+        if i == 20:
+            day['events'].append({'title': 'Public Hearing', 'type': 'Hearing'})
+        calendar_days.append(day)
+
+    past_meetings = [
+        {'date': 'Nov 28, 2024', 'title': 'Regular City Council Meeting', 'type': 'Regular', 'status': 'Approved'},
+        {'date': 'Nov 21, 2024', 'title': 'Finance Committee Meeting', 'type': 'Committee', 'status': 'Draft'},
+        {'date': 'Nov 14, 2024', 'title': 'Regular City Council Meeting', 'type': 'Regular', 'status': 'Approved'},
+    ]
+
+    public_hearing_list = [
+        {
+            'id': 'PH-001',
+            'title': 'Proposed Zoning Change for New School Site',
+            'date': 'December 20, 2024',
+            'time': '7:00 PM',
+            'description': 'Public hearing to discuss rezoning of 50-acre parcel for new elementary school construction.',
+            'related_contract': {'id': 'CNT-012', 'title': 'New Elementary School Construction', 'amount': 35000000},
+            'comments_received': 24,
+            'comment_deadline': 'December 18, 2024'
+        }
+    ]
+
+    return render_template('meetings.html',
+                          upcoming_meetings=upcoming_meetings,
+                          calendar_days=calendar_days,
+                          past_meetings=past_meetings,
+                          public_hearing_list=public_hearing_list,
+                          pending_items=5,
+                          public_hearings=2,
+                          pending_votes=4,
+                          title='Meetings & Agendas')
+
+
+@app.route('/voting-records')
+def voting_records_page():
+    """Board and council voting records."""
+    members = [
+        {'id': 'M001', 'name': 'John Smith', 'initials': 'JS', 'position': 'Council President', 'total_votes': 145, 'yes_votes': 128, 'no_votes': 12, 'abstentions': 5, 'participation_rate': 97, 'recent_recusals': []},
+        {'id': 'M002', 'name': 'Sarah Johnson', 'initials': 'SJ', 'position': 'Vice President', 'total_votes': 142, 'yes_votes': 125, 'no_votes': 15, 'abstentions': 2, 'participation_rate': 95, 'recent_recusals': [{'date': 'Nov 28', 'reason': 'Financial Interest'}]},
+        {'id': 'M003', 'name': 'Mike Chen', 'initials': 'MC', 'position': 'Member', 'total_votes': 140, 'yes_votes': 110, 'no_votes': 25, 'abstentions': 5, 'participation_rate': 94, 'recent_recusals': []},
+        {'id': 'M004', 'name': 'Emily Davis', 'initials': 'ED', 'position': 'Member', 'total_votes': 143, 'yes_votes': 130, 'no_votes': 10, 'abstentions': 3, 'participation_rate': 96, 'recent_recusals': []},
+        {'id': 'M005', 'name': 'James Wilson', 'initials': 'JW', 'position': 'Member', 'total_votes': 138, 'yes_votes': 115, 'no_votes': 18, 'abstentions': 5, 'participation_rate': 92, 'recent_recusals': [{'date': 'Nov 14', 'reason': 'Business Relationship'}]},
+    ]
+
+    recent_votes = [
+        {'id': 'V001', 'date': 'Dec 5, 2024', 'item': 'HVAC System Upgrade Change Order', 'type': 'Contract', 'yes': 4, 'no': 1, 'abstain': 0, 'result': 'Passed', 'contract_id': 'CNT-003', 'amount': 85000},
+        {'id': 'V002', 'date': 'Nov 28, 2024', 'item': 'FY 2024-25 Budget Amendment #3', 'type': 'Budget', 'yes': 5, 'no': 0, 'abstain': 0, 'result': 'Passed', 'contract_id': None, 'amount': 500000},
+        {'id': 'V003', 'date': 'Nov 28, 2024', 'item': 'School Renovation Project Approval', 'type': 'Contract', 'yes': 3, 'no': 1, 'abstain': 1, 'result': 'Passed', 'contract_id': 'CNT-001', 'amount': 2500000},
+        {'id': 'V004', 'date': 'Nov 14, 2024', 'item': 'Resolution for Bond Measure', 'type': 'Resolution', 'yes': 4, 'no': 1, 'abstain': 0, 'result': 'Passed', 'contract_id': None, 'amount': None},
+    ]
+
+    contract_votes = [
+        {'date': 'Dec 5, 2024', 'contract_id': 'CNT-003', 'contract_title': 'HVAC System Upgrade', 'vendor_name': 'CoolAir Systems', 'amount': 85000, 'yes': 4, 'no': 1, 'abstain': 0, 'result': 'Approved'},
+        {'date': 'Nov 28, 2024', 'contract_id': 'CNT-001', 'contract_title': 'School Renovation Project', 'vendor_name': 'BuildRight Construction', 'amount': 2500000, 'yes': 3, 'no': 1, 'abstain': 1, 'result': 'Approved'},
+        {'date': 'Nov 14, 2024', 'contract_id': 'CNT-007', 'contract_title': 'IT Infrastructure', 'vendor_name': 'TechSolutions Inc', 'amount': 450000, 'yes': 5, 'no': 0, 'abstain': 0, 'result': 'Approved'},
+    ]
+
+    stats = {'total_votes': 156, 'passed': 142, 'failed': 8, 'unanimous': 98, 'total_value': 15000000}
+    contract_stats = {'approved': 24, 'rejected': 2, 'change_orders': 12, 'total_value': 18500000}
+    pass_rates = [
+        {'type': 'Contracts', 'rate': 92, 'passed': 23, 'total': 25},
+        {'type': 'Budget', 'rate': 100, 'passed': 8, 'total': 8},
+        {'type': 'Resolutions', 'rate': 88, 'passed': 15, 'total': 17},
+    ]
+
+    return render_template('voting_records.html',
+                          members=members,
+                          recent_votes=recent_votes,
+                          contract_votes=contract_votes,
+                          stats=stats,
+                          contract_stats=contract_stats,
+                          pass_rates=pass_rates,
+                          title='Voting Records')
+
+
+@app.route('/conflicts')
+def conflicts_page():
+    """Conflict of interest tracking."""
+    disclosures = [
+        {'id': 'D001', 'name': 'John Smith', 'initials': 'JS', 'position': 'Council President', 'last_disclosure': 'Jan 15, 2024', 'next_due': 'Jan 15, 2025', 'status': 'Current'},
+        {'id': 'D002', 'name': 'Sarah Johnson', 'initials': 'SJ', 'position': 'Vice President', 'last_disclosure': 'Jan 20, 2024', 'next_due': 'Jan 20, 2025', 'status': 'Current'},
+        {'id': 'D003', 'name': 'Mike Chen', 'initials': 'MC', 'position': 'Member', 'last_disclosure': 'Dec 15, 2023', 'next_due': 'Dec 15, 2024', 'status': 'Due Soon'},
+        {'id': 'D004', 'name': 'Emily Davis', 'initials': 'ED', 'position': 'Member', 'last_disclosure': 'Feb 1, 2024', 'next_due': 'Feb 1, 2025', 'status': 'Current'},
+        {'id': 'D005', 'name': 'James Wilson', 'initials': 'JW', 'position': 'Member', 'last_disclosure': 'Nov 1, 2023', 'next_due': 'Nov 1, 2024', 'status': 'Overdue'},
+    ]
+
+    recusals = [
+        {'date': 'Nov 28, 2024', 'member_name': 'Sarah Johnson', 'member_initials': 'SJ', 'meeting': 'Regular Council Meeting', 'agenda_item': 'Johnson Properties Zoning Request', 'reason': 'Financial Interest', 'contract_id': None, 'contract_title': None},
+        {'date': 'Nov 14, 2024', 'member_name': 'James Wilson', 'member_initials': 'JW', 'meeting': 'Regular Council Meeting', 'agenda_item': 'IT Services Contract Renewal', 'reason': 'Business Relationship', 'contract_id': 'CNT-007', 'contract_title': 'IT Infrastructure'},
+        {'date': 'Oct 24, 2024', 'member_name': 'Mike Chen', 'member_initials': 'MC', 'meeting': 'School Board Meeting', 'agenda_item': 'Catering Services Bid', 'reason': 'Family Connection', 'contract_id': None, 'contract_title': None},
+    ]
+
+    member_relationships = [
+        {
+            'id': 'M002', 'name': 'Sarah Johnson', 'initials': 'SJ', 'position': 'Vice President',
+            'relationships': [
+                {'vendor_name': 'Johnson Properties LLC', 'relationship_type': 'Ownership Interest (25%)', 'conflict_level': 'High', 'active_contracts': 0, 'contract_value': 0},
+                {'vendor_name': 'ABC Insurance', 'relationship_type': 'Board Member', 'conflict_level': 'Medium', 'active_contracts': 1, 'contract_value': 50000}
+            ]
+        },
+        {
+            'id': 'M005', 'name': 'James Wilson', 'initials': 'JW', 'position': 'Member',
+            'relationships': [
+                {'vendor_name': 'TechSolutions Inc', 'relationship_type': 'Previous Employment', 'conflict_level': 'Medium', 'active_contracts': 2, 'contract_value': 650000}
+            ]
+        },
+        {
+            'id': 'M003', 'name': 'Mike Chen', 'initials': 'MC', 'position': 'Member',
+            'relationships': [
+                {'vendor_name': 'Chen Catering Services', 'relationship_type': 'Family Member Ownership', 'conflict_level': 'High', 'active_contracts': 0, 'contract_value': 0}
+            ]
+        }
+    ]
+
+    conflict_alerts = [
+        {'id': 'CA001', 'title': 'Potential Conflict Detected', 'description': 'Member James Wilson has disclosed previous employment with TechSolutions Inc, which has an active contract bid pending.', 'severity': 'High', 'date': 'Dec 3, 2024', 'member_name': 'James Wilson', 'member_initials': 'JW', 'vendor_name': 'TechSolutions Inc', 'contract_id': 'CNT-015'},
+        {'id': 'CA002', 'title': 'Disclosure Reminder', 'description': 'Annual financial disclosure is overdue for Member James Wilson.', 'severity': 'Medium', 'date': 'Dec 1, 2024', 'member_name': 'James Wilson', 'member_initials': 'JW', 'vendor_name': None, 'contract_id': None},
+    ]
+
+    stats = {'total_members': 5, 'current_disclosures': 3, 'pending_disclosures': 2, 'recusals_count': 8, 'potential_conflicts': 2}
+    vendors = current_vendors.to_dict('records') if current_vendors is not None else []
+    all_members = [{'id': m['id'], 'name': m['name']} for m in disclosures]
+
+    return render_template('conflicts.html',
+                          disclosures=disclosures,
+                          recusals=recusals,
+                          member_relationships=member_relationships,
+                          conflict_alerts=conflict_alerts,
+                          stats=stats,
+                          vendors=vendors,
+                          all_members=all_members,
+                          pending_disclosures=2,
+                          title='Conflict of Interest')
+
+
+@app.route('/policy-compliance')
+def policy_compliance_page():
+    """Policy compliance dashboard."""
+    mwbe_goal = 30
+    mwbe_stats = {'total_value': 25000000, 'mwbe_value': 6750000, 'current_rate': 27.0}
+    mwbe_breakdown = {'mbe': 12.5, 'wbe': 9.2, 'sbe': 5.3}
+
+    local_hiring_goal = 40
+    local_hiring = {
+        'total_projects': 12,
+        'projects_meeting_goal': 9,
+        'compliance_rate': 75,
+        'total_workers': 450,
+        'local_workers': 315,
+        'local_percentage': 70,
+        'non_compliant_projects': [
+            {'contract_id': 'CNT-003', 'title': 'HVAC System Upgrade', 'current_rate': 32},
+            {'contract_id': 'CNT-009', 'title': 'Parking Lot Repair', 'current_rate': 28},
+        ]
+    }
+
+    living_wage = {'minimum_rate': 18.50, 'compliance_rate': 94, 'compliant_contracts': 47, 'total_contracts': 50, 'violations': 2}
+    environmental = {'recycled_rate': 28, 'energy_efficient_rate': 55, 'local_sourcing_rate': 22}
+
+    department_compliance = [
+        {'name': 'Public Works', 'mwbe': 32, 'local_hire': 45, 'living_wage': 100, 'environmental': 85, 'overall': 88},
+        {'name': 'Education', 'mwbe': 28, 'local_hire': 38, 'living_wage': 92, 'environmental': 78, 'overall': 82},
+        {'name': 'IT Services', 'mwbe': 22, 'local_hire': 35, 'living_wage': 100, 'environmental': 65, 'overall': 75},
+        {'name': 'Parks & Recreation', 'mwbe': 35, 'local_hire': 52, 'living_wage': 88, 'environmental': 90, 'overall': 86},
+    ]
+
+    return render_template('policy_compliance.html',
+                          mwbe_goal=mwbe_goal,
+                          mwbe_stats=mwbe_stats,
+                          mwbe_breakdown=mwbe_breakdown,
+                          local_hiring_goal=local_hiring_goal,
+                          local_hiring=local_hiring,
+                          living_wage=living_wage,
+                          environmental=environmental,
+                          department_compliance=department_compliance,
+                          title='Policy Compliance')
+
+
+@app.route('/grants')
+def grants_page():
+    """Grant management dashboard."""
+    grants = [
+        {
+            'id': 'GR-001', 'name': 'ESSER III - Learning Loss Recovery', 'program': 'Elementary and Secondary School Emergency Relief',
+            'source': 'Federal', 'grant_number': 'ESSER-III-2024-001', 'award_amount': 5200000, 'drawn_amount': 3120000,
+            'remaining': 2080000, 'utilization_pct': 60, 'start_date': '2023-03-01', 'end_date': '2024-09-30',
+            'allowable_uses': ['Learning Loss', 'Mental Health', 'Summer Programs', 'Technology'],
+            'match_required': 0, 'match_percentage': 0, 'match_provided': 0
+        },
+        {
+            'id': 'GR-002', 'name': 'Title I - Part A', 'program': 'Improving Basic Programs',
+            'source': 'Federal', 'grant_number': 'TITLE1-2024-045', 'award_amount': 1800000, 'drawn_amount': 900000,
+            'remaining': 900000, 'utilization_pct': 50, 'start_date': '2024-07-01', 'end_date': '2025-06-30',
+            'allowable_uses': ['Instruction', 'Professional Development', 'Parental Involvement'],
+            'match_required': 0, 'match_percentage': 0, 'match_provided': 0
+        },
+        {
+            'id': 'GR-003', 'name': 'CDBG Infrastructure', 'program': 'Community Development Block Grant',
+            'source': 'Federal', 'grant_number': 'CDBG-2024-112', 'award_amount': 750000, 'drawn_amount': 225000,
+            'remaining': 525000, 'utilization_pct': 30, 'start_date': '2024-01-01', 'end_date': '2025-12-31',
+            'allowable_uses': ['Infrastructure', 'Public Facilities', 'Housing'],
+            'match_required': 187500, 'match_percentage': 25, 'match_provided': 150000
+        }
+    ]
+
+    upcoming_deadlines = [
+        {'grant_name': 'ESSER III', 'report_type': 'Quarterly Financial Report', 'due_date': 'Dec 15, 2024'},
+        {'grant_name': 'Title I', 'report_type': 'Mid-Year Performance Report', 'due_date': 'Jan 15, 2025'},
+    ]
+
+    reporting_deadlines = [
+        {'id': 'RPT-001', 'grant_name': 'ESSER III', 'report_type': 'Quarterly Financial Report', 'due_date': 'Dec 15, 2024', 'period': 'Q2 FY25', 'status': 'In Progress', 'days_until': 10, 'is_overdue': False},
+        {'id': 'RPT-002', 'grant_name': 'Title I', 'report_type': 'Mid-Year Performance', 'due_date': 'Jan 15, 2025', 'period': 'FY25 Mid-Year', 'status': 'Not Started', 'days_until': 41, 'is_overdue': False},
+        {'id': 'RPT-003', 'grant_name': 'CDBG', 'report_type': 'Quarterly Progress', 'due_date': 'Dec 31, 2024', 'period': 'Q4 2024', 'status': 'Not Started', 'days_until': 26, 'is_overdue': False},
+    ]
+
+    upcoming_drawdowns = [
+        {'grant_name': 'ESSER III', 'amount': 250000, 'scheduled_date': 'Dec 15, 2024', 'description': 'Technology purchases'},
+        {'grant_name': 'Title I', 'amount': 150000, 'scheduled_date': 'Dec 20, 2024', 'description': 'Q2 instructional materials'},
+    ]
+
+    all_drawdowns = [
+        {'date': 'Nov 30, 2024', 'grant_name': 'ESSER III', 'amount': 180000, 'purpose': 'Mental health services', 'status': 'Completed'},
+        {'date': 'Nov 15, 2024', 'grant_name': 'Title I', 'amount': 120000, 'purpose': 'Professional development', 'status': 'Completed'},
+        {'date': 'Dec 15, 2024', 'grant_name': 'ESSER III', 'amount': 250000, 'purpose': 'Technology purchases', 'status': 'Pending'},
+    ]
+
+    grant_funded_contracts = [
+        {'contract_id': 'CNT-010', 'title': 'Summer Learning Program', 'grant_name': 'ESSER III', 'grant_number': 'ESSER-III-2024-001', 'vendor_name': 'Learning Partners LLC', 'grant_amount': 450000, 'local_match': 0, 'status': 'Active'},
+        {'contract_id': 'CNT-011', 'title': 'Tutoring Services', 'grant_name': 'Title I', 'grant_number': 'TITLE1-2024-045', 'vendor_name': 'Academic Support Inc', 'grant_amount': 200000, 'local_match': 0, 'status': 'Active'},
+        {'contract_id': 'CNT-012', 'title': 'Infrastructure Improvement', 'grant_name': 'CDBG', 'grant_number': 'CDBG-2024-112', 'vendor_name': 'City Works Construction', 'grant_amount': 500000, 'local_match': 125000, 'status': 'Active'},
+    ]
+
+    stats = {'active_grants': 8, 'total_awarded': 12500000, 'total_drawn': 6200000, 'remaining': 6300000, 'match_required': 450000}
+
+    return render_template('grants.html',
+                          grants=grants,
+                          upcoming_deadlines=upcoming_deadlines,
+                          reporting_deadlines=reporting_deadlines,
+                          upcoming_drawdowns=upcoming_drawdowns,
+                          all_drawdowns=all_drawdowns,
+                          grant_funded_contracts=grant_funded_contracts,
+                          stats=stats,
+                          title='Grant Management')
+
+
+@app.route('/fund-accounting')
+def fund_accounting_page():
+    """Multi-fund accounting dashboard."""
+    funds = [
+        {'id': 'F001', 'name': 'General Fund', 'type': 'General', 'restriction': 'Unrestricted', 'budget': 45000000, 'encumbered': 12000000, 'expended': 28000000, 'available': 5000000, 'utilization_pct': 89},
+        {'id': 'F002', 'name': 'Capital Projects Fund', 'type': 'Capital', 'restriction': 'Restricted', 'budget': 25000000, 'encumbered': 8000000, 'expended': 10000000, 'available': 7000000, 'utilization_pct': 72},
+        {'id': 'F003', 'name': 'Federal Grants Fund', 'type': 'Grant', 'restriction': 'Restricted', 'budget': 12500000, 'encumbered': 3000000, 'expended': 6200000, 'available': 3300000, 'utilization_pct': 74},
+        {'id': 'F004', 'name': 'Special Revenue Fund', 'type': 'Special Revenue', 'restriction': 'Committed', 'budget': 8000000, 'encumbered': 2500000, 'expended': 4200000, 'available': 1300000, 'utilization_pct': 84},
+        {'id': 'F005', 'name': 'Debt Service Fund', 'type': 'Debt Service', 'restriction': 'Restricted', 'budget': 5000000, 'encumbered': 0, 'expended': 3800000, 'available': 1200000, 'utilization_pct': 76},
+    ]
+
+    summary = {
+        'total_budget': sum(f['budget'] for f in funds),
+        'total_encumbered': sum(f['encumbered'] for f in funds),
+        'total_expended': sum(f['expended'] for f in funds),
+        'available_balance': sum(f['available'] for f in funds)
+    }
+
+    interfund_transfers = [
+        {'date': 'Nov 30, 2024', 'from_fund': 'General Fund', 'to_fund': 'Capital Projects Fund', 'amount': 500000, 'purpose': 'Emergency roof repairs', 'status': 'Completed', 'approved_by': 'Board'},
+        {'date': 'Nov 15, 2024', 'from_fund': 'Special Revenue Fund', 'to_fund': 'General Fund', 'amount': 150000, 'purpose': 'Program support', 'status': 'Completed', 'approved_by': 'CFO'},
+        {'date': 'Dec 10, 2024', 'from_fund': 'General Fund', 'to_fund': 'Debt Service Fund', 'amount': 200000, 'purpose': 'Debt payment reserve', 'status': 'Pending', 'approved_by': 'Pending'},
+    ]
+
+    fund_alerts = [
+        {'title': 'General Fund Utilization High', 'message': 'General Fund has reached 89% utilization with 6 months remaining in fiscal year.', 'severity': 'Medium', 'date': 'Dec 5, 2024'},
+        {'title': 'Grant Spending Deadline', 'message': 'ESSER III funds must be expended by September 30, 2024. Currently 40% remaining.', 'severity': 'High', 'date': 'Dec 3, 2024'},
+    ]
+
+    restriction_analysis = {'unrestricted': 5000000, 'restricted': 11500000, 'committed': 1300000}
+
+    return render_template('fund_accounting.html',
+                          funds=funds,
+                          summary=summary,
+                          interfund_transfers=interfund_transfers,
+                          fund_alerts=fund_alerts,
+                          restriction_analysis=restriction_analysis,
+                          title='Fund Accounting')
+
+
+@app.route('/procurement')
+def procurement_page():
+    """Procurement pipeline management."""
+    pipeline = {
+        'draft': [
+            {'id': 'PR-001', 'title': 'Cafeteria Equipment Replacement', 'type': 'RFP', 'department': 'Education', 'estimated_value': 350000},
+            {'id': 'PR-002', 'title': 'Landscaping Services', 'type': 'RFQ', 'department': 'Parks & Recreation', 'estimated_value': 125000},
+        ],
+        'posted': [
+            {'id': 'PR-003', 'title': 'Network Infrastructure Upgrade', 'type': 'RFP', 'department': 'IT Services', 'estimated_value': 800000, 'close_date': 'Dec 15', 'bids_received': 4},
+            {'id': 'PR-004', 'title': 'HVAC Maintenance Contract', 'type': 'IFB', 'department': 'Public Works', 'estimated_value': 200000, 'close_date': 'Dec 20', 'bids_received': 6},
+        ],
+        'evaluation': [
+            {'id': 'PR-005', 'title': 'Security Camera System', 'type': 'RFP', 'department': 'Administration', 'estimated_value': 450000, 'bids_received': 5, 'eval_progress': 60},
+        ],
+        'pending_award': [
+            {'id': 'PR-006', 'title': 'Bus Fleet Replacement', 'type': 'IFB', 'department': 'Transportation', 'estimated_value': 2500000, 'recommended_vendor': 'Blue Bird Corp', 'recommended_amount': 2350000, 'board_date': 'Dec 12'},
+        ],
+        'awarded': [
+            {'id': 'PR-007', 'title': 'Playground Equipment', 'type': 'RFQ', 'department': 'Parks & Recreation', 'estimated_value': 180000, 'awarded_vendor': 'PlaySafe Inc', 'awarded_amount': 165000, 'award_date': 'Nov 28', 'contract_id': 'CNT-014'},
+        ]
+    }
+
+    stats = {
+        'draft': len(pipeline['draft']),
+        'posted': len(pipeline['posted']),
+        'evaluation': len(pipeline['evaluation']),
+        'pending_award': len(pipeline['pending_award']),
+        'awarded': len(pipeline['awarded']),
+        'total_value': sum(p['estimated_value'] for p in pipeline['draft'] + pipeline['posted'] + pipeline['evaluation'] + pipeline['pending_award'])
+    }
+
+    bid_calendar = [
+        {'month': 'DEC', 'day': '10', 'time': '2:00 PM', 'type': 'Pre-Bid Meeting', 'title': 'Network Infrastructure Upgrade', 'location': 'City Hall Room 201', 'estimated_value': 800000},
+        {'month': 'DEC', 'day': '15', 'time': '3:00 PM', 'type': 'Bid Opening', 'title': 'Network Infrastructure Upgrade', 'location': 'City Hall Room 201', 'estimated_value': 800000},
+        {'month': 'DEC', 'day': '20', 'time': '2:00 PM', 'type': 'Bid Opening', 'title': 'HVAC Maintenance Contract', 'location': 'City Hall Room 201', 'estimated_value': 200000},
+    ]
+
+    vendor_outreach = [
+        {'vendor_name': 'TechCorp Solutions', 'procurement_title': 'Network Infrastructure Upgrade', 'status': 'Responded', 'date': 'Dec 3'},
+        {'vendor_name': 'SecureView Inc', 'procurement_title': 'Security Camera System', 'status': 'Invited', 'date': 'Nov 28'},
+        {'vendor_name': 'HVAC Pro Services', 'procurement_title': 'HVAC Maintenance Contract', 'status': 'Responded', 'date': 'Dec 1'},
+        {'vendor_name': 'Green Thumb Landscaping', 'procurement_title': 'Landscaping Services', 'status': 'Declined', 'date': 'Nov 25'},
+    ]
+
+    outreach_stats = {'invited': 45, 'responded': 32, 'response_rate': 71.1, 'mwbe_invited': 18}
+
+    procurement_analytics = [
+        {'type': 'RFP', 'savings_pct': 12.5, 'avg_bids': 5.2},
+        {'type': 'IFB', 'savings_pct': 15.8, 'avg_bids': 7.1},
+        {'type': 'RFQ', 'savings_pct': 8.2, 'avg_bids': 4.3},
+    ]
+
+    historical_bids = [
+        {'title': 'Playground Equipment', 'type': 'RFQ', 'bid_count': 4, 'estimated_value': 180000, 'awarded_value': 165000, 'savings_pct': 8.3},
+        {'title': 'IT Consulting Services', 'type': 'RFP', 'bid_count': 6, 'estimated_value': 500000, 'awarded_value': 425000, 'savings_pct': 15.0},
+        {'title': 'Roofing Replacement', 'type': 'IFB', 'bid_count': 8, 'estimated_value': 750000, 'awarded_value': 680000, 'savings_pct': 9.3},
+    ]
+
+    return render_template('procurement.html',
+                          pipeline=pipeline,
+                          stats=stats,
+                          bid_calendar=bid_calendar,
+                          vendor_outreach=vendor_outreach,
+                          outreach_stats=outreach_stats,
+                          procurement_analytics=procurement_analytics,
+                          historical_bids=historical_bids,
+                          title='Procurement Pipeline')
+
+
+@app.route('/constituent-portal')
+def constituent_portal_page():
+    """Constituent services portal."""
+    public_comments = [
+        {'id': 'C001', 'name': 'Robert Miller', 'date': 'Dec 4, 2024', 'topic': 'Contract', 'content': 'I support the school renovation project. Our children deserve modern facilities.', 'sentiment': 'Support', 'response': True, 'related_item': {'title': 'School Renovation Project', 'url': '/contract/CNT-001'}},
+        {'id': 'C002', 'name': 'Lisa Thompson', 'date': 'Dec 3, 2024', 'topic': 'Budget', 'content': 'Concerned about the proposed budget increase for IT services. Please provide more details on ROI.', 'sentiment': 'Neutral', 'response': False, 'related_item': {'title': 'FY25 Budget Amendment', 'url': '#'}},
+        {'id': 'C003', 'name': 'James Brown', 'date': 'Dec 2, 2024', 'topic': 'Contract', 'content': 'The HVAC contractor has been unresponsive. When will the work be completed?', 'sentiment': 'Oppose', 'response': True, 'related_item': {'title': 'HVAC System Upgrade', 'url': '/contract/CNT-003'}},
+    ]
+
+    sentiment_stats = {'support': 45, 'neutral': 30, 'oppose': 15}
+    top_commented = [
+        {'title': 'School Renovation Project', 'url': '/contract/CNT-001', 'count': 24},
+        {'title': 'FY25 Budget', 'url': '#', 'count': 18},
+        {'title': 'New Elementary School', 'url': '/contract/CNT-012', 'count': 12},
+    ]
+
+    foia_requests = [
+        {'id': 'FOIA-2024-156', 'requestor_name': 'Local News Daily', 'requestor_org': 'Media', 'description': 'All contracts awarded to BuildRight Construction in the past 3 years', 'received_date': 'Nov 25, 2024', 'due_date': 'Dec 9, 2024', 'status': 'In Progress', 'days_remaining': 4, 'is_overdue': False},
+        {'id': 'FOIA-2024-157', 'requestor_name': 'Jane Citizen', 'requestor_org': 'Individual', 'description': 'Board meeting minutes from October 2024', 'received_date': 'Dec 1, 2024', 'due_date': 'Dec 15, 2024', 'status': 'Open', 'days_remaining': 10, 'is_overdue': False},
+        {'id': 'FOIA-2024-158', 'requestor_name': 'Watchdog Group', 'requestor_org': 'Non-Profit', 'description': 'Vendor payment records for FY24', 'received_date': 'Nov 15, 2024', 'due_date': 'Nov 29, 2024', 'status': 'Completed', 'days_remaining': 0, 'is_overdue': False},
+    ]
+
+    foia_stats = {'total_year': 156, 'on_time_pct': 94, 'avg_days': 8, 'denial_rate': 3.2}
+
+    complaints = [
+        {'id': 'CMP-2024-089', 'subject': 'Construction Noise Complaint', 'description': 'Excessive noise from school renovation project before 7 AM.', 'from_name': 'Nearby Resident', 'date': 'Dec 3, 2024', 'priority': 'Medium', 'status': 'Investigating', 'related_contract': {'id': 'CNT-001', 'title': 'School Renovation'}},
+        {'id': 'CMP-2024-090', 'subject': 'Invoice Payment Delay', 'description': 'Vendor reports 60-day payment delay on approved invoices.', 'from_name': 'ABC Supplies', 'date': 'Dec 1, 2024', 'priority': 'High', 'status': 'New', 'related_contract': None},
+    ]
+
+    complaint_categories = [
+        {'name': 'Payment Issues', 'count': 12, 'percentage': 30},
+        {'name': 'Construction', 'count': 8, 'percentage': 20},
+        {'name': 'Service Quality', 'count': 10, 'percentage': 25},
+        {'name': 'Communication', 'count': 6, 'percentage': 15},
+        {'name': 'Other', 'count': 4, 'percentage': 10},
+    ]
+
+    complaint_metrics = {'avg_resolution': 5, 'first_response': 4, 'satisfaction': 85}
+
+    satisfaction_by_area = [
+        {'name': 'Contract Transparency', 'rating': 4.2},
+        {'name': 'Response Time', 'rating': 3.8},
+        {'name': 'Public Meeting Access', 'rating': 4.5},
+        {'name': 'Information Availability', 'rating': 4.0},
+    ]
+
+    recent_feedback = [
+        {'rating': 5, 'comment': 'Excellent transparency with the new contract dashboard!', 'service': 'Public Portal', 'date': 'Dec 4'},
+        {'rating': 4, 'comment': 'FOIA request was processed quickly.', 'service': 'Records Request', 'date': 'Dec 2'},
+        {'rating': 3, 'comment': 'Had to follow up multiple times on my complaint.', 'service': 'Constituent Services', 'date': 'Nov 28'},
+    ]
+
+    stats = {'open_foia': 8, 'recent_comments': 45, 'open_complaints': 12, 'avg_response_time': 3, 'satisfaction_rate': 87}
+
+    return render_template('constituent_portal.html',
+                          public_comments=public_comments,
+                          sentiment_stats=sentiment_stats,
+                          top_commented=top_commented,
+                          foia_requests=foia_requests,
+                          foia_stats=foia_stats,
+                          complaints=complaints,
+                          complaint_categories=complaint_categories,
+                          complaint_metrics=complaint_metrics,
+                          satisfaction_by_area=satisfaction_by_area,
+                          recent_feedback=recent_feedback,
+                          stats=stats,
+                          title='Constituent Portal')
 
 
 # ==========================

@@ -1,0 +1,437 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="space-y-6">
+    <!-- Header -->
+    <div class="flex justify-between items-center">
+        <div>
+            <h1 class="text-2xl font-bold text-gray-900 dark:text-white">Voting Records</h1>
+            <p class="text-gray-600 dark:text-gray-400">Board and council voting history on contracts and resolutions</p>
+        </div>
+        <div class="flex space-x-3">
+            <select id="memberFilter" class="px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg dark:bg-gray-700">
+                <option value="">All Members</option>
+                {% for member in members %}
+                <option value="{{ member.id }}">{{ member.name }}</option>
+                {% endfor %}
+            </select>
+            <button onclick="exportVotes()" class="px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300">
+                Export Report
+            </button>
+        </div>
+    </div>
+
+    <!-- Stats Cards -->
+    <div class="grid grid-cols-1 md:grid-cols-5 gap-4">
+        <div class="bg-white dark:bg-gray-800 rounded-xl shadow p-4">
+            <p class="text-sm text-gray-500 dark:text-gray-400">Total Votes</p>
+            <p class="text-2xl font-bold text-gray-900 dark:text-white">{{ stats.total_votes }}</p>
+        </div>
+        <div class="bg-white dark:bg-gray-800 rounded-xl shadow p-4">
+            <p class="text-sm text-gray-500 dark:text-gray-400">Passed</p>
+            <p class="text-2xl font-bold text-green-600">{{ stats.passed }}</p>
+        </div>
+        <div class="bg-white dark:bg-gray-800 rounded-xl shadow p-4">
+            <p class="text-sm text-gray-500 dark:text-gray-400">Failed</p>
+            <p class="text-2xl font-bold text-red-600">{{ stats.failed }}</p>
+        </div>
+        <div class="bg-white dark:bg-gray-800 rounded-xl shadow p-4">
+            <p class="text-sm text-gray-500 dark:text-gray-400">Unanimous</p>
+            <p class="text-2xl font-bold text-blue-600">{{ stats.unanimous }}</p>
+        </div>
+        <div class="bg-white dark:bg-gray-800 rounded-xl shadow p-4">
+            <p class="text-sm text-gray-500 dark:text-gray-400">Total Value Approved</p>
+            <p class="text-2xl font-bold text-purple-600">${{ "{:,.0f}".format(stats.total_value) }}</p>
+        </div>
+    </div>
+
+    <!-- Tabs -->
+    <div class="border-b border-gray-200 dark:border-gray-700">
+        <nav class="flex space-x-8">
+            <button onclick="showTab('recent')" id="tab-recent" class="tab-btn border-b-2 border-blue-500 text-blue-600 dark:text-blue-400 py-4 px-1 font-medium">
+                Recent Votes
+            </button>
+            <button onclick="showTab('member')" id="tab-member" class="tab-btn text-gray-500 hover:text-gray-700 dark:text-gray-400 py-4 px-1 font-medium">
+                By Member
+            </button>
+            <button onclick="showTab('patterns')" id="tab-patterns" class="tab-btn text-gray-500 hover:text-gray-700 dark:text-gray-400 py-4 px-1 font-medium">
+                Voting Patterns
+            </button>
+            <button onclick="showTab('contracts')" id="tab-contracts" class="tab-btn text-gray-500 hover:text-gray-700 dark:text-gray-400 py-4 px-1 font-medium">
+                Contract Votes
+            </button>
+        </nav>
+    </div>
+
+    <!-- Recent Votes Tab -->
+    <div id="content-recent" class="tab-content">
+        <div class="bg-white dark:bg-gray-800 rounded-xl shadow overflow-hidden">
+            <table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+                <thead class="bg-gray-50 dark:bg-gray-700">
+                    <tr>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Date</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Item</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Type</th>
+                        <th class="px-6 py-3 text-center text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Yes</th>
+                        <th class="px-6 py-3 text-center text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">No</th>
+                        <th class="px-6 py-3 text-center text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Abstain</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Result</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Actions</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-gray-200 dark:divide-gray-700">
+                    {% for vote in recent_votes %}
+                    <tr class="hover:bg-gray-50 dark:hover:bg-gray-700">
+                        <td class="px-6 py-4 text-sm text-gray-600 dark:text-gray-400">{{ vote.date }}</td>
+                        <td class="px-6 py-4">
+                            <div class="text-sm font-medium text-gray-900 dark:text-white">{{ vote.item }}</div>
+                            {% if vote.contract_id %}
+                            <a href="/contract/{{ vote.contract_id }}" class="text-xs text-blue-600 hover:text-blue-800">View Contract</a>
+                            {% endif %}
+                            {% if vote.amount %}
+                            <span class="text-xs text-gray-500 dark:text-gray-400"> - ${{ "{:,.0f}".format(vote.amount) }}</span>
+                            {% endif %}
+                        </td>
+                        <td class="px-6 py-4">
+                            <span class="px-2 py-1 text-xs rounded-full
+                                {% if vote.type == 'Contract' %}bg-blue-100 text-blue-800
+                                {% elif vote.type == 'Budget' %}bg-green-100 text-green-800
+                                {% elif vote.type == 'Resolution' %}bg-purple-100 text-purple-800
+                                {% else %}bg-gray-100 text-gray-800{% endif %}">
+                                {{ vote.type }}
+                            </span>
+                        </td>
+                        <td class="px-6 py-4 text-center">
+                            <span class="inline-flex items-center justify-center w-8 h-8 rounded-full bg-green-100 text-green-800 font-medium">{{ vote.yes }}</span>
+                        </td>
+                        <td class="px-6 py-4 text-center">
+                            <span class="inline-flex items-center justify-center w-8 h-8 rounded-full bg-red-100 text-red-800 font-medium">{{ vote.no }}</span>
+                        </td>
+                        <td class="px-6 py-4 text-center">
+                            <span class="inline-flex items-center justify-center w-8 h-8 rounded-full bg-gray-100 text-gray-800 font-medium">{{ vote.abstain }}</span>
+                        </td>
+                        <td class="px-6 py-4">
+                            <span class="px-2 py-1 text-xs font-medium rounded-full
+                                {% if vote.result == 'Passed' %}bg-green-100 text-green-800
+                                {% elif vote.result == 'Failed' %}bg-red-100 text-red-800
+                                {% else %}bg-yellow-100 text-yellow-800{% endif %}">
+                                {{ vote.result }}
+                            </span>
+                        </td>
+                        <td class="px-6 py-4">
+                            <button onclick="showVoteDetails('{{ vote.id }}')" class="text-blue-600 hover:text-blue-800 text-sm">
+                                View Details
+                            </button>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- By Member Tab -->
+    <div id="content-member" class="tab-content hidden">
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {% for member in members %}
+            <div class="bg-white dark:bg-gray-800 rounded-xl shadow p-6">
+                <div class="flex items-center space-x-4">
+                    <div class="w-14 h-14 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center text-white text-xl font-bold">
+                        {{ member.initials }}
+                    </div>
+                    <div>
+                        <h3 class="text-lg font-semibold text-gray-900 dark:text-white">{{ member.name }}</h3>
+                        <p class="text-sm text-gray-500 dark:text-gray-400">{{ member.position }}</p>
+                    </div>
+                </div>
+
+                <div class="mt-4 grid grid-cols-4 gap-2 text-center">
+                    <div>
+                        <p class="text-2xl font-bold text-gray-900 dark:text-white">{{ member.total_votes }}</p>
+                        <p class="text-xs text-gray-500 dark:text-gray-400">Total</p>
+                    </div>
+                    <div>
+                        <p class="text-2xl font-bold text-green-600">{{ member.yes_votes }}</p>
+                        <p class="text-xs text-gray-500 dark:text-gray-400">Yes</p>
+                    </div>
+                    <div>
+                        <p class="text-2xl font-bold text-red-600">{{ member.no_votes }}</p>
+                        <p class="text-xs text-gray-500 dark:text-gray-400">No</p>
+                    </div>
+                    <div>
+                        <p class="text-2xl font-bold text-gray-500">{{ member.abstentions }}</p>
+                        <p class="text-xs text-gray-500 dark:text-gray-400">Abstain</p>
+                    </div>
+                </div>
+
+                <div class="mt-4">
+                    <div class="flex justify-between text-xs text-gray-500 dark:text-gray-400 mb-1">
+                        <span>Voting Participation</span>
+                        <span>{{ member.participation_rate }}%</span>
+                    </div>
+                    <div class="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
+                        <div class="bg-blue-600 h-2 rounded-full" style="width: {{ member.participation_rate }}%"></div>
+                    </div>
+                </div>
+
+                <div class="mt-4 pt-4 border-t border-gray-200 dark:border-gray-700">
+                    <p class="text-xs text-gray-500 dark:text-gray-400 mb-2">Recent Recusals</p>
+                    {% if member.recent_recusals %}
+                    {% for recusal in member.recent_recusals[:2] %}
+                    <div class="text-xs text-gray-600 dark:text-gray-400 mb-1">
+                        {{ recusal.date }}: {{ recusal.reason }}
+                    </div>
+                    {% endfor %}
+                    {% else %}
+                    <p class="text-xs text-gray-400 italic">No recent recusals</p>
+                    {% endif %}
+                </div>
+
+                <div class="mt-4">
+                    <a href="#" class="text-sm text-blue-600 hover:text-blue-800">View Full History</a>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+
+    <!-- Voting Patterns Tab -->
+    <div id="content-patterns" class="tab-content hidden">
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <!-- Voting by Category -->
+            <div class="bg-white dark:bg-gray-800 rounded-xl shadow p-6">
+                <h3 class="text-lg font-semibold text-gray-900 dark:text-white mb-4">Votes by Category</h3>
+                <div id="categoryChart" class="h-64"></div>
+            </div>
+
+            <!-- Monthly Trend -->
+            <div class="bg-white dark:bg-gray-800 rounded-xl shadow p-6">
+                <h3 class="text-lg font-semibold text-gray-900 dark:text-white mb-4">Monthly Voting Activity</h3>
+                <div id="monthlyChart" class="h-64"></div>
+            </div>
+
+            <!-- Unanimous vs Split -->
+            <div class="bg-white dark:bg-gray-800 rounded-xl shadow p-6">
+                <h3 class="text-lg font-semibold text-gray-900 dark:text-white mb-4">Vote Consensus</h3>
+                <div id="consensusChart" class="h-64"></div>
+            </div>
+
+            <!-- Pass Rate by Type -->
+            <div class="bg-white dark:bg-gray-800 rounded-xl shadow p-6">
+                <h3 class="text-lg font-semibold text-gray-900 dark:text-white mb-4">Pass Rate by Type</h3>
+                <div class="space-y-4">
+                    {% for type_stat in pass_rates %}
+                    <div>
+                        <div class="flex justify-between text-sm mb-1">
+                            <span class="text-gray-700 dark:text-gray-300">{{ type_stat.type }}</span>
+                            <span class="text-gray-900 dark:text-white font-medium">{{ type_stat.rate }}%</span>
+                        </div>
+                        <div class="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-3">
+                            <div class="bg-green-500 h-3 rounded-full" style="width: {{ type_stat.rate }}%"></div>
+                        </div>
+                        <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">{{ type_stat.passed }} of {{ type_stat.total }} passed</p>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Contract Votes Tab -->
+    <div id="content-contracts" class="tab-content hidden">
+        <div class="bg-white dark:bg-gray-800 rounded-xl shadow p-6 mb-6">
+            <h3 class="text-lg font-semibold text-gray-900 dark:text-white mb-4">Contract Approval Votes</h3>
+            <p class="text-sm text-gray-600 dark:text-gray-400 mb-4">All votes specifically related to contract approvals, amendments, and renewals.</p>
+
+            <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+                <div class="bg-gray-50 dark:bg-gray-700 rounded-lg p-4">
+                    <p class="text-sm text-gray-500 dark:text-gray-400">Contracts Approved</p>
+                    <p class="text-2xl font-bold text-green-600">{{ contract_stats.approved }}</p>
+                </div>
+                <div class="bg-gray-50 dark:bg-gray-700 rounded-lg p-4">
+                    <p class="text-sm text-gray-500 dark:text-gray-400">Contracts Rejected</p>
+                    <p class="text-2xl font-bold text-red-600">{{ contract_stats.rejected }}</p>
+                </div>
+                <div class="bg-gray-50 dark:bg-gray-700 rounded-lg p-4">
+                    <p class="text-sm text-gray-500 dark:text-gray-400">Change Orders Approved</p>
+                    <p class="text-2xl font-bold text-blue-600">{{ contract_stats.change_orders }}</p>
+                </div>
+                <div class="bg-gray-50 dark:bg-gray-700 rounded-lg p-4">
+                    <p class="text-sm text-gray-500 dark:text-gray-400">Total Value Approved</p>
+                    <p class="text-2xl font-bold text-purple-600">${{ "{:,.0f}".format(contract_stats.total_value) }}</p>
+                </div>
+            </div>
+        </div>
+
+        <div class="bg-white dark:bg-gray-800 rounded-xl shadow overflow-hidden">
+            <table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+                <thead class="bg-gray-50 dark:bg-gray-700">
+                    <tr>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Date</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Contract</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Vendor</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Amount</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Vote</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Result</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-gray-200 dark:divide-gray-700">
+                    {% for vote in contract_votes %}
+                    <tr class="hover:bg-gray-50 dark:hover:bg-gray-700">
+                        <td class="px-6 py-4 text-sm text-gray-600 dark:text-gray-400">{{ vote.date }}</td>
+                        <td class="px-6 py-4">
+                            <a href="/contract/{{ vote.contract_id }}" class="text-sm font-medium text-blue-600 hover:text-blue-800">{{ vote.contract_title }}</a>
+                        </td>
+                        <td class="px-6 py-4 text-sm text-gray-600 dark:text-gray-400">{{ vote.vendor_name }}</td>
+                        <td class="px-6 py-4 text-sm font-medium text-gray-900 dark:text-white">${{ "{:,.0f}".format(vote.amount) }}</td>
+                        <td class="px-6 py-4">
+                            <span class="text-green-600">{{ vote.yes }}-{{ vote.no }}</span>
+                            {% if vote.abstain > 0 %}
+                            <span class="text-gray-400">({{ vote.abstain }} abstain)</span>
+                            {% endif %}
+                        </td>
+                        <td class="px-6 py-4">
+                            <span class="px-2 py-1 text-xs font-medium rounded-full
+                                {% if vote.result == 'Approved' %}bg-green-100 text-green-800
+                                {% else %}bg-red-100 text-red-800{% endif %}">
+                                {{ vote.result }}
+                            </span>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<!-- Vote Details Modal -->
+<div id="voteDetailsModal" class="fixed inset-0 bg-black bg-opacity-50 hidden z-50 flex items-center justify-center">
+    <div class="bg-white dark:bg-gray-800 rounded-xl shadow-xl max-w-2xl w-full mx-4 max-h-[90vh] overflow-y-auto">
+        <div class="p-6 border-b dark:border-gray-700">
+            <div class="flex justify-between items-center">
+                <h3 class="text-xl font-semibold text-gray-900 dark:text-white">Vote Details</h3>
+                <button onclick="closeVoteDetails()" class="text-gray-400 hover:text-gray-600">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                    </svg>
+                </button>
+            </div>
+        </div>
+        <div class="p-6">
+            <div id="voteDetailsContent">
+                <!-- Dynamic content loaded here -->
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    function showTab(tabName) {
+        document.querySelectorAll('.tab-content').forEach(el => el.classList.add('hidden'));
+        document.querySelectorAll('.tab-btn').forEach(el => {
+            el.classList.remove('border-b-2', 'border-blue-500', 'text-blue-600', 'dark:text-blue-400');
+            el.classList.add('text-gray-500');
+        });
+        document.getElementById('content-' + tabName).classList.remove('hidden');
+        const activeTab = document.getElementById('tab-' + tabName);
+        activeTab.classList.add('border-b-2', 'border-blue-500', 'text-blue-600', 'dark:text-blue-400');
+        activeTab.classList.remove('text-gray-500');
+
+        if (tabName === 'patterns') {
+            initCharts();
+        }
+    }
+
+    function initCharts() {
+        // Category Chart
+        Plotly.newPlot('categoryChart', [{
+            values: [45, 25, 15, 10, 5],
+            labels: ['Contracts', 'Budget', 'Resolutions', 'Personnel', 'Other'],
+            type: 'pie',
+            marker: { colors: ['#3B82F6', '#10B981', '#8B5CF6', '#F59E0B', '#6B7280'] }
+        }], {
+            margin: { t: 10, b: 10, l: 10, r: 10 },
+            paper_bgcolor: 'transparent',
+            showlegend: true,
+            legend: { orientation: 'h', y: -0.1 }
+        }, { responsive: true });
+
+        // Monthly Chart
+        Plotly.newPlot('monthlyChart', [{
+            x: ['Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'],
+            y: [12, 15, 8, 18, 14, 10],
+            type: 'bar',
+            marker: { color: '#3B82F6' }
+        }], {
+            margin: { t: 10, b: 40, l: 40, r: 10 },
+            paper_bgcolor: 'transparent',
+            plot_bgcolor: 'transparent',
+            yaxis: { gridcolor: '#e5e7eb' }
+        }, { responsive: true });
+
+        // Consensus Chart
+        Plotly.newPlot('consensusChart', [{
+            values: [65, 35],
+            labels: ['Unanimous', 'Split Vote'],
+            type: 'pie',
+            hole: 0.5,
+            marker: { colors: ['#10B981', '#F59E0B'] }
+        }], {
+            margin: { t: 10, b: 10, l: 10, r: 10 },
+            paper_bgcolor: 'transparent',
+            annotations: [{ text: '65%', showarrow: false, font: { size: 20 } }]
+        }, { responsive: true });
+    }
+
+    function showVoteDetails(voteId) {
+        document.getElementById('voteDetailsModal').classList.remove('hidden');
+        document.getElementById('voteDetailsContent').innerHTML = `
+            <div class="space-y-4">
+                <div class="flex justify-between">
+                    <span class="text-gray-500">Motion</span>
+                    <span class="font-medium">Approve Contract CNT-001</span>
+                </div>
+                <div class="border-t dark:border-gray-700 pt-4">
+                    <h4 class="font-medium mb-3">Roll Call Vote</h4>
+                    <div class="space-y-2">
+                        <div class="flex justify-between items-center py-2 border-b dark:border-gray-700">
+                            <span>John Smith</span>
+                            <span class="px-2 py-1 bg-green-100 text-green-800 rounded text-sm">Yes</span>
+                        </div>
+                        <div class="flex justify-between items-center py-2 border-b dark:border-gray-700">
+                            <span>Sarah Johnson</span>
+                            <span class="px-2 py-1 bg-green-100 text-green-800 rounded text-sm">Yes</span>
+                        </div>
+                        <div class="flex justify-between items-center py-2 border-b dark:border-gray-700">
+                            <span>Mike Chen</span>
+                            <span class="px-2 py-1 bg-red-100 text-red-800 rounded text-sm">No</span>
+                        </div>
+                        <div class="flex justify-between items-center py-2 border-b dark:border-gray-700">
+                            <span>Emily Davis</span>
+                            <span class="px-2 py-1 bg-green-100 text-green-800 rounded text-sm">Yes</span>
+                        </div>
+                        <div class="flex justify-between items-center py-2">
+                            <span>James Wilson</span>
+                            <span class="px-2 py-1 bg-gray-100 text-gray-800 rounded text-sm">Abstain</span>
+                        </div>
+                    </div>
+                </div>
+                <div class="bg-green-50 dark:bg-green-900 rounded-lg p-4 text-center">
+                    <p class="text-lg font-bold text-green-800 dark:text-green-200">Motion Passed (3-1-1)</p>
+                </div>
+            </div>
+        `;
+    }
+
+    function closeVoteDetails() {
+        document.getElementById('voteDetailsModal').classList.add('hidden');
+    }
+
+    function exportVotes() {
+        alert('Exporting voting records...');
+    }
+</script>
+{% endblock %}

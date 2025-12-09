@@ -1,0 +1,288 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="space-y-6">
+    <!-- Header -->
+    <div class="flex justify-between items-center">
+        <div>
+            <h1 class="text-2xl font-bold text-gray-900 dark:text-white">Fund Accounting</h1>
+            <p class="text-gray-600 dark:text-gray-400">Multi-fund budget tracking and analysis</p>
+        </div>
+        <div class="flex space-x-3">
+            <select class="px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg dark:bg-gray-700">
+                <option>FY 2024-2025</option>
+                <option>FY 2023-2024</option>
+                <option>FY 2022-2023</option>
+            </select>
+            <button class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">
+                Export Report
+            </button>
+        </div>
+    </div>
+
+    <!-- Summary Cards -->
+    <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+        <div class="bg-white dark:bg-gray-800 rounded-xl shadow p-4">
+            <p class="text-sm text-gray-500 dark:text-gray-400">Total Budget (All Funds)</p>
+            <p class="text-2xl font-bold text-gray-900 dark:text-white">${{ "{:,.0f}".format(summary.total_budget) }}</p>
+        </div>
+        <div class="bg-white dark:bg-gray-800 rounded-xl shadow p-4">
+            <p class="text-sm text-gray-500 dark:text-gray-400">Total Encumbered</p>
+            <p class="text-2xl font-bold text-blue-600">${{ "{:,.0f}".format(summary.total_encumbered) }}</p>
+        </div>
+        <div class="bg-white dark:bg-gray-800 rounded-xl shadow p-4">
+            <p class="text-sm text-gray-500 dark:text-gray-400">Total Expended</p>
+            <p class="text-2xl font-bold text-green-600">${{ "{:,.0f}".format(summary.total_expended) }}</p>
+        </div>
+        <div class="bg-white dark:bg-gray-800 rounded-xl shadow p-4">
+            <p class="text-sm text-gray-500 dark:text-gray-400">Available Balance</p>
+            <p class="text-2xl font-bold text-purple-600">${{ "{:,.0f}".format(summary.available_balance) }}</p>
+        </div>
+    </div>
+
+    <!-- Fund Overview Cards -->
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        {% for fund in funds %}
+        <div class="bg-white dark:bg-gray-800 rounded-xl shadow p-6 border-l-4
+            {% if fund.type == 'General' %}border-l-blue-500
+            {% elif fund.type == 'Capital' %}border-l-green-500
+            {% elif fund.type == 'Grant' %}border-l-purple-500
+            {% elif fund.type == 'Special Revenue' %}border-l-orange-500
+            {% else %}border-l-gray-500{% endif %}">
+            <div class="flex justify-between items-start mb-4">
+                <div>
+                    <h3 class="text-lg font-semibold text-gray-900 dark:text-white">{{ fund.name }}</h3>
+                    <span class="text-xs px-2 py-0.5 rounded
+                        {% if fund.type == 'General' %}bg-blue-100 text-blue-800
+                        {% elif fund.type == 'Capital' %}bg-green-100 text-green-800
+                        {% elif fund.type == 'Grant' %}bg-purple-100 text-purple-800
+                        {% elif fund.type == 'Special Revenue' %}bg-orange-100 text-orange-800
+                        {% else %}bg-gray-100 text-gray-800{% endif %}">
+                        {{ fund.type }}
+                    </span>
+                </div>
+                <span class="px-2 py-1 text-xs rounded-full
+                    {% if fund.restriction == 'Unrestricted' %}bg-green-100 text-green-800
+                    {% elif fund.restriction == 'Restricted' %}bg-red-100 text-red-800
+                    {% else %}bg-yellow-100 text-yellow-800{% endif %}">
+                    {{ fund.restriction }}
+                </span>
+            </div>
+
+            <div class="space-y-3">
+                <div class="flex justify-between text-sm">
+                    <span class="text-gray-600 dark:text-gray-400">Budget</span>
+                    <span class="font-medium text-gray-900 dark:text-white">${{ "{:,.0f}".format(fund.budget) }}</span>
+                </div>
+                <div class="flex justify-between text-sm">
+                    <span class="text-gray-600 dark:text-gray-400">Encumbered</span>
+                    <span class="font-medium text-blue-600">${{ "{:,.0f}".format(fund.encumbered) }}</span>
+                </div>
+                <div class="flex justify-between text-sm">
+                    <span class="text-gray-600 dark:text-gray-400">Expended</span>
+                    <span class="font-medium text-green-600">${{ "{:,.0f}".format(fund.expended) }}</span>
+                </div>
+                <div class="flex justify-between text-sm border-t dark:border-gray-700 pt-2">
+                    <span class="text-gray-600 dark:text-gray-400">Available</span>
+                    <span class="font-semibold {% if fund.available > 0 %}text-purple-600{% else %}text-red-600{% endif %}">${{ "{:,.0f}".format(fund.available) }}</span>
+                </div>
+            </div>
+
+            <!-- Utilization Bar -->
+            <div class="mt-4">
+                <div class="flex justify-between text-xs text-gray-500 dark:text-gray-400 mb-1">
+                    <span>Utilization</span>
+                    <span>{{ "%.1f"|format(fund.utilization_pct) }}%</span>
+                </div>
+                <div class="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
+                    <div class="h-2 rounded-full {% if fund.utilization_pct >= 90 %}bg-red-500{% elif fund.utilization_pct >= 75 %}bg-yellow-500{% else %}bg-green-500{% endif %}" style="width: {{ fund.utilization_pct }}%"></div>
+                </div>
+            </div>
+
+            <div class="mt-4 flex space-x-2">
+                <button class="flex-1 px-3 py-1 text-sm border border-gray-300 dark:border-gray-600 rounded hover:bg-gray-50 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300">
+                    Details
+                </button>
+                <button class="flex-1 px-3 py-1 text-sm border border-gray-300 dark:border-gray-600 rounded hover:bg-gray-50 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300">
+                    Transactions
+                </button>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+
+    <!-- Fund Comparison Chart -->
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <div class="bg-white dark:bg-gray-800 rounded-xl shadow p-6">
+            <h3 class="text-lg font-semibold text-gray-900 dark:text-white mb-4">Fund Balance Distribution</h3>
+            <div id="fundDistributionChart" class="h-64"></div>
+        </div>
+
+        <div class="bg-white dark:bg-gray-800 rounded-xl shadow p-6">
+            <h3 class="text-lg font-semibold text-gray-900 dark:text-white mb-4">Monthly Expenditure Trend</h3>
+            <div id="monthlyExpenditureChart" class="h-64"></div>
+        </div>
+    </div>
+
+    <!-- Interfund Transfers -->
+    <div class="bg-white dark:bg-gray-800 rounded-xl shadow p-6">
+        <div class="flex justify-between items-center mb-4">
+            <h3 class="text-lg font-semibold text-gray-900 dark:text-white">Interfund Transfers</h3>
+            <button class="px-4 py-2 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700">
+                New Transfer
+            </button>
+        </div>
+
+        <div class="overflow-x-auto">
+            <table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+                <thead>
+                    <tr>
+                        <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Date</th>
+                        <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">From Fund</th>
+                        <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">To Fund</th>
+                        <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Amount</th>
+                        <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Purpose</th>
+                        <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Status</th>
+                        <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Approved By</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-gray-200 dark:divide-gray-700">
+                    {% for transfer in interfund_transfers %}
+                    <tr class="hover:bg-gray-50 dark:hover:bg-gray-700">
+                        <td class="px-4 py-3 text-sm text-gray-600 dark:text-gray-400">{{ transfer.date }}</td>
+                        <td class="px-4 py-3 text-sm text-gray-900 dark:text-white">{{ transfer.from_fund }}</td>
+                        <td class="px-4 py-3 text-sm text-gray-900 dark:text-white">{{ transfer.to_fund }}</td>
+                        <td class="px-4 py-3 text-sm font-medium text-gray-900 dark:text-white">${{ "{:,.0f}".format(transfer.amount) }}</td>
+                        <td class="px-4 py-3 text-sm text-gray-600 dark:text-gray-400">{{ transfer.purpose }}</td>
+                        <td class="px-4 py-3">
+                            <span class="px-2 py-1 text-xs rounded-full
+                                {% if transfer.status == 'Completed' %}bg-green-100 text-green-800
+                                {% elif transfer.status == 'Pending' %}bg-yellow-100 text-yellow-800
+                                {% else %}bg-gray-100 text-gray-800{% endif %}">
+                                {{ transfer.status }}
+                            </span>
+                        </td>
+                        <td class="px-4 py-3 text-sm text-gray-600 dark:text-gray-400">{{ transfer.approved_by }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- Fund Balance Alerts -->
+    {% if fund_alerts %}
+    <div class="bg-white dark:bg-gray-800 rounded-xl shadow p-6">
+        <h3 class="text-lg font-semibold text-gray-900 dark:text-white mb-4">Fund Balance Alerts</h3>
+        <div class="space-y-3">
+            {% for alert in fund_alerts %}
+            <div class="p-4 rounded-lg border-l-4
+                {% if alert.severity == 'High' %}bg-red-50 dark:bg-red-900 border-l-red-500
+                {% elif alert.severity == 'Medium' %}bg-yellow-50 dark:bg-yellow-900 border-l-yellow-500
+                {% else %}bg-blue-50 dark:bg-blue-900 border-l-blue-500{% endif %}">
+                <div class="flex justify-between items-start">
+                    <div>
+                        <p class="text-sm font-medium
+                            {% if alert.severity == 'High' %}text-red-800 dark:text-red-200
+                            {% elif alert.severity == 'Medium' %}text-yellow-800 dark:text-yellow-200
+                            {% else %}text-blue-800 dark:text-blue-200{% endif %}">
+                            {{ alert.title }}
+                        </p>
+                        <p class="text-sm mt-1
+                            {% if alert.severity == 'High' %}text-red-600 dark:text-red-300
+                            {% elif alert.severity == 'Medium' %}text-yellow-600 dark:text-yellow-300
+                            {% else %}text-blue-600 dark:text-blue-300{% endif %}">
+                            {{ alert.message }}
+                        </p>
+                    </div>
+                    <span class="text-xs
+                        {% if alert.severity == 'High' %}text-red-500
+                        {% elif alert.severity == 'Medium' %}text-yellow-500
+                        {% else %}text-blue-500{% endif %}">
+                        {{ alert.date }}
+                    </span>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Restricted vs Unrestricted Analysis -->
+    <div class="bg-white dark:bg-gray-800 rounded-xl shadow p-6">
+        <h3 class="text-lg font-semibold text-gray-900 dark:text-white mb-4">Fund Restriction Analysis</h3>
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div>
+                <div id="restrictionChart" class="h-48"></div>
+            </div>
+            <div class="space-y-4">
+                <div class="p-4 bg-green-50 dark:bg-green-900 rounded-lg">
+                    <p class="text-sm text-green-700 dark:text-green-200">Unrestricted Funds</p>
+                    <p class="text-2xl font-bold text-green-800 dark:text-green-100">${{ "{:,.0f}".format(restriction_analysis.unrestricted) }}</p>
+                    <p class="text-xs text-green-600 dark:text-green-300">Available for general operations</p>
+                </div>
+                <div class="p-4 bg-red-50 dark:bg-red-900 rounded-lg">
+                    <p class="text-sm text-red-700 dark:text-red-200">Restricted Funds</p>
+                    <p class="text-2xl font-bold text-red-800 dark:text-red-100">${{ "{:,.0f}".format(restriction_analysis.restricted) }}</p>
+                    <p class="text-xs text-red-600 dark:text-red-300">Must be used for designated purposes</p>
+                </div>
+                <div class="p-4 bg-yellow-50 dark:bg-yellow-900 rounded-lg">
+                    <p class="text-sm text-yellow-700 dark:text-yellow-200">Committed Funds</p>
+                    <p class="text-2xl font-bold text-yellow-800 dark:text-yellow-100">${{ "{:,.0f}".format(restriction_analysis.committed) }}</p>
+                    <p class="text-xs text-yellow-600 dark:text-yellow-300">Board-designated for specific purposes</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    // Fund Distribution Chart
+    Plotly.newPlot('fundDistributionChart', [{
+        values: [{{ funds|map(attribute='budget')|join(', ') }}],
+        labels: [{% for fund in funds %}'{{ fund.name }}'{% if not loop.last %}, {% endif %}{% endfor %}],
+        type: 'pie',
+        hole: 0.4,
+        marker: {
+            colors: ['#3B82F6', '#10B981', '#8B5CF6', '#F59E0B', '#EF4444', '#6B7280']
+        }
+    }], {
+        margin: { t: 20, b: 20, l: 20, r: 20 },
+        paper_bgcolor: 'transparent',
+        showlegend: true,
+        legend: { orientation: 'h', y: -0.2 }
+    }, { responsive: true });
+
+    // Monthly Expenditure Chart
+    Plotly.newPlot('monthlyExpenditureChart', [{
+        x: ['Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'],
+        y: [2500000, 3200000, 2800000, 3100000, 2900000, 3500000],
+        type: 'scatter',
+        mode: 'lines+markers',
+        line: { color: '#3B82F6', width: 3 },
+        marker: { size: 8 }
+    }], {
+        margin: { t: 20, b: 40, l: 70, r: 20 },
+        paper_bgcolor: 'transparent',
+        plot_bgcolor: 'transparent',
+        xaxis: { gridcolor: '#e5e7eb' },
+        yaxis: { gridcolor: '#e5e7eb', tickprefix: '$' }
+    }, { responsive: true });
+
+    // Restriction Chart
+    Plotly.newPlot('restrictionChart', [{
+        values: [{{ restriction_analysis.unrestricted }}, {{ restriction_analysis.restricted }}, {{ restriction_analysis.committed }}],
+        labels: ['Unrestricted', 'Restricted', 'Committed'],
+        type: 'pie',
+        marker: {
+            colors: ['#10B981', '#EF4444', '#F59E0B']
+        }
+    }], {
+        margin: { t: 10, b: 10, l: 10, r: 10 },
+        paper_bgcolor: 'transparent',
+        showlegend: false
+    }, { responsive: true });
+</script>
+{% endblock %}

@@ -1,0 +1,456 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="space-y-6">
+    <!-- Header -->
+    <div class="flex justify-between items-center">
+        <div>
+            <h1 class="text-2xl font-bold text-gray-900 dark:text-white">Grant Management</h1>
+            <p class="text-gray-600 dark:text-gray-400">Federal and state grant tracking, compliance, and reporting</p>
+        </div>
+        <button onclick="openNewGrantModal()" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg flex items-center">
+            <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path>
+            </svg>
+            Add Grant
+        </button>
+    </div>
+
+    <!-- Upcoming Deadlines Alert -->
+    {% if upcoming_deadlines %}
+    <div class="bg-yellow-50 dark:bg-yellow-900 border-l-4 border-yellow-400 p-4 rounded-r-lg">
+        <div class="flex items-start">
+            <svg class="w-5 h-5 text-yellow-400 mt-0.5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+            </svg>
+            <div>
+                <p class="text-yellow-700 dark:text-yellow-200 font-medium">{{ upcoming_deadlines|length }} reporting deadline(s) in the next 30 days</p>
+                <ul class="text-sm text-yellow-600 dark:text-yellow-300 mt-1">
+                    {% for deadline in upcoming_deadlines[:3] %}
+                    <li>{{ deadline.grant_name }}: {{ deadline.report_type }} due {{ deadline.due_date }}</li>
+                    {% endfor %}
+                </ul>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Stats Cards -->
+    <div class="grid grid-cols-1 md:grid-cols-5 gap-4">
+        <div class="bg-white dark:bg-gray-800 rounded-xl shadow p-4">
+            <p class="text-sm text-gray-500 dark:text-gray-400">Active Grants</p>
+            <p class="text-2xl font-bold text-gray-900 dark:text-white">{{ stats.active_grants }}</p>
+        </div>
+        <div class="bg-white dark:bg-gray-800 rounded-xl shadow p-4">
+            <p class="text-sm text-gray-500 dark:text-gray-400">Total Awarded</p>
+            <p class="text-2xl font-bold text-green-600">${{ "{:,.0f}".format(stats.total_awarded) }}</p>
+        </div>
+        <div class="bg-white dark:bg-gray-800 rounded-xl shadow p-4">
+            <p class="text-sm text-gray-500 dark:text-gray-400">Drawn Down</p>
+            <p class="text-2xl font-bold text-blue-600">${{ "{:,.0f}".format(stats.total_drawn) }}</p>
+        </div>
+        <div class="bg-white dark:bg-gray-800 rounded-xl shadow p-4">
+            <p class="text-sm text-gray-500 dark:text-gray-400">Remaining</p>
+            <p class="text-2xl font-bold text-purple-600">${{ "{:,.0f}".format(stats.remaining) }}</p>
+        </div>
+        <div class="bg-white dark:bg-gray-800 rounded-xl shadow p-4">
+            <p class="text-sm text-gray-500 dark:text-gray-400">Match Required</p>
+            <p class="text-2xl font-bold text-orange-600">${{ "{:,.0f}".format(stats.match_required) }}</p>
+        </div>
+    </div>
+
+    <!-- Tabs -->
+    <div class="border-b border-gray-200 dark:border-gray-700">
+        <nav class="flex space-x-8">
+            <button onclick="showTab('overview')" id="tab-overview" class="tab-btn border-b-2 border-blue-500 text-blue-600 dark:text-blue-400 py-4 px-1 font-medium">
+                Grant Overview
+            </button>
+            <button onclick="showTab('deadlines')" id="tab-deadlines" class="tab-btn text-gray-500 hover:text-gray-700 dark:text-gray-400 py-4 px-1 font-medium">
+                Reporting Deadlines
+            </button>
+            <button onclick="showTab('drawdowns')" id="tab-drawdowns" class="tab-btn text-gray-500 hover:text-gray-700 dark:text-gray-400 py-4 px-1 font-medium">
+                Drawdown Schedule
+            </button>
+            <button onclick="showTab('contracts')" id="tab-contracts" class="tab-btn text-gray-500 hover:text-gray-700 dark:text-gray-400 py-4 px-1 font-medium">
+                Grant-Funded Contracts
+            </button>
+        </nav>
+    </div>
+
+    <!-- Grant Overview Tab -->
+    <div id="content-overview" class="tab-content">
+        <div class="space-y-4">
+            {% for grant in grants %}
+            <div class="bg-white dark:bg-gray-800 rounded-xl shadow p-6">
+                <div class="flex justify-between items-start">
+                    <div class="flex-1">
+                        <div class="flex items-center space-x-3">
+                            <span class="px-3 py-1 text-xs font-medium rounded-full
+                                {% if grant.source == 'Federal' %}bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200
+                                {% elif grant.source == 'State' %}bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200
+                                {% else %}bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200{% endif %}">
+                                {{ grant.source }}
+                            </span>
+                            <span class="px-2 py-1 text-xs bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300 rounded">{{ grant.grant_number }}</span>
+                        </div>
+                        <h3 class="mt-2 text-lg font-semibold text-gray-900 dark:text-white">{{ grant.name }}</h3>
+                        <p class="text-sm text-gray-600 dark:text-gray-400">{{ grant.program }}</p>
+
+                        <div class="mt-4 grid grid-cols-2 md:grid-cols-4 gap-4">
+                            <div>
+                                <p class="text-xs text-gray-500 dark:text-gray-400">Award Amount</p>
+                                <p class="text-lg font-semibold text-gray-900 dark:text-white">${{ "{:,.0f}".format(grant.award_amount) }}</p>
+                            </div>
+                            <div>
+                                <p class="text-xs text-gray-500 dark:text-gray-400">Drawn Down</p>
+                                <p class="text-lg font-semibold text-blue-600">${{ "{:,.0f}".format(grant.drawn_amount) }}</p>
+                            </div>
+                            <div>
+                                <p class="text-xs text-gray-500 dark:text-gray-400">Remaining</p>
+                                <p class="text-lg font-semibold text-green-600">${{ "{:,.0f}".format(grant.remaining) }}</p>
+                            </div>
+                            <div>
+                                <p class="text-xs text-gray-500 dark:text-gray-400">Period Ends</p>
+                                <p class="text-lg font-semibold text-gray-900 dark:text-white">{{ grant.end_date }}</p>
+                            </div>
+                        </div>
+
+                        <!-- Utilization Bar -->
+                        <div class="mt-4">
+                            <div class="flex justify-between text-xs text-gray-500 dark:text-gray-400 mb-1">
+                                <span>Utilization</span>
+                                <span>{{ "%.1f"|format(grant.utilization_pct) }}%</span>
+                            </div>
+                            <div class="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-3">
+                                <div class="h-3 rounded-full {% if grant.utilization_pct >= 75 %}bg-green-500{% elif grant.utilization_pct >= 50 %}bg-yellow-500{% else %}bg-red-500{% endif %}" style="width: {{ grant.utilization_pct }}%"></div>
+                            </div>
+                        </div>
+
+                        <!-- Allowable Uses -->
+                        <div class="mt-4">
+                            <p class="text-xs text-gray-500 dark:text-gray-400 mb-2">Allowable Uses</p>
+                            <div class="flex flex-wrap gap-2">
+                                {% for use in grant.allowable_uses %}
+                                <span class="px-2 py-1 text-xs bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded">{{ use }}</span>
+                                {% endfor %}
+                            </div>
+                        </div>
+
+                        <!-- Match Requirement -->
+                        {% if grant.match_required > 0 %}
+                        <div class="mt-4 p-3 bg-orange-50 dark:bg-orange-900 rounded-lg">
+                            <div class="flex justify-between items-center">
+                                <div>
+                                    <p class="text-xs text-orange-700 dark:text-orange-200">Match Requirement ({{ grant.match_percentage }}%)</p>
+                                    <p class="text-sm font-semibold text-orange-800 dark:text-orange-100">${{ "{:,.0f}".format(grant.match_required) }} required</p>
+                                </div>
+                                <div class="text-right">
+                                    <p class="text-xs text-orange-700 dark:text-orange-200">Matched</p>
+                                    <p class="text-sm font-semibold text-orange-800 dark:text-orange-100">${{ "{:,.0f}".format(grant.match_provided) }}</p>
+                                </div>
+                            </div>
+                        </div>
+                        {% endif %}
+                    </div>
+
+                    <div class="flex flex-col space-y-2 ml-4">
+                        <button class="px-4 py-2 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700">
+                            View Details
+                        </button>
+                        <button class="px-4 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300">
+                            Submit Report
+                        </button>
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+
+    <!-- Reporting Deadlines Tab -->
+    <div id="content-deadlines" class="tab-content hidden">
+        <div class="bg-white dark:bg-gray-800 rounded-xl shadow overflow-hidden">
+            <table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+                <thead class="bg-gray-50 dark:bg-gray-700">
+                    <tr>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Due Date</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Grant</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Report Type</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Period</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Status</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Actions</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-gray-200 dark:divide-gray-700">
+                    {% for report in reporting_deadlines %}
+                    <tr class="hover:bg-gray-50 dark:hover:bg-gray-700 {% if report.is_overdue %}bg-red-50 dark:bg-red-900{% endif %}">
+                        <td class="px-6 py-4">
+                            <div class="flex items-center">
+                                {% if report.days_until < 0 %}
+                                <span class="w-2 h-2 bg-red-500 rounded-full mr-2"></span>
+                                {% elif report.days_until <= 7 %}
+                                <span class="w-2 h-2 bg-yellow-500 rounded-full mr-2"></span>
+                                {% else %}
+                                <span class="w-2 h-2 bg-green-500 rounded-full mr-2"></span>
+                                {% endif %}
+                                <span class="text-sm text-gray-900 dark:text-white">{{ report.due_date }}</span>
+                            </div>
+                            {% if report.days_until < 0 %}
+                            <span class="text-xs text-red-600">{{ report.days_until|abs }} days overdue</span>
+                            {% elif report.days_until <= 7 %}
+                            <span class="text-xs text-yellow-600">{{ report.days_until }} days remaining</span>
+                            {% endif %}
+                        </td>
+                        <td class="px-6 py-4 text-sm text-gray-900 dark:text-white">{{ report.grant_name }}</td>
+                        <td class="px-6 py-4 text-sm text-gray-600 dark:text-gray-400">{{ report.report_type }}</td>
+                        <td class="px-6 py-4 text-sm text-gray-600 dark:text-gray-400">{{ report.period }}</td>
+                        <td class="px-6 py-4">
+                            <span class="px-2 py-1 text-xs font-medium rounded-full
+                                {% if report.status == 'Submitted' %}bg-green-100 text-green-800
+                                {% elif report.status == 'In Progress' %}bg-yellow-100 text-yellow-800
+                                {% elif report.status == 'Overdue' %}bg-red-100 text-red-800
+                                {% else %}bg-gray-100 text-gray-800{% endif %}">
+                                {{ report.status }}
+                            </span>
+                        </td>
+                        <td class="px-6 py-4">
+                            <div class="flex space-x-3">
+                                {% if report.status != 'Submitted' %}
+                                <button class="text-blue-600 hover:text-blue-800 text-sm">Start Report</button>
+                                {% else %}
+                                <button class="text-blue-600 hover:text-blue-800 text-sm">View</button>
+                                {% endif %}
+                            </div>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- Drawdown Schedule Tab -->
+    <div id="content-drawdowns" class="tab-content hidden">
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <div class="bg-white dark:bg-gray-800 rounded-xl shadow p-6">
+                <h3 class="text-lg font-semibold text-gray-900 dark:text-white mb-4">Drawdown Timeline</h3>
+                <div id="drawdownChart" class="h-64"></div>
+            </div>
+
+            <div class="bg-white dark:bg-gray-800 rounded-xl shadow p-6">
+                <h3 class="text-lg font-semibold text-gray-900 dark:text-white mb-4">Upcoming Drawdowns</h3>
+                <div class="space-y-3">
+                    {% for drawdown in upcoming_drawdowns %}
+                    <div class="border border-gray-200 dark:border-gray-700 rounded-lg p-3">
+                        <div class="flex justify-between items-start">
+                            <div>
+                                <p class="text-sm font-medium text-gray-900 dark:text-white">{{ drawdown.grant_name }}</p>
+                                <p class="text-xs text-gray-500 dark:text-gray-400">{{ drawdown.description }}</p>
+                            </div>
+                            <div class="text-right">
+                                <p class="text-sm font-semibold text-green-600">${{ "{:,.0f}".format(drawdown.amount) }}</p>
+                                <p class="text-xs text-gray-500 dark:text-gray-400">{{ drawdown.scheduled_date }}</p>
+                            </div>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+
+        <div class="bg-white dark:bg-gray-800 rounded-xl shadow overflow-hidden mt-6">
+            <table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+                <thead class="bg-gray-50 dark:bg-gray-700">
+                    <tr>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Date</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Grant</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Amount</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Purpose</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Status</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-gray-200 dark:divide-gray-700">
+                    {% for drawdown in all_drawdowns %}
+                    <tr class="hover:bg-gray-50 dark:hover:bg-gray-700">
+                        <td class="px-6 py-4 text-sm text-gray-600 dark:text-gray-400">{{ drawdown.date }}</td>
+                        <td class="px-6 py-4 text-sm text-gray-900 dark:text-white">{{ drawdown.grant_name }}</td>
+                        <td class="px-6 py-4 text-sm font-medium text-gray-900 dark:text-white">${{ "{:,.0f}".format(drawdown.amount) }}</td>
+                        <td class="px-6 py-4 text-sm text-gray-600 dark:text-gray-400">{{ drawdown.purpose }}</td>
+                        <td class="px-6 py-4">
+                            <span class="px-2 py-1 text-xs rounded-full
+                                {% if drawdown.status == 'Completed' %}bg-green-100 text-green-800
+                                {% elif drawdown.status == 'Pending' %}bg-yellow-100 text-yellow-800
+                                {% else %}bg-gray-100 text-gray-800{% endif %}">
+                                {{ drawdown.status }}
+                            </span>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- Grant-Funded Contracts Tab -->
+    <div id="content-contracts" class="tab-content hidden">
+        <div class="bg-white dark:bg-gray-800 rounded-xl shadow overflow-hidden">
+            <table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+                <thead class="bg-gray-50 dark:bg-gray-700">
+                    <tr>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Contract</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Grant</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Vendor</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Grant Amount</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Local Match</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Status</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-gray-200 dark:divide-gray-700">
+                    {% for contract in grant_funded_contracts %}
+                    <tr class="hover:bg-gray-50 dark:hover:bg-gray-700">
+                        <td class="px-6 py-4">
+                            <a href="/contract/{{ contract.contract_id }}" class="text-sm font-medium text-blue-600 hover:text-blue-800">{{ contract.title }}</a>
+                        </td>
+                        <td class="px-6 py-4">
+                            <span class="text-sm text-gray-900 dark:text-white">{{ contract.grant_name }}</span>
+                            <span class="block text-xs text-gray-500 dark:text-gray-400">{{ contract.grant_number }}</span>
+                        </td>
+                        <td class="px-6 py-4 text-sm text-gray-600 dark:text-gray-400">{{ contract.vendor_name }}</td>
+                        <td class="px-6 py-4 text-sm font-medium text-gray-900 dark:text-white">${{ "{:,.0f}".format(contract.grant_amount) }}</td>
+                        <td class="px-6 py-4 text-sm text-gray-600 dark:text-gray-400">${{ "{:,.0f}".format(contract.local_match) }}</td>
+                        <td class="px-6 py-4">
+                            <span class="px-2 py-1 text-xs rounded-full
+                                {% if contract.status == 'Active' %}bg-green-100 text-green-800
+                                {% elif contract.status == 'Completed' %}bg-blue-100 text-blue-800
+                                {% else %}bg-gray-100 text-gray-800{% endif %}">
+                                {{ contract.status }}
+                            </span>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<!-- New Grant Modal -->
+<div id="newGrantModal" class="fixed inset-0 bg-black bg-opacity-50 hidden z-50 flex items-center justify-center">
+    <div class="bg-white dark:bg-gray-800 rounded-xl shadow-xl max-w-2xl w-full mx-4 max-h-[90vh] overflow-y-auto">
+        <div class="p-6 border-b dark:border-gray-700">
+            <div class="flex justify-between items-center">
+                <h3 class="text-xl font-semibold text-gray-900 dark:text-white">Add New Grant</h3>
+                <button onclick="closeNewGrantModal()" class="text-gray-400 hover:text-gray-600">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                    </svg>
+                </button>
+            </div>
+        </div>
+        <form class="p-6 space-y-4">
+            <div class="grid grid-cols-2 gap-4">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Grant Source</label>
+                    <select class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg dark:bg-gray-700">
+                        <option>Federal</option>
+                        <option>State</option>
+                        <option>Foundation</option>
+                        <option>Other</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Grant Number</label>
+                    <input type="text" class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg dark:bg-gray-700" placeholder="e.g., ESSER-III-2024">
+                </div>
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Grant Name</label>
+                <input type="text" class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg dark:bg-gray-700" placeholder="e.g., ESSER III - Learning Loss Recovery">
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Program</label>
+                <input type="text" class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg dark:bg-gray-700" placeholder="e.g., Elementary and Secondary School Emergency Relief">
+            </div>
+            <div class="grid grid-cols-2 gap-4">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Award Amount</label>
+                    <input type="number" class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg dark:bg-gray-700" placeholder="0.00">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Match Percentage</label>
+                    <input type="number" class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg dark:bg-gray-700" placeholder="0" max="100">
+                </div>
+            </div>
+            <div class="grid grid-cols-2 gap-4">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Start Date</label>
+                    <input type="date" class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg dark:bg-gray-700">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">End Date</label>
+                    <input type="date" class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg dark:bg-gray-700">
+                </div>
+            </div>
+            <div class="flex justify-end space-x-3 pt-4">
+                <button type="button" onclick="closeNewGrantModal()" class="px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700">
+                    Cancel
+                </button>
+                <button type="submit" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">
+                    Add Grant
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    function showTab(tabName) {
+        document.querySelectorAll('.tab-content').forEach(el => el.classList.add('hidden'));
+        document.querySelectorAll('.tab-btn').forEach(el => {
+            el.classList.remove('border-b-2', 'border-blue-500', 'text-blue-600', 'dark:text-blue-400');
+            el.classList.add('text-gray-500');
+        });
+        document.getElementById('content-' + tabName).classList.remove('hidden');
+        const activeTab = document.getElementById('tab-' + tabName);
+        activeTab.classList.add('border-b-2', 'border-blue-500', 'text-blue-600', 'dark:text-blue-400');
+        activeTab.classList.remove('text-gray-500');
+
+        if (tabName === 'drawdowns') {
+            initDrawdownChart();
+        }
+    }
+
+    function initDrawdownChart() {
+        Plotly.newPlot('drawdownChart', [{
+            x: ['Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec', 'Jan', 'Feb', 'Mar'],
+            y: [150000, 200000, 175000, 225000, 180000, 250000, 200000, 190000, 210000],
+            type: 'bar',
+            marker: { color: '#3B82F6' },
+            name: 'Planned'
+        }, {
+            x: ['Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec', 'Jan', 'Feb', 'Mar'],
+            y: [145000, 195000, 180000, 220000, 175000, 0, 0, 0, 0],
+            type: 'bar',
+            marker: { color: '#10B981' },
+            name: 'Actual'
+        }], {
+            margin: { t: 20, b: 40, l: 60, r: 20 },
+            paper_bgcolor: 'transparent',
+            plot_bgcolor: 'transparent',
+            barmode: 'group',
+            yaxis: { gridcolor: '#e5e7eb' },
+            legend: { orientation: 'h', y: 1.1 }
+        }, { responsive: true });
+    }
+
+    function openNewGrantModal() {
+        document.getElementById('newGrantModal').classList.remove('hidden');
+    }
+
+    function closeNewGrantModal() {
+        document.getElementById('newGrantModal').classList.add('hidden');
+    }
+</script>
+{% endblock %}

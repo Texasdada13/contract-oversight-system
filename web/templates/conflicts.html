@@ -1,0 +1,388 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="space-y-6">
+    <!-- Header -->
+    <div class="flex justify-between items-center">
+        <div>
+            <h1 class="text-2xl font-bold text-gray-900 dark:text-white">Conflict of Interest</h1>
+            <p class="text-gray-600 dark:text-gray-400">Member disclosures, recusals, and vendor relationship tracking</p>
+        </div>
+        <button onclick="openDisclosureModal()" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg flex items-center">
+            <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path>
+            </svg>
+            New Disclosure
+        </button>
+    </div>
+
+    <!-- Alert Banner -->
+    {% if pending_disclosures > 0 %}
+    <div class="bg-yellow-50 dark:bg-yellow-900 border-l-4 border-yellow-400 p-4 rounded-r-lg">
+        <div class="flex items-center">
+            <svg class="w-5 h-5 text-yellow-400 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path>
+            </svg>
+            <div>
+                <p class="text-yellow-700 dark:text-yellow-200 font-medium">{{ pending_disclosures }} member(s) have annual disclosures due this month</p>
+                <a href="#" class="text-yellow-600 dark:text-yellow-300 text-sm underline">Send reminders</a>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Stats Cards -->
+    <div class="grid grid-cols-1 md:grid-cols-5 gap-4">
+        <div class="bg-white dark:bg-gray-800 rounded-xl shadow p-4">
+            <p class="text-sm text-gray-500 dark:text-gray-400">Active Members</p>
+            <p class="text-2xl font-bold text-gray-900 dark:text-white">{{ stats.total_members }}</p>
+        </div>
+        <div class="bg-white dark:bg-gray-800 rounded-xl shadow p-4">
+            <p class="text-sm text-gray-500 dark:text-gray-400">Current Disclosures</p>
+            <p class="text-2xl font-bold text-green-600">{{ stats.current_disclosures }}</p>
+        </div>
+        <div class="bg-white dark:bg-gray-800 rounded-xl shadow p-4">
+            <p class="text-sm text-gray-500 dark:text-gray-400">Pending</p>
+            <p class="text-2xl font-bold text-yellow-600">{{ stats.pending_disclosures }}</p>
+        </div>
+        <div class="bg-white dark:bg-gray-800 rounded-xl shadow p-4">
+            <p class="text-sm text-gray-500 dark:text-gray-400">Recusals This Year</p>
+            <p class="text-2xl font-bold text-blue-600">{{ stats.recusals_count }}</p>
+        </div>
+        <div class="bg-white dark:bg-gray-800 rounded-xl shadow p-4">
+            <p class="text-sm text-gray-500 dark:text-gray-400">Potential Conflicts</p>
+            <p class="text-2xl font-bold text-red-600">{{ stats.potential_conflicts }}</p>
+        </div>
+    </div>
+
+    <!-- Tabs -->
+    <div class="border-b border-gray-200 dark:border-gray-700">
+        <nav class="flex space-x-8">
+            <button onclick="showTab('disclosures')" id="tab-disclosures" class="tab-btn border-b-2 border-blue-500 text-blue-600 dark:text-blue-400 py-4 px-1 font-medium">
+                Financial Disclosures
+            </button>
+            <button onclick="showTab('recusals')" id="tab-recusals" class="tab-btn text-gray-500 hover:text-gray-700 dark:text-gray-400 py-4 px-1 font-medium">
+                Recusal Records
+            </button>
+            <button onclick="showTab('relationships')" id="tab-relationships" class="tab-btn text-gray-500 hover:text-gray-700 dark:text-gray-400 py-4 px-1 font-medium">
+                Vendor Relationships
+            </button>
+            <button onclick="showTab('alerts')" id="tab-alerts" class="tab-btn text-gray-500 hover:text-gray-700 dark:text-gray-400 py-4 px-1 font-medium">
+                Conflict Alerts
+            </button>
+        </nav>
+    </div>
+
+    <!-- Financial Disclosures Tab -->
+    <div id="content-disclosures" class="tab-content">
+        <div class="bg-white dark:bg-gray-800 rounded-xl shadow overflow-hidden">
+            <table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+                <thead class="bg-gray-50 dark:bg-gray-700">
+                    <tr>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Member</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Position</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Last Disclosure</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Next Due</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Status</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Actions</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-gray-200 dark:divide-gray-700">
+                    {% for member in disclosures %}
+                    <tr class="hover:bg-gray-50 dark:hover:bg-gray-700">
+                        <td class="px-6 py-4">
+                            <div class="flex items-center">
+                                <div class="w-10 h-10 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center text-white font-bold mr-3">
+                                    {{ member.initials }}
+                                </div>
+                                <span class="text-sm font-medium text-gray-900 dark:text-white">{{ member.name }}</span>
+                            </div>
+                        </td>
+                        <td class="px-6 py-4 text-sm text-gray-600 dark:text-gray-400">{{ member.position }}</td>
+                        <td class="px-6 py-4 text-sm text-gray-600 dark:text-gray-400">{{ member.last_disclosure }}</td>
+                        <td class="px-6 py-4 text-sm text-gray-600 dark:text-gray-400">{{ member.next_due }}</td>
+                        <td class="px-6 py-4">
+                            <span class="px-2 py-1 text-xs font-medium rounded-full
+                                {% if member.status == 'Current' %}bg-green-100 text-green-800
+                                {% elif member.status == 'Due Soon' %}bg-yellow-100 text-yellow-800
+                                {% else %}bg-red-100 text-red-800{% endif %}">
+                                {{ member.status }}
+                            </span>
+                        </td>
+                        <td class="px-6 py-4 text-sm">
+                            <div class="flex space-x-3">
+                                <a href="#" class="text-blue-600 hover:text-blue-800">View</a>
+                                <a href="#" class="text-blue-600 hover:text-blue-800">Download</a>
+                            </div>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- Recusal Records Tab -->
+    <div id="content-recusals" class="tab-content hidden">
+        <div class="bg-white dark:bg-gray-800 rounded-xl shadow overflow-hidden">
+            <table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+                <thead class="bg-gray-50 dark:bg-gray-700">
+                    <tr>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Date</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Member</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Meeting</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Agenda Item</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Reason</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Related Contract</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-gray-200 dark:divide-gray-700">
+                    {% for recusal in recusals %}
+                    <tr class="hover:bg-gray-50 dark:hover:bg-gray-700">
+                        <td class="px-6 py-4 text-sm text-gray-600 dark:text-gray-400">{{ recusal.date }}</td>
+                        <td class="px-6 py-4">
+                            <div class="flex items-center">
+                                <div class="w-8 h-8 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center text-white text-xs font-bold mr-2">
+                                    {{ recusal.member_initials }}
+                                </div>
+                                <span class="text-sm font-medium text-gray-900 dark:text-white">{{ recusal.member_name }}</span>
+                            </div>
+                        </td>
+                        <td class="px-6 py-4 text-sm text-gray-600 dark:text-gray-400">{{ recusal.meeting }}</td>
+                        <td class="px-6 py-4 text-sm text-gray-900 dark:text-white">{{ recusal.agenda_item }}</td>
+                        <td class="px-6 py-4">
+                            <span class="px-2 py-1 text-xs rounded-full
+                                {% if recusal.reason == 'Financial Interest' %}bg-yellow-100 text-yellow-800
+                                {% elif recusal.reason == 'Family Connection' %}bg-purple-100 text-purple-800
+                                {% elif recusal.reason == 'Business Relationship' %}bg-blue-100 text-blue-800
+                                {% else %}bg-gray-100 text-gray-800{% endif %}">
+                                {{ recusal.reason }}
+                            </span>
+                        </td>
+                        <td class="px-6 py-4">
+                            {% if recusal.contract_id %}
+                            <a href="/contract/{{ recusal.contract_id }}" class="text-sm text-blue-600 hover:text-blue-800">{{ recusal.contract_title }}</a>
+                            {% else %}
+                            <span class="text-sm text-gray-400">N/A</span>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- Vendor Relationships Tab -->
+    <div id="content-relationships" class="tab-content hidden">
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            {% for member in member_relationships %}
+            <div class="bg-white dark:bg-gray-800 rounded-xl shadow p-6">
+                <div class="flex items-center space-x-4 mb-4">
+                    <div class="w-12 h-12 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center text-white text-lg font-bold">
+                        {{ member.initials }}
+                    </div>
+                    <div>
+                        <h3 class="text-lg font-semibold text-gray-900 dark:text-white">{{ member.name }}</h3>
+                        <p class="text-sm text-gray-500 dark:text-gray-400">{{ member.position }}</p>
+                    </div>
+                </div>
+
+                {% if member.relationships %}
+                <div class="space-y-3">
+                    {% for rel in member.relationships %}
+                    <div class="border border-gray-200 dark:border-gray-700 rounded-lg p-3
+                        {% if rel.conflict_level == 'High' %}border-l-4 border-l-red-500
+                        {% elif rel.conflict_level == 'Medium' %}border-l-4 border-l-yellow-500
+                        {% else %}border-l-4 border-l-green-500{% endif %}">
+                        <div class="flex justify-between items-start">
+                            <div>
+                                <p class="text-sm font-medium text-gray-900 dark:text-white">{{ rel.vendor_name }}</p>
+                                <p class="text-xs text-gray-500 dark:text-gray-400">{{ rel.relationship_type }}</p>
+                            </div>
+                            <span class="px-2 py-0.5 text-xs rounded-full
+                                {% if rel.conflict_level == 'High' %}bg-red-100 text-red-800
+                                {% elif rel.conflict_level == 'Medium' %}bg-yellow-100 text-yellow-800
+                                {% else %}bg-green-100 text-green-800{% endif %}">
+                                {{ rel.conflict_level }} Risk
+                            </span>
+                        </div>
+                        {% if rel.active_contracts > 0 %}
+                        <p class="mt-2 text-xs text-gray-500 dark:text-gray-400">
+                            <span class="font-medium text-gray-700 dark:text-gray-300">{{ rel.active_contracts }} active contract(s)</span>
+                            totaling ${{ "{:,.0f}".format(rel.contract_value) }}
+                        </p>
+                        {% endif %}
+                    </div>
+                    {% endfor %}
+                </div>
+                {% else %}
+                <p class="text-sm text-gray-400 italic">No disclosed relationships</p>
+                {% endif %}
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+
+    <!-- Conflict Alerts Tab -->
+    <div id="content-alerts" class="tab-content hidden">
+        <div class="space-y-4">
+            {% for alert in conflict_alerts %}
+            <div class="bg-white dark:bg-gray-800 rounded-xl shadow p-6 border-l-4
+                {% if alert.severity == 'High' %}border-l-red-500
+                {% elif alert.severity == 'Medium' %}border-l-yellow-500
+                {% else %}border-l-blue-500{% endif %}">
+                <div class="flex justify-between items-start">
+                    <div class="flex-1">
+                        <div class="flex items-center space-x-3">
+                            <span class="px-2 py-1 text-xs font-medium rounded-full
+                                {% if alert.severity == 'High' %}bg-red-100 text-red-800
+                                {% elif alert.severity == 'Medium' %}bg-yellow-100 text-yellow-800
+                                {% else %}bg-blue-100 text-blue-800{% endif %}">
+                                {{ alert.severity }} Priority
+                            </span>
+                            <span class="text-sm text-gray-500 dark:text-gray-400">{{ alert.date }}</span>
+                        </div>
+                        <h3 class="mt-2 text-lg font-semibold text-gray-900 dark:text-white">{{ alert.title }}</h3>
+                        <p class="mt-1 text-sm text-gray-600 dark:text-gray-400">{{ alert.description }}</p>
+
+                        <div class="mt-3 flex items-center space-x-4">
+                            <div class="flex items-center">
+                                <div class="w-6 h-6 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center text-white text-xs font-bold mr-2">
+                                    {{ alert.member_initials }}
+                                </div>
+                                <span class="text-sm text-gray-700 dark:text-gray-300">{{ alert.member_name }}</span>
+                            </div>
+                            {% if alert.vendor_name %}
+                            <span class="text-sm text-gray-500 dark:text-gray-400">|</span>
+                            <span class="text-sm text-gray-700 dark:text-gray-300">{{ alert.vendor_name }}</span>
+                            {% endif %}
+                            {% if alert.contract_id %}
+                            <a href="/contract/{{ alert.contract_id }}" class="text-sm text-blue-600 hover:text-blue-800">View Contract</a>
+                            {% endif %}
+                        </div>
+                    </div>
+                    <div class="flex flex-col space-y-2 ml-4">
+                        <button class="px-3 py-1 text-sm bg-blue-600 text-white rounded hover:bg-blue-700">
+                            Review
+                        </button>
+                        <button class="px-3 py-1 text-sm border border-gray-300 dark:border-gray-600 rounded hover:bg-gray-50 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300">
+                            Dismiss
+                        </button>
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+
+            {% if not conflict_alerts %}
+            <div class="bg-green-50 dark:bg-green-900 rounded-xl p-8 text-center">
+                <svg class="w-16 h-16 mx-auto text-green-500 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                </svg>
+                <h3 class="text-xl font-semibold text-green-800 dark:text-green-200">No Active Conflict Alerts</h3>
+                <p class="text-green-600 dark:text-green-300 mt-2">All member-vendor relationships have been reviewed and cleared.</p>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<!-- New Disclosure Modal -->
+<div id="disclosureModal" class="fixed inset-0 bg-black bg-opacity-50 hidden z-50 flex items-center justify-center">
+    <div class="bg-white dark:bg-gray-800 rounded-xl shadow-xl max-w-2xl w-full mx-4 max-h-[90vh] overflow-y-auto">
+        <div class="p-6 border-b dark:border-gray-700">
+            <div class="flex justify-between items-center">
+                <h3 class="text-xl font-semibold text-gray-900 dark:text-white">New Financial Disclosure</h3>
+                <button onclick="closeDisclosureModal()" class="text-gray-400 hover:text-gray-600">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                    </svg>
+                </button>
+            </div>
+        </div>
+        <form class="p-6 space-y-4">
+            <div>
+                <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Member</label>
+                <select class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg dark:bg-gray-700">
+                    {% for member in all_members %}
+                    <option value="{{ member.id }}">{{ member.name }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Disclosure Type</label>
+                <select class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg dark:bg-gray-700">
+                    <option>Annual Financial Disclosure</option>
+                    <option>Business Interest Declaration</option>
+                    <option>Real Property Disclosure</option>
+                    <option>Family Member Employment</option>
+                    <option>Other Financial Interest</option>
+                </select>
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Related Vendor (if applicable)</label>
+                <select class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg dark:bg-gray-700">
+                    <option value="">None</option>
+                    {% for vendor in vendors %}
+                    <option value="{{ vendor.vendor_id }}">{{ vendor.name }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Relationship Description</label>
+                <textarea rows="3" class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg dark:bg-gray-700" placeholder="Describe the nature of the financial interest or relationship..."></textarea>
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Upload Documentation</label>
+                <div class="mt-1 flex justify-center px-6 pt-5 pb-6 border-2 border-gray-300 dark:border-gray-600 border-dashed rounded-lg">
+                    <div class="space-y-1 text-center">
+                        <svg class="mx-auto h-12 w-12 text-gray-400" stroke="currentColor" fill="none" viewBox="0 0 48 48">
+                            <path d="M28 8H12a4 4 0 00-4 4v20m32-12v8m0 0v8a4 4 0 01-4 4H12a4 4 0 01-4-4v-4m32-4l-3.172-3.172a4 4 0 00-5.656 0L28 28M8 32l9.172-9.172a4 4 0 015.656 0L28 28m0 0l4 4m4-24h8m-4-4v8m-12 4h.02" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+                        </svg>
+                        <div class="text-sm text-gray-600 dark:text-gray-400">
+                            <label class="relative cursor-pointer rounded-md font-medium text-blue-600 hover:text-blue-500">
+                                <span>Upload a file</span>
+                                <input type="file" class="sr-only">
+                            </label>
+                            <p class="pl-1">or drag and drop</p>
+                        </div>
+                        <p class="text-xs text-gray-500">PDF, DOC up to 10MB</p>
+                    </div>
+                </div>
+            </div>
+            <div class="flex justify-end space-x-3 pt-4">
+                <button type="button" onclick="closeDisclosureModal()" class="px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700">
+                    Cancel
+                </button>
+                <button type="submit" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">
+                    Submit Disclosure
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    function showTab(tabName) {
+        document.querySelectorAll('.tab-content').forEach(el => el.classList.add('hidden'));
+        document.querySelectorAll('.tab-btn').forEach(el => {
+            el.classList.remove('border-b-2', 'border-blue-500', 'text-blue-600', 'dark:text-blue-400');
+            el.classList.add('text-gray-500');
+        });
+        document.getElementById('content-' + tabName).classList.remove('hidden');
+        const activeTab = document.getElementById('tab-' + tabName);
+        activeTab.classList.add('border-b-2', 'border-blue-500', 'text-blue-600', 'dark:text-blue-400');
+        activeTab.classList.remove('text-gray-500');
+    }
+
+    function openDisclosureModal() {
+        document.getElementById('disclosureModal').classList.remove('hidden');
+    }
+
+    function closeDisclosureModal() {
+        document.getElementById('disclosureModal').classList.add('hidden');
+    }
+</script>
+{% endblock %}

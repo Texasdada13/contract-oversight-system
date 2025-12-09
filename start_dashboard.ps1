@@ -150,4 +150,4 @@ if ($AutoOpenBrowser) {
 
 # Run the Flask app with the selected port
 $env:FLASK_RUN_PORT = $Port
-python -c "from app import app; app.run(debug=True, port=$Port)"
+python -c "from app import app; app.run(debug=True, host='127.0.0.1', port=$Port)"
