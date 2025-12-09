@@ -2523,6 +2523,62 @@ def school_board_page():
 
 
 # ==========================
+# COUNTY COMPARISON
+# ==========================
+
+@app.route('/county-comparison')
+def county_comparison_page():
+    """County comparison dashboard."""
+    # Get comparison data
+    comparison_data = db.get_county_comparison_data()
+    peer_counties = db.get_peer_counties()
+
+    # Get Marion County local data for comparison
+    marion_contracts = current_contracts[
+        current_contracts['vendor_id'].str.startswith('MC-', na=False) |
+        current_contracts['vendor_id'].str.startswith('MCSD-', na=False)
+    ] if current_contracts is not None and not current_contracts.empty else pd.DataFrame()
+
+    local_stats = {
+        'total_contracts': len(marion_contracts),
+        'total_value': float(marion_contracts['current_amount'].sum()) if not marion_contracts.empty else 0,
+        'school_contracts': len(marion_contracts[marion_contracts['vendor_id'].str.startswith('MCSD-', na=False)]) if not marion_contracts.empty else 0,
+        'school_value': float(marion_contracts[marion_contracts['vendor_id'].str.startswith('MCSD-', na=False)]['current_amount'].sum()) if not marion_contracts.empty else 0,
+        'county_contracts': len(marion_contracts[marion_contracts['vendor_id'].str.startswith('MC-', na=False)]) if not marion_contracts.empty else 0,
+        'county_value': float(marion_contracts[marion_contracts['vendor_id'].str.startswith('MC-', na=False)]['current_amount'].sum()) if not marion_contracts.empty else 0,
+    }
+
+    return render_template('county_comparison.html',
+                          comparison_data=comparison_data,
+                          peer_counties=peer_counties,
+                          local_stats=local_stats,
+                          title='County Comparison')
+
+
+@app.route('/api/county-comparison')
+def api_county_comparison():
+    """API endpoint for county comparison data."""
+    fiscal_year = request.args.get('fiscal_year')
+    comparison_data = db.get_county_comparison_data(fiscal_year)
+    return jsonify(comparison_data)
+
+
+@app.route('/api/counties')
+def api_counties():
+    """API endpoint for list of counties."""
+    counties = db.get_peer_counties()
+    return jsonify(counties)
+
+
+@app.route('/api/county/<county_id>/fiscal')
+def api_county_fiscal(county_id):
+    """API endpoint for a county's fiscal data."""
+    fiscal_year = request.args.get('fiscal_year')
+    fiscal_data = db.get_county_fiscal_data(county_id, fiscal_year)
+    return jsonify(fiscal_data)
+
+
+# ==========================
 # TEMPLATE CONTEXT
 # ==========================
 

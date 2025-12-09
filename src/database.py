@@ -6,7 +6,7 @@ SQLite database for contract, vendor, and spending management.
 import sqlite3
 import json
 import logging
-from datetime import datetime
+from datetime import datetime, date
 from pathlib import Path
 from typing import Dict, List, Any, Optional
 import pandas as pd
@@ -355,6 +355,88 @@ class DatabaseManager:
             )
         ''')
 
+        # Counties table for peer comparison
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS counties (
+                county_id TEXT PRIMARY KEY,
+                county_name TEXT NOT NULL,
+                state TEXT DEFAULT 'FL',
+                population INTEGER,
+                population_year INTEGER,
+                median_income REAL,
+                land_area_sq_miles REAL,
+                is_peer_county INTEGER DEFAULT 0,
+                is_home_county INTEGER DEFAULT 0,
+                region TEXT,
+                county_type TEXT,
+                notes TEXT,
+                created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+                updated_at TEXT DEFAULT CURRENT_TIMESTAMP
+            )
+        ''')
+
+        # County Fiscal Data table (from Florida EDR)
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS county_fiscal_data (
+                fiscal_data_id INTEGER PRIMARY KEY AUTOINCREMENT,
+                county_id TEXT NOT NULL,
+                fiscal_year TEXT NOT NULL,
+                data_source TEXT DEFAULT 'Florida EDR',
+
+                -- Revenue categories
+                total_revenue REAL DEFAULT 0,
+                property_tax_revenue REAL DEFAULT 0,
+                sales_tax_revenue REAL DEFAULT 0,
+                intergovernmental_revenue REAL DEFAULT 0,
+                charges_for_services REAL DEFAULT 0,
+                other_revenue REAL DEFAULT 0,
+
+                -- Expenditure categories (mapped to Florida EDR categories)
+                total_expenditures REAL DEFAULT 0,
+                general_government REAL DEFAULT 0,
+                public_safety REAL DEFAULT 0,
+                physical_environment REAL DEFAULT 0,
+                transportation REAL DEFAULT 0,
+                economic_environment REAL DEFAULT 0,
+                human_services REAL DEFAULT 0,
+                culture_recreation REAL DEFAULT 0,
+                court_related REAL DEFAULT 0,
+                debt_service REAL DEFAULT 0,
+
+                -- Per capita metrics
+                expenditures_per_capita REAL DEFAULT 0,
+                revenue_per_capita REAL DEFAULT 0,
+
+                -- School district data (separate from county but tracked together)
+                school_district_expenditures REAL DEFAULT 0,
+                school_capital_projects REAL DEFAULT 0,
+                school_operations REAL DEFAULT 0,
+
+                created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+                updated_at TEXT DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (county_id) REFERENCES counties(county_id),
+                UNIQUE(county_id, fiscal_year)
+            )
+        ''')
+
+        # County Comparison Metrics view/cache
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS county_comparison_metrics (
+                metric_id INTEGER PRIMARY KEY AUTOINCREMENT,
+                county_id TEXT NOT NULL,
+                fiscal_year TEXT NOT NULL,
+                metric_category TEXT NOT NULL,
+                metric_name TEXT NOT NULL,
+                metric_value REAL,
+                metric_unit TEXT,
+                rank_among_peers INTEGER,
+                percentile REAL,
+                notes TEXT,
+                created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (county_id) REFERENCES counties(county_id)
+            )
+        ''')
+
         # Create indexes
         cursor.execute('CREATE INDEX IF NOT EXISTS idx_contracts_vendor ON contracts(vendor_id)')
         cursor.execute('CREATE INDEX IF NOT EXISTS idx_contracts_status ON contracts(status)')
@@ -363,6 +445,8 @@ class DatabaseManager:
         cursor.execute('CREATE INDEX IF NOT EXISTS idx_milestones_contract ON milestones(contract_id)')
         cursor.execute('CREATE INDEX IF NOT EXISTS idx_change_orders_contract ON change_orders(contract_id)')
         cursor.execute('CREATE INDEX IF NOT EXISTS idx_audit_record ON audit_log(table_name, record_id)')
+        cursor.execute('CREATE INDEX IF NOT EXISTS idx_county_fiscal_county ON county_fiscal_data(county_id)')
+        cursor.execute('CREATE INDEX IF NOT EXISTS idx_county_fiscal_year ON county_fiscal_data(fiscal_year)')
 
         conn.commit()
         conn.close()
@@ -1122,6 +1206,260 @@ class DatabaseManager:
 
         conn.commit()
         conn.close()
+
+    # ==================
+    # COUNTY COMPARISON
+    # ==================
+
+    def save_county(self, data: Dict) -> bool:
+        """Save or update a county."""
+        conn = self._get_connection()
+        cursor = conn.cursor()
+
+        county_id = data.get('county_id')
+        if not county_id:
+            return False
+
+        cursor.execute("SELECT * FROM counties WHERE county_id = ?", (county_id,))
+        existing = cursor.fetchone()
+
+        data['updated_at'] = datetime.now().isoformat()
+
+        if existing:
+            fields = [f"{k} = ?" for k in data.keys() if k != 'county_id']
+            values = [v for k, v in data.items() if k != 'county_id']
+            values.append(county_id)
+            cursor.execute(f"UPDATE counties SET {', '.join(fields)} WHERE county_id = ?", values)
+        else:
+            data['created_at'] = datetime.now().isoformat()
+            fields = list(data.keys())
+            placeholders = ', '.join(['?' for _ in fields])
+            cursor.execute(f"INSERT INTO counties ({', '.join(fields)}) VALUES ({placeholders})", list(data.values()))
+
+        conn.commit()
+        conn.close()
+        return True
+
+    def get_county(self, county_id: str) -> Optional[Dict]:
+        """Get a county by ID."""
+        conn = self._get_connection()
+        cursor = conn.cursor()
+        cursor.execute("SELECT * FROM counties WHERE county_id = ?", (county_id,))
+        row = cursor.fetchone()
+        conn.close()
+        return dict(row) if row else None
+
+    def get_all_counties(self) -> List[Dict]:
+        """Get all counties."""
+        conn = self._get_connection()
+        cursor = conn.cursor()
+        cursor.execute("SELECT * FROM counties ORDER BY population DESC")
+        rows = cursor.fetchall()
+        conn.close()
+        return [dict(row) for row in rows]
+
+    def get_peer_counties(self) -> List[Dict]:
+        """Get peer counties for comparison."""
+        conn = self._get_connection()
+        cursor = conn.cursor()
+        cursor.execute("""
+            SELECT * FROM counties
+            WHERE is_peer_county = 1 OR is_home_county = 1
+            ORDER BY population DESC
+        """)
+        rows = cursor.fetchall()
+        conn.close()
+        return [dict(row) for row in rows]
+
+    def save_county_fiscal_data(self, data: Dict) -> bool:
+        """Save or update county fiscal data."""
+        conn = self._get_connection()
+        cursor = conn.cursor()
+
+        county_id = data.get('county_id')
+        fiscal_year = data.get('fiscal_year')
+
+        if not county_id or not fiscal_year:
+            return False
+
+        # Check if exists
+        cursor.execute("""
+            SELECT * FROM county_fiscal_data
+            WHERE county_id = ? AND fiscal_year = ?
+        """, (county_id, fiscal_year))
+        existing = cursor.fetchone()
+
+        data['updated_at'] = datetime.now().isoformat()
+
+        if existing:
+            fields = [f"{k} = ?" for k in data.keys() if k not in ('county_id', 'fiscal_year', 'fiscal_data_id')]
+            values = [v for k, v in data.items() if k not in ('county_id', 'fiscal_year', 'fiscal_data_id')]
+            values.extend([county_id, fiscal_year])
+            cursor.execute(f"""
+                UPDATE county_fiscal_data
+                SET {', '.join(fields)}
+                WHERE county_id = ? AND fiscal_year = ?
+            """, values)
+        else:
+            data['created_at'] = datetime.now().isoformat()
+            fields = list(data.keys())
+            placeholders = ', '.join(['?' for _ in fields])
+            cursor.execute(f"""
+                INSERT INTO county_fiscal_data ({', '.join(fields)})
+                VALUES ({placeholders})
+            """, list(data.values()))
+
+        conn.commit()
+        conn.close()
+        return True
+
+    def get_county_fiscal_data(self, county_id: str, fiscal_year: str = None) -> List[Dict]:
+        """Get fiscal data for a county."""
+        conn = self._get_connection()
+        cursor = conn.cursor()
+
+        if fiscal_year:
+            cursor.execute("""
+                SELECT * FROM county_fiscal_data
+                WHERE county_id = ? AND fiscal_year = ?
+            """, (county_id, fiscal_year))
+        else:
+            cursor.execute("""
+                SELECT * FROM county_fiscal_data
+                WHERE county_id = ?
+                ORDER BY fiscal_year DESC
+            """, (county_id,))
+
+        rows = cursor.fetchall()
+        conn.close()
+        return [dict(row) for row in rows]
+
+    def get_county_comparison_data(self, fiscal_year: str = None) -> Dict:
+        """Get comparison data for all peer counties."""
+        conn = self._get_connection()
+        cursor = conn.cursor()
+
+        # Get the most recent fiscal year if not specified
+        if not fiscal_year:
+            cursor.execute("""
+                SELECT MAX(fiscal_year) FROM county_fiscal_data
+            """)
+            result = cursor.fetchone()
+            fiscal_year = result[0] if result and result[0] else '2023'
+
+        # Get all peer counties with their fiscal data
+        cursor.execute("""
+            SELECT c.*, f.*
+            FROM counties c
+            LEFT JOIN county_fiscal_data f ON c.county_id = f.county_id AND f.fiscal_year = ?
+            WHERE c.is_peer_county = 1 OR c.is_home_county = 1
+            ORDER BY c.population DESC
+        """, (fiscal_year,))
+        rows = cursor.fetchall()
+        conn.close()
+
+        counties = []
+        for row in rows:
+            county_data = dict(row)
+            counties.append(county_data)
+
+        # Calculate rankings and percentiles
+        metrics_to_rank = [
+            'total_expenditures', 'expenditures_per_capita',
+            'general_government', 'public_safety', 'transportation',
+            'school_district_expenditures', 'school_capital_projects'
+        ]
+
+        for metric in metrics_to_rank:
+            values = [(c['county_id'], c.get(metric, 0) or 0) for c in counties]
+            values.sort(key=lambda x: x[1], reverse=True)
+            for rank, (county_id, value) in enumerate(values, 1):
+                for c in counties:
+                    if c['county_id'] == county_id:
+                        c[f'{metric}_rank'] = rank
+
+        return {
+            'fiscal_year': fiscal_year,
+            'counties': counties,
+            'home_county': next((c for c in counties if c.get('is_home_county')), None),
+            'peer_count': len(counties)
+        }
+
+    def initialize_peer_counties(self) -> bool:
+        """Initialize peer counties for Marion County comparison."""
+        # Marion County and its recommended peer counties
+        counties_data = [
+            {
+                'county_id': 'marion',
+                'county_name': 'Marion County',
+                'state': 'FL',
+                'population': 385000,
+                'population_year': 2023,
+                'median_income': 47500,
+                'land_area_sq_miles': 1579,
+                'is_peer_county': 0,
+                'is_home_county': 1,
+                'region': 'North Central',
+                'county_type': 'Mixed Urban/Rural'
+            },
+            {
+                'county_id': 'lake',
+                'county_name': 'Lake County',
+                'state': 'FL',
+                'population': 400000,
+                'population_year': 2023,
+                'median_income': 52000,
+                'land_area_sq_miles': 938,
+                'is_peer_county': 1,
+                'is_home_county': 0,
+                'region': 'Central',
+                'county_type': 'Suburban/Rural'
+            },
+            {
+                'county_id': 'volusia',
+                'county_name': 'Volusia County',
+                'state': 'FL',
+                'population': 550000,
+                'population_year': 2023,
+                'median_income': 51000,
+                'land_area_sq_miles': 1101,
+                'is_peer_county': 1,
+                'is_home_county': 0,
+                'region': 'East Central',
+                'county_type': 'Mixed Urban/Suburban'
+            },
+            {
+                'county_id': 'alachua',
+                'county_name': 'Alachua County',
+                'state': 'FL',
+                'population': 285000,
+                'population_year': 2023,
+                'median_income': 48500,
+                'land_area_sq_miles': 875,
+                'is_peer_county': 1,
+                'is_home_county': 0,
+                'region': 'North Central',
+                'county_type': 'University Town'
+            },
+            {
+                'county_id': 'stjohns',
+                'county_name': 'St. Johns County',
+                'state': 'FL',
+                'population': 280000,
+                'population_year': 2023,
+                'median_income': 78000,
+                'land_area_sq_miles': 601,
+                'is_peer_county': 1,
+                'is_home_county': 0,
+                'region': 'Northeast',
+                'county_type': 'Fast-Growing Suburban'
+            }
+        ]
+
+        for county in counties_data:
+            self.save_county(county)
+
+        return True
 
     # ==================
     # STATISTICS

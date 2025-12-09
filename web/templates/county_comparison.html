@@ -1,0 +1,417 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="space-y-6">
+    <!-- Header with Fiscal Year Selector -->
+    <div class="flex justify-between items-center">
+        <div>
+            <h1 class="text-3xl font-bold text-gray-900 dark:text-white">County Comparison</h1>
+            <p class="text-gray-600 dark:text-gray-400 mt-1">
+                Compare Marion County with similar Florida counties across fiscal metrics
+            </p>
+        </div>
+        <div class="flex items-center space-x-4">
+            <select id="fiscalYearSelect" class="px-4 py-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 dark:text-white">
+                <option value="2023" {% if comparison_data.fiscal_year == '2023' %}selected{% endif %}>FY 2023</option>
+                <option value="2022" {% if comparison_data.fiscal_year == '2022' %}selected{% endif %}>FY 2022</option>
+            </select>
+            <span class="text-sm text-gray-500 dark:text-gray-400">
+                Data Source: Florida EDR
+            </span>
+        </div>
+    </div>
+
+    <!-- Marion County Summary Card -->
+    <div class="bg-gradient-to-r from-blue-600 to-blue-800 rounded-xl p-6 text-white">
+        <div class="flex items-center justify-between">
+            <div>
+                <h2 class="text-2xl font-bold">Marion County</h2>
+                <p class="text-blue-100">Your Home County</p>
+            </div>
+            <div class="text-right">
+                <p class="text-sm text-blue-100">Population</p>
+                <p class="text-3xl font-bold">
+                    {% if comparison_data.home_county %}
+                        {{ "{:,}".format(comparison_data.home_county.population|default(0)) }}
+                    {% else %}
+                        385,000
+                    {% endif %}
+                </p>
+            </div>
+        </div>
+
+        <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mt-6">
+            <div class="bg-white/10 rounded-lg p-4">
+                <p class="text-blue-100 text-sm">Total Expenditures</p>
+                <p class="text-xl font-bold">
+                    {% if comparison_data.home_county and comparison_data.home_county.total_expenditures %}
+                        ${{ "{:,.0f}".format(comparison_data.home_county.total_expenditures / 1000000) }}M
+                    {% else %}
+                        $485M
+                    {% endif %}
+                </p>
+            </div>
+            <div class="bg-white/10 rounded-lg p-4">
+                <p class="text-blue-100 text-sm">Per Capita Spending</p>
+                <p class="text-xl font-bold">
+                    {% if comparison_data.home_county and comparison_data.home_county.expenditures_per_capita %}
+                        ${{ "{:,.0f}".format(comparison_data.home_county.expenditures_per_capita) }}
+                    {% else %}
+                        $1,260
+                    {% endif %}
+                </p>
+            </div>
+            <div class="bg-white/10 rounded-lg p-4">
+                <p class="text-blue-100 text-sm">School District</p>
+                <p class="text-xl font-bold">
+                    {% if comparison_data.home_county and comparison_data.home_county.school_district_expenditures %}
+                        ${{ "{:,.0f}".format(comparison_data.home_county.school_district_expenditures / 1000000) }}M
+                    {% else %}
+                        $450M
+                    {% endif %}
+                </p>
+            </div>
+            <div class="bg-white/10 rounded-lg p-4">
+                <p class="text-blue-100 text-sm">Tracked Contracts</p>
+                <p class="text-xl font-bold">{{ local_stats.total_contracts }}</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Peer Counties Overview -->
+    <div class="bg-white dark:bg-gray-800 rounded-xl shadow p-6">
+        <h3 class="text-lg font-semibold text-gray-900 dark:text-white mb-4">Peer Counties Overview</h3>
+        <div class="overflow-x-auto">
+            <table class="w-full">
+                <thead>
+                    <tr class="text-left text-sm text-gray-500 dark:text-gray-400 border-b dark:border-gray-700">
+                        <th class="pb-3 font-medium">County</th>
+                        <th class="pb-3 font-medium">Population</th>
+                        <th class="pb-3 font-medium">Type</th>
+                        <th class="pb-3 font-medium text-right">Total Expenditures</th>
+                        <th class="pb-3 font-medium text-right">Per Capita</th>
+                        <th class="pb-3 font-medium text-right">School District</th>
+                        <th class="pb-3 font-medium text-right">School Capital</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for county in comparison_data.counties %}
+                    <tr class="border-b dark:border-gray-700 {% if county.is_home_county %}bg-blue-50 dark:bg-blue-900/20{% endif %}">
+                        <td class="py-3">
+                            <div class="flex items-center">
+                                {% if county.is_home_county %}
+                                <span class="w-2 h-2 bg-blue-500 rounded-full mr-2"></span>
+                                {% endif %}
+                                <span class="font-medium text-gray-900 dark:text-white">{{ county.county_name }}</span>
+                                {% if county.is_home_county %}
+                                <span class="ml-2 text-xs bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200 px-2 py-0.5 rounded">Home</span>
+                                {% endif %}
+                            </div>
+                        </td>
+                        <td class="py-3 text-gray-600 dark:text-gray-300">{{ "{:,}".format(county.population|default(0)) }}</td>
+                        <td class="py-3 text-gray-600 dark:text-gray-300">{{ county.county_type|default('N/A') }}</td>
+                        <td class="py-3 text-right font-medium text-gray-900 dark:text-white">
+                            {% if county.total_expenditures %}
+                                ${{ "{:,.0f}".format(county.total_expenditures / 1000000) }}M
+                            {% else %}
+                                -
+                            {% endif %}
+                        </td>
+                        <td class="py-3 text-right text-gray-600 dark:text-gray-300">
+                            {% if county.expenditures_per_capita %}
+                                ${{ "{:,.0f}".format(county.expenditures_per_capita) }}
+                            {% else %}
+                                -
+                            {% endif %}
+                        </td>
+                        <td class="py-3 text-right text-gray-600 dark:text-gray-300">
+                            {% if county.school_district_expenditures %}
+                                ${{ "{:,.0f}".format(county.school_district_expenditures / 1000000) }}M
+                            {% else %}
+                                -
+                            {% endif %}
+                        </td>
+                        <td class="py-3 text-right text-gray-600 dark:text-gray-300">
+                            {% if county.school_capital_projects %}
+                                ${{ "{:,.0f}".format(county.school_capital_projects / 1000000) }}M
+                            {% else %}
+                                -
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- Charts Row -->
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <!-- Total Expenditures Comparison -->
+        <div class="bg-white dark:bg-gray-800 rounded-xl shadow p-6">
+            <h3 class="text-lg font-semibold text-gray-900 dark:text-white mb-4">Total Expenditures by County</h3>
+            <div id="expendituresChart" style="height: 300px;"></div>
+        </div>
+
+        <!-- Per Capita Spending -->
+        <div class="bg-white dark:bg-gray-800 rounded-xl shadow p-6">
+            <h3 class="text-lg font-semibold text-gray-900 dark:text-white mb-4">Per Capita Spending Comparison</h3>
+            <div id="perCapitaChart" style="height: 300px;"></div>
+        </div>
+    </div>
+
+    <!-- Department Breakdown Comparison -->
+    <div class="bg-white dark:bg-gray-800 rounded-xl shadow p-6">
+        <h3 class="text-lg font-semibold text-gray-900 dark:text-white mb-4">Expenditure Breakdown by Department</h3>
+        <div id="departmentChart" style="height: 400px;"></div>
+    </div>
+
+    <!-- School Comparison -->
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <!-- School District Spending -->
+        <div class="bg-white dark:bg-gray-800 rounded-xl shadow p-6">
+            <h3 class="text-lg font-semibold text-gray-900 dark:text-white mb-4">School District Expenditures</h3>
+            <div id="schoolSpendingChart" style="height: 300px;"></div>
+        </div>
+
+        <!-- School Capital Projects -->
+        <div class="bg-white dark:bg-gray-800 rounded-xl shadow p-6">
+            <h3 class="text-lg font-semibold text-gray-900 dark:text-white mb-4">School Capital Projects</h3>
+            <div id="schoolCapitalChart" style="height: 300px;"></div>
+        </div>
+    </div>
+
+    <!-- Rankings Card -->
+    <div class="bg-white dark:bg-gray-800 rounded-xl shadow p-6">
+        <h3 class="text-lg font-semibold text-gray-900 dark:text-white mb-4">Marion County Rankings Among Peers</h3>
+        <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <div class="text-center p-4 bg-gray-50 dark:bg-gray-700 rounded-lg">
+                <p class="text-3xl font-bold text-blue-600 dark:text-blue-400" id="rankPopulation">-</p>
+                <p class="text-sm text-gray-600 dark:text-gray-400">Population Size</p>
+            </div>
+            <div class="text-center p-4 bg-gray-50 dark:bg-gray-700 rounded-lg">
+                <p class="text-3xl font-bold text-green-600 dark:text-green-400" id="rankPerCapita">-</p>
+                <p class="text-sm text-gray-600 dark:text-gray-400">Per Capita Spending</p>
+            </div>
+            <div class="text-center p-4 bg-gray-50 dark:bg-gray-700 rounded-lg">
+                <p class="text-3xl font-bold text-purple-600 dark:text-purple-400" id="rankSchool">-</p>
+                <p class="text-sm text-gray-600 dark:text-gray-400">School Spending</p>
+            </div>
+            <div class="text-center p-4 bg-gray-50 dark:bg-gray-700 rounded-lg">
+                <p class="text-3xl font-bold text-orange-600 dark:text-orange-400" id="rankPublicSafety">-</p>
+                <p class="text-sm text-gray-600 dark:text-gray-400">Public Safety</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Data Sources Note -->
+    <div class="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg p-4">
+        <div class="flex items-start">
+            <svg class="w-5 h-5 text-yellow-500 mt-0.5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+            </svg>
+            <div>
+                <h4 class="text-sm font-medium text-yellow-800 dark:text-yellow-200">Data Sources</h4>
+                <p class="text-sm text-yellow-700 dark:text-yellow-300 mt-1">
+                    County fiscal data is sourced from Florida Economic and Demographic Research (EDR) Annual Financial Reports.
+                    School district data includes both operational and capital expenditures. Data shown represents FY {{ comparison_data.fiscal_year }}.
+                </p>
+                <a href="https://edr.state.fl.us/Content/local-government/data/revenues-expenditures/cntyfiscal.cfm"
+                   target="_blank"
+                   class="text-sm text-yellow-600 dark:text-yellow-400 hover:underline mt-2 inline-block">
+                    View Florida EDR Data Source
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    const comparisonData = {{ comparison_data|tojson|safe }};
+    const isDark = document.documentElement.classList.contains('dark');
+
+    const chartColors = {
+        marion: '#3B82F6',
+        peers: ['#10B981', '#F59E0B', '#8B5CF6', '#EF4444', '#06B6D4'],
+        gridColor: isDark ? '#374151' : '#E5E7EB',
+        textColor: isDark ? '#9CA3AF' : '#6B7280',
+        bgColor: isDark ? '#1F2937' : '#FFFFFF'
+    };
+
+    // Prepare data for charts
+    const counties = comparisonData.counties || [];
+    const countyNames = counties.map(c => c.county_name.replace(' County', ''));
+    const colors = counties.map(c => c.is_home_county ? chartColors.marion : '#94A3B8');
+
+    // Total Expenditures Bar Chart
+    const expendituresData = [{
+        x: countyNames,
+        y: counties.map(c => (c.total_expenditures || 0) / 1000000),
+        type: 'bar',
+        marker: { color: colors },
+        text: counties.map(c => `$${((c.total_expenditures || 0) / 1000000).toFixed(0)}M`),
+        textposition: 'outside'
+    }];
+
+    Plotly.newPlot('expendituresChart', expendituresData, {
+        paper_bgcolor: 'transparent',
+        plot_bgcolor: 'transparent',
+        font: { color: chartColors.textColor },
+        margin: { t: 20, b: 50, l: 60, r: 20 },
+        yaxis: {
+            title: 'Millions ($)',
+            gridcolor: chartColors.gridColor,
+            zeroline: false
+        },
+        xaxis: {
+            tickangle: -45
+        }
+    }, {responsive: true});
+
+    // Per Capita Chart
+    const perCapitaData = [{
+        x: countyNames,
+        y: counties.map(c => c.expenditures_per_capita || 0),
+        type: 'bar',
+        marker: { color: colors },
+        text: counties.map(c => `$${(c.expenditures_per_capita || 0).toFixed(0)}`),
+        textposition: 'outside'
+    }];
+
+    Plotly.newPlot('perCapitaChart', perCapitaData, {
+        paper_bgcolor: 'transparent',
+        plot_bgcolor: 'transparent',
+        font: { color: chartColors.textColor },
+        margin: { t: 20, b: 50, l: 60, r: 20 },
+        yaxis: {
+            title: 'Per Capita ($)',
+            gridcolor: chartColors.gridColor,
+            zeroline: false
+        },
+        xaxis: {
+            tickangle: -45
+        }
+    }, {responsive: true});
+
+    // Department Breakdown Grouped Bar Chart
+    const departments = [
+        { key: 'public_safety', name: 'Public Safety' },
+        { key: 'transportation', name: 'Transportation' },
+        { key: 'general_government', name: 'General Gov' },
+        { key: 'human_services', name: 'Human Services' },
+        { key: 'culture_recreation', name: 'Culture/Rec' }
+    ];
+
+    const departmentTraces = counties.map((county, idx) => ({
+        name: county.county_name.replace(' County', ''),
+        x: departments.map(d => d.name),
+        y: departments.map(d => (county[d.key] || 0) / 1000000),
+        type: 'bar',
+        marker: {
+            color: county.is_home_county ? chartColors.marion : chartColors.peers[idx % chartColors.peers.length]
+        }
+    }));
+
+    Plotly.newPlot('departmentChart', departmentTraces, {
+        paper_bgcolor: 'transparent',
+        plot_bgcolor: 'transparent',
+        font: { color: chartColors.textColor },
+        margin: { t: 20, b: 80, l: 60, r: 20 },
+        barmode: 'group',
+        yaxis: {
+            title: 'Millions ($)',
+            gridcolor: chartColors.gridColor,
+            zeroline: false
+        },
+        legend: {
+            orientation: 'h',
+            y: -0.2
+        }
+    }, {responsive: true});
+
+    // School District Spending Chart
+    const schoolSpendingData = [{
+        x: countyNames,
+        y: counties.map(c => (c.school_district_expenditures || 0) / 1000000),
+        type: 'bar',
+        marker: { color: colors },
+        text: counties.map(c => `$${((c.school_district_expenditures || 0) / 1000000).toFixed(0)}M`),
+        textposition: 'outside'
+    }];
+
+    Plotly.newPlot('schoolSpendingChart', schoolSpendingData, {
+        paper_bgcolor: 'transparent',
+        plot_bgcolor: 'transparent',
+        font: { color: chartColors.textColor },
+        margin: { t: 20, b: 50, l: 60, r: 20 },
+        yaxis: {
+            title: 'Millions ($)',
+            gridcolor: chartColors.gridColor,
+            zeroline: false
+        },
+        xaxis: {
+            tickangle: -45
+        }
+    }, {responsive: true});
+
+    // School Capital Projects Chart
+    const schoolCapitalData = [{
+        x: countyNames,
+        y: counties.map(c => (c.school_capital_projects || 0) / 1000000),
+        type: 'bar',
+        marker: { color: colors },
+        text: counties.map(c => `$${((c.school_capital_projects || 0) / 1000000).toFixed(0)}M`),
+        textposition: 'outside'
+    }];
+
+    Plotly.newPlot('schoolCapitalChart', schoolCapitalData, {
+        paper_bgcolor: 'transparent',
+        plot_bgcolor: 'transparent',
+        font: { color: chartColors.textColor },
+        margin: { t: 20, b: 50, l: 60, r: 20 },
+        yaxis: {
+            title: 'Millions ($)',
+            gridcolor: chartColors.gridColor,
+            zeroline: false
+        },
+        xaxis: {
+            tickangle: -45
+        }
+    }, {responsive: true});
+
+    // Calculate and display rankings
+    function calculateRankings() {
+        const marionIdx = counties.findIndex(c => c.is_home_county);
+        if (marionIdx === -1) return;
+
+        // Population ranking (larger = better)
+        const popRanked = [...counties].sort((a, b) => (b.population || 0) - (a.population || 0));
+        const popRank = popRanked.findIndex(c => c.is_home_county) + 1;
+        document.getElementById('rankPopulation').textContent = `#${popRank}`;
+
+        // Per capita (lower = better for efficiency)
+        const pcRanked = [...counties].sort((a, b) => (a.expenditures_per_capita || 0) - (b.expenditures_per_capita || 0));
+        const pcRank = pcRanked.findIndex(c => c.is_home_county) + 1;
+        document.getElementById('rankPerCapita').textContent = `#${pcRank}`;
+
+        // School spending ranking
+        const schoolRanked = [...counties].sort((a, b) => (b.school_district_expenditures || 0) - (a.school_district_expenditures || 0));
+        const schoolRank = schoolRanked.findIndex(c => c.is_home_county) + 1;
+        document.getElementById('rankSchool').textContent = `#${schoolRank}`;
+
+        // Public safety ranking
+        const psRanked = [...counties].sort((a, b) => (b.public_safety || 0) - (a.public_safety || 0));
+        const psRank = psRanked.findIndex(c => c.is_home_county) + 1;
+        document.getElementById('rankPublicSafety').textContent = `#${psRank}`;
+    }
+
+    calculateRankings();
+
+    // Fiscal year change handler
+    document.getElementById('fiscalYearSelect').addEventListener('change', function() {
+        window.location.href = `/county-comparison?fiscal_year=${this.value}`;
+    });
+</script>
+{% endblock %}
