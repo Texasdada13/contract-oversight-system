@@ -2435,6 +2435,66 @@ def constituent_portal_page():
 
 
 # ==========================
+# SCHOOL BOARD VIEW
+# ==========================
+
+@app.route('/school-board')
+def school_board_page():
+    """Marion County School Board focused view - capital projects and facilities."""
+    global current_contracts
+
+    if current_contracts is None:
+        load_data()
+
+    # Filter for School District contracts (MCSD prefix)
+    df = current_contracts.copy() if current_contracts is not None else pd.DataFrame()
+
+    if not df.empty:
+        # Filter for school district contracts (vendor_id starts with MCSD)
+        df = df[df['vendor_id'].str.startswith('MCSD', na=False)]
+
+    contracts = df.to_dict('records') if not df.empty else []
+
+    # Calculate summary stats
+    total_projects = len(df) if not df.empty else 0
+    total_budget = float(df['current_amount'].sum()) if not df.empty else 0
+    funded_amount = float(df[df['status'] == 'Active']['current_amount'].sum()) if not df.empty else 0
+    proposed_amount = float(df[df['status'] == 'Proposed']['current_amount'].sum()) if not df.empty else 0
+    planning_amount = float(df[df['status'] == 'Planning']['current_amount'].sum()) if not df.empty else 0
+
+    # Group by project type
+    type_distribution = df['contract_type'].value_counts().to_dict() if not df.empty and 'contract_type' in df.columns else {}
+
+    # Group by status
+    status_distribution = df['status'].value_counts().to_dict() if not df.empty and 'status' in df.columns else {}
+
+    # Get top projects by value
+    top_projects = df.nlargest(10, 'current_amount').to_dict('records') if not df.empty and len(df) > 0 else []
+
+    # Calculate 5-year projections from fiscal_year data
+    yearly_spending = {}
+    if not df.empty and 'fiscal_year' in df.columns:
+        for _, row in df.iterrows():
+            fy = str(row.get('fiscal_year', 'Unknown'))
+            if fy not in yearly_spending:
+                yearly_spending[fy] = 0
+            yearly_spending[fy] += row.get('current_amount', 0)
+
+    return render_template('school_board.html',
+                          contracts=contracts,
+                          total_projects=total_projects,
+                          total_budget=total_budget,
+                          funded_amount=funded_amount,
+                          proposed_amount=proposed_amount,
+                          planning_amount=planning_amount,
+                          type_distribution=type_distribution,
+                          status_distribution=status_distribution,
+                          top_projects=top_projects,
+                          yearly_spending=yearly_spending,
+                          title='School Board - Capital Projects')
+
+
+# ==========================
 # TEMPLATE CONTEXT
 # ==========================
 

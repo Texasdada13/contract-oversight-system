@@ -1,0 +1,283 @@
+{% extends "base.html" %}
+
+{% block content %}
+<!-- Page Header -->
+<div class="flex flex-col md:flex-row md:items-center md:justify-between mb-6">
+    <div>
+        <h1 class="text-2xl font-bold text-gray-800 dark:text-white">Marion County School Board</h1>
+        <p class="text-gray-500 dark:text-gray-400">Capital Projects & Facilities Work Plan</p>
+    </div>
+    <div class="mt-4 md:mt-0 flex space-x-3">
+        <a href="{{ url_for('contracts_list') }}" class="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 flex items-center">
+            <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+            </svg>
+            All Contracts
+        </a>
+    </div>
+</div>
+
+<!-- Summary Cards -->
+<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-6">
+    <div class="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
+        <div class="flex items-center justify-between">
+            <div>
+                <p class="text-sm text-gray-500 dark:text-gray-400">Total Projects</p>
+                <p class="text-3xl font-bold text-gray-800 dark:text-white">{{ total_projects }}</p>
+            </div>
+            <div class="p-3 bg-blue-100 dark:bg-blue-900 rounded-full">
+                <svg class="w-6 h-6 text-blue-600 dark:text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"></path>
+                </svg>
+            </div>
+        </div>
+        <p class="text-sm text-gray-500 dark:text-gray-400 mt-2">From 5-Year Work Plan</p>
+    </div>
+
+    <div class="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
+        <div class="flex items-center justify-between">
+            <div>
+                <p class="text-sm text-gray-500 dark:text-gray-400">Total Budget</p>
+                <p class="text-3xl font-bold text-gray-800 dark:text-white">${{ '{:,.0f}'.format(total_budget / 1000000) }}M</p>
+            </div>
+            <div class="p-3 bg-green-100 dark:bg-green-900 rounded-full">
+                <svg class="w-6 h-6 text-green-600 dark:text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                </svg>
+            </div>
+        </div>
+        <p class="text-sm text-gray-500 dark:text-gray-400 mt-2">5-Year Capital Plan</p>
+    </div>
+
+    <div class="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
+        <div class="flex items-center justify-between">
+            <div>
+                <p class="text-sm text-gray-500 dark:text-gray-400">Funded Projects</p>
+                <p class="text-3xl font-bold text-green-600 dark:text-green-400">${{ '{:,.0f}'.format(funded_amount / 1000000) }}M</p>
+            </div>
+            <div class="p-3 bg-green-100 dark:bg-green-900 rounded-full">
+                <svg class="w-6 h-6 text-green-600 dark:text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                </svg>
+            </div>
+        </div>
+        <p class="text-sm text-gray-500 dark:text-gray-400 mt-2">Active/Approved</p>
+    </div>
+
+    <div class="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
+        <div class="flex items-center justify-between">
+            <div>
+                <p class="text-sm text-gray-500 dark:text-gray-400">Proposed/Unfunded</p>
+                <p class="text-3xl font-bold text-yellow-600 dark:text-yellow-400">${{ '{:,.0f}'.format((proposed_amount + planning_amount) / 1000000) }}M</p>
+            </div>
+            <div class="p-3 bg-yellow-100 dark:bg-yellow-900 rounded-full">
+                <svg class="w-6 h-6 text-yellow-600 dark:text-yellow-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                </svg>
+            </div>
+        </div>
+        <p class="text-sm text-gray-500 dark:text-gray-400 mt-2">Future Funding Needed</p>
+    </div>
+</div>
+
+<!-- Charts Row -->
+<div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+    <!-- Project Type Distribution -->
+    <div class="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
+        <h3 class="text-lg font-semibold text-gray-800 dark:text-white mb-4">Projects by Type</h3>
+        <div id="typeChart" class="h-64"></div>
+    </div>
+
+    <!-- Status Distribution -->
+    <div class="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
+        <h3 class="text-lg font-semibold text-gray-800 dark:text-white mb-4">Funding Status</h3>
+        <div id="statusChart" class="h-64"></div>
+    </div>
+</div>
+
+<!-- Top Projects -->
+<div class="bg-white dark:bg-gray-800 rounded-lg shadow mb-6">
+    <div class="p-6 border-b dark:border-gray-700">
+        <h3 class="text-lg font-semibold text-gray-800 dark:text-white">Top Capital Projects by Value</h3>
+    </div>
+    <div class="overflow-x-auto">
+        <table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+            <thead class="bg-gray-50 dark:bg-gray-700">
+                <tr>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Project</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Type</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Status</th>
+                    <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Budget</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Fiscal Year</th>
+                </tr>
+            </thead>
+            <tbody class="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
+                {% for project in top_projects %}
+                <tr class="hover:bg-gray-50 dark:hover:bg-gray-700">
+                    <td class="px-6 py-4">
+                        <a href="{{ url_for('contract_detail', contract_id=project.contract_id) }}" class="text-blue-600 hover:text-blue-800 dark:text-blue-400 font-medium">
+                            {{ project.title }}
+                        </a>
+                        <p class="text-sm text-gray-500 dark:text-gray-400">{{ project.description[:100] }}{% if project.description|length > 100 %}...{% endif %}</p>
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap">
+                        <span class="px-2 py-1 text-xs rounded-full
+                            {% if project.contract_type == 'New Construction' %}bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200
+                            {% elif project.contract_type == 'HVAC' %}bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200
+                            {% elif project.contract_type == 'Renovation' %}bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-200
+                            {% elif project.contract_type == 'Debt Service' %}bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-200
+                            {% else %}bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200{% endif %}">
+                            {{ project.contract_type }}
+                        </span>
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap">
+                        <span class="px-2 py-1 text-xs rounded-full
+                            {% if project.status == 'Active' %}bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200
+                            {% elif project.status == 'Proposed' %}bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200
+                            {% elif project.status == 'Planning' %}bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200
+                            {% else %}bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-200{% endif %}">
+                            {{ project.status }}
+                        </span>
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap text-right font-medium text-gray-800 dark:text-white">
+                        ${{ '{:,.0f}'.format(project.current_amount) }}
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap text-gray-500 dark:text-gray-400">
+                        FY {{ project.fiscal_year }}
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- All Projects List -->
+<div class="bg-white dark:bg-gray-800 rounded-lg shadow">
+    <div class="p-6 border-b dark:border-gray-700">
+        <div class="flex items-center justify-between">
+            <h3 class="text-lg font-semibold text-gray-800 dark:text-white">All School Board Projects ({{ contracts|length }})</h3>
+            <div class="flex space-x-2">
+                <select id="typeFilter" onchange="filterProjects()" class="px-3 py-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 dark:text-white text-sm">
+                    <option value="">All Types</option>
+                    {% for type, count in type_distribution.items() %}
+                    <option value="{{ type }}">{{ type }} ({{ count }})</option>
+                    {% endfor %}
+                </select>
+                <select id="statusFilter" onchange="filterProjects()" class="px-3 py-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 dark:text-white text-sm">
+                    <option value="">All Statuses</option>
+                    {% for status, count in status_distribution.items() %}
+                    <option value="{{ status }}">{{ status }} ({{ count }})</option>
+                    {% endfor %}
+                </select>
+            </div>
+        </div>
+    </div>
+    <div class="overflow-x-auto">
+        <table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700" id="projectsTable">
+            <thead class="bg-gray-50 dark:bg-gray-700">
+                <tr>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Project</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Type</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Status</th>
+                    <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Budget</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Timeline</th>
+                </tr>
+            </thead>
+            <tbody class="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
+                {% for contract in contracts %}
+                <tr class="hover:bg-gray-50 dark:hover:bg-gray-700 project-row" data-type="{{ contract.contract_type }}" data-status="{{ contract.status }}">
+                    <td class="px-6 py-4">
+                        <a href="{{ url_for('contract_detail', contract_id=contract.contract_id) }}" class="text-blue-600 hover:text-blue-800 dark:text-blue-400 font-medium">
+                            {{ contract.title }}
+                        </a>
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap">
+                        <span class="text-sm text-gray-600 dark:text-gray-300">{{ contract.contract_type }}</span>
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap">
+                        <span class="px-2 py-1 text-xs rounded-full
+                            {% if contract.status == 'Active' %}bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200
+                            {% elif contract.status == 'Proposed' %}bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200
+                            {% elif contract.status == 'Planning' %}bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200
+                            {% else %}bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-200{% endif %}">
+                            {{ contract.status }}
+                        </span>
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap text-right font-medium text-gray-800 dark:text-white">
+                        ${{ '{:,.0f}'.format(contract.current_amount) }}
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap text-gray-500 dark:text-gray-400">
+                        {{ contract.start_date }} - {{ contract.current_end_date }}
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<script>
+// Project Type Chart
+const typeData = {{ type_distribution | tojson }};
+const typeLabels = Object.keys(typeData);
+const typeValues = Object.values(typeData);
+
+Plotly.newPlot('typeChart', [{
+    type: 'pie',
+    labels: typeLabels,
+    values: typeValues,
+    hole: 0.4,
+    marker: {
+        colors: ['#3B82F6', '#8B5CF6', '#F59E0B', '#10B981', '#EF4444', '#6B7280']
+    }
+}], {
+    margin: { t: 20, b: 20, l: 20, r: 20 },
+    showlegend: true,
+    legend: { orientation: 'h', y: -0.1 },
+    paper_bgcolor: 'transparent',
+    plot_bgcolor: 'transparent',
+    font: { color: document.documentElement.classList.contains('dark') ? '#fff' : '#333' }
+});
+
+// Status Chart
+const statusData = {{ status_distribution | tojson }};
+const statusLabels = Object.keys(statusData);
+const statusValues = Object.values(statusData);
+const statusColors = statusLabels.map(s => {
+    if (s === 'Active') return '#10B981';
+    if (s === 'Proposed') return '#F59E0B';
+    if (s === 'Planning') return '#3B82F6';
+    return '#6B7280';
+});
+
+Plotly.newPlot('statusChart', [{
+    type: 'bar',
+    x: statusLabels,
+    y: statusValues,
+    marker: { color: statusColors }
+}], {
+    margin: { t: 20, b: 40, l: 40, r: 20 },
+    paper_bgcolor: 'transparent',
+    plot_bgcolor: 'transparent',
+    font: { color: document.documentElement.classList.contains('dark') ? '#fff' : '#333' },
+    xaxis: { gridcolor: 'rgba(128,128,128,0.2)' },
+    yaxis: { gridcolor: 'rgba(128,128,128,0.2)' }
+});
+
+// Filter function
+function filterProjects() {
+    const typeFilter = document.getElementById('typeFilter').value;
+    const statusFilter = document.getElementById('statusFilter').value;
+    const rows = document.querySelectorAll('.project-row');
+
+    rows.forEach(row => {
+        const type = row.dataset.type;
+        const status = row.dataset.status;
+        const matchType = !typeFilter || type === typeFilter;
+        const matchStatus = !statusFilter || status === statusFilter;
+        row.style.display = matchType && matchStatus ? '' : 'none';
+    });
+}
+</script>
+{% endblock %}
