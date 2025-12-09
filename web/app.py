@@ -208,6 +208,7 @@ def contract_detail(contract_id):
 
     # Get related data
     milestones = db.get_milestones(contract_id)
+    milestone_stats = db.get_milestone_stats(contract_id)
     change_orders = db.get_change_orders(contract_id)
     payments = db.get_payments(contract_id)
     comments = db.get_comments(contract_id)
@@ -234,6 +235,7 @@ def contract_detail(contract_id):
     return render_template('contract_detail.html',
                           contract=contract,
                           milestones=milestones,
+                          milestone_stats=milestone_stats,
                           change_orders=change_orders,
                           payments=payments,
                           comments=comments,
@@ -525,6 +527,28 @@ def api_add_milestone(contract_id):
     data['contract_id'] = contract_id
     milestone_id = db.add_milestone(data)
     return jsonify({'success': True, 'milestone_id': milestone_id})
+
+
+@app.route('/api/contract/<contract_id>/milestones/stats')
+def api_milestone_stats(contract_id):
+    """Get milestone statistics for a contract."""
+    stats = db.get_milestone_stats(contract_id)
+    return jsonify(stats)
+
+
+@app.route('/api/milestone/<int:milestone_id>', methods=['PUT'])
+def api_update_milestone(milestone_id):
+    """Update a milestone."""
+    data = request.get_json()
+    success = db.update_milestone(milestone_id, data)
+    return jsonify({'success': success})
+
+
+@app.route('/api/milestone/<int:milestone_id>', methods=['DELETE'])
+def api_delete_milestone(milestone_id):
+    """Delete a milestone."""
+    success = db.delete_milestone(milestone_id)
+    return jsonify({'success': success})
 
 
 @app.route('/api/contract/<contract_id>/change-orders')
@@ -2480,6 +2504,9 @@ def school_board_page():
                 yearly_spending[fy] = 0
             yearly_spending[fy] += row.get('current_amount', 0)
 
+    # Get aggregated milestone stats for MCSD contracts
+    milestone_stats = db.get_aggregated_milestone_stats('MCSD')
+
     return render_template('school_board.html',
                           contracts=contracts,
                           total_projects=total_projects,
@@ -2491,6 +2518,7 @@ def school_board_page():
                           status_distribution=status_distribution,
                           top_projects=top_projects,
                           yearly_spending=yearly_spending,
+                          milestone_stats=milestone_stats,
                           title='School Board - Capital Projects')
 
 

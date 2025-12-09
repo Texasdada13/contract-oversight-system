@@ -175,17 +175,23 @@ class DatabaseManager:
                 milestone_number INTEGER,
                 title TEXT NOT NULL,
                 description TEXT,
+                planned_start_date TEXT,
                 due_date TEXT,
+                actual_start_date TEXT,
                 completed_date TEXT,
                 status TEXT DEFAULT 'Pending',
+                percent_complete REAL DEFAULT 0,
                 payment_amount REAL DEFAULT 0,
                 payment_status TEXT DEFAULT 'Not Due',
                 deliverable_type TEXT,
+                responsible_party TEXT,
+                blockers TEXT,
                 verification_required INTEGER DEFAULT 1,
                 verified_by TEXT,
                 verified_date TEXT,
                 notes TEXT,
                 created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+                updated_at TEXT DEFAULT CURRENT_TIMESTAMP,
                 FOREIGN KEY (contract_id) REFERENCES contracts(contract_id)
             )
         ''')
@@ -594,6 +600,7 @@ class DatabaseManager:
         conn = self._get_connection()
         cursor = conn.cursor()
 
+        data['updated_at'] = datetime.now().isoformat()
         fields = [f"{k} = ?" for k in data.keys()]
         values = list(data.values())
         values.append(milestone_id)
@@ -602,6 +609,193 @@ class DatabaseManager:
         conn.commit()
         conn.close()
         return True
+
+    def delete_milestone(self, milestone_id: int) -> bool:
+        """Delete a milestone."""
+        conn = self._get_connection()
+        cursor = conn.cursor()
+        cursor.execute("DELETE FROM milestones WHERE milestone_id = ?", (milestone_id,))
+        conn.commit()
+        conn.close()
+        return True
+
+    def get_milestone_stats(self, contract_id: str) -> Dict:
+        """Get milestone statistics for a contract."""
+        conn = self._get_connection()
+        cursor = conn.cursor()
+
+        stats = {}
+
+        # Total milestones
+        cursor.execute("SELECT COUNT(*) FROM milestones WHERE contract_id = ?", (contract_id,))
+        stats['total'] = cursor.fetchone()[0]
+
+        # By status
+        cursor.execute("""
+            SELECT status, COUNT(*) FROM milestones
+            WHERE contract_id = ?
+            GROUP BY status
+        """, (contract_id,))
+        status_counts = {row[0]: row[1] for row in cursor.fetchall()}
+        stats['completed'] = status_counts.get('Completed', 0)
+        stats['in_progress'] = status_counts.get('In Progress', 0)
+        stats['pending'] = status_counts.get('Pending', 0)
+        stats['delayed'] = status_counts.get('Delayed', 0)
+
+        # Overall progress
+        if stats['total'] > 0:
+            cursor.execute("""
+                SELECT AVG(percent_complete) FROM milestones WHERE contract_id = ?
+            """, (contract_id,))
+            stats['avg_progress'] = cursor.fetchone()[0] or 0
+        else:
+            stats['avg_progress'] = 0
+
+        # Overdue milestones
+        cursor.execute("""
+            SELECT COUNT(*) FROM milestones
+            WHERE contract_id = ? AND due_date < date('now') AND status NOT IN ('Completed')
+        """, (contract_id,))
+        stats['overdue'] = cursor.fetchone()[0]
+
+        # Next milestone due
+        cursor.execute("""
+            SELECT title, due_date FROM milestones
+            WHERE contract_id = ? AND status NOT IN ('Completed') AND due_date >= date('now')
+            ORDER BY due_date ASC LIMIT 1
+        """, (contract_id,))
+        next_milestone = cursor.fetchone()
+        if next_milestone:
+            stats['next_milestone'] = {'title': next_milestone[0], 'due_date': next_milestone[1]}
+        else:
+            stats['next_milestone'] = None
+
+        conn.close()
+        return stats
+
+    def get_all_milestones_with_contracts(self, vendor_id: str = None) -> List[Dict]:
+        """Get all milestones with contract info, optionally filtered by vendor."""
+        conn = self._get_connection()
+        cursor = conn.cursor()
+
+        query = """
+            SELECT m.*, c.title as contract_title, c.vendor_id, c.vendor_name, c.status as contract_status
+            FROM milestones m
+            JOIN contracts c ON m.contract_id = c.contract_id
+            WHERE c.is_deleted = 0
+        """
+        params = []
+
+        if vendor_id:
+            query += " AND c.vendor_id = ?"
+            params.append(vendor_id)
+
+        query += " ORDER BY m.due_date ASC"
+
+        cursor.execute(query, params)
+        rows = cursor.fetchall()
+        conn.close()
+        return [dict(row) for row in rows]
+
+    def get_aggregated_milestone_stats(self, vendor_prefix: str = None) -> Dict:
+        """Get aggregated milestone statistics across multiple contracts, optionally filtered by vendor prefix."""
+        conn = self._get_connection()
+        cursor = conn.cursor()
+
+        base_query = """
+            SELECT m.*, c.title as contract_title, c.vendor_id, c.contract_id
+            FROM milestones m
+            JOIN contracts c ON m.contract_id = c.contract_id
+            WHERE c.is_deleted = 0
+        """
+        params = []
+
+        if vendor_prefix:
+            base_query += " AND c.vendor_id LIKE ?"
+            params.append(f"{vendor_prefix}%")
+
+        cursor.execute(base_query, params)
+        milestones = [dict(row) for row in cursor.fetchall()]
+        conn.close()
+
+        if not milestones:
+            return {
+                'total': 0,
+                'completed': 0,
+                'in_progress': 0,
+                'pending': 0,
+                'delayed': 0,
+                'overdue': 0,
+                'avg_progress': 0,
+                'upcoming': [],
+                'overdue_list': [],
+                'by_contract': {}
+            }
+
+        today = date.today().isoformat()
+        total = len(milestones)
+        completed = sum(1 for m in milestones if m.get('status') == 'Completed')
+        in_progress = sum(1 for m in milestones if m.get('status') == 'In Progress')
+        pending = sum(1 for m in milestones if m.get('status') == 'Pending')
+        delayed = sum(1 for m in milestones if m.get('status') == 'Delayed')
+
+        # Calculate overdue
+        overdue = sum(1 for m in milestones
+                     if m.get('due_date') and m.get('due_date') < today
+                     and m.get('status') not in ('Completed',))
+
+        # Average progress
+        progress_values = [m.get('percent_complete', 0) or 0 for m in milestones]
+        avg_progress = sum(progress_values) / len(progress_values) if progress_values else 0
+
+        # Upcoming milestones (next 7 due within 30 days)
+        upcoming = sorted(
+            [m for m in milestones
+             if m.get('due_date') and m.get('due_date') >= today and m.get('status') != 'Completed'],
+            key=lambda x: x.get('due_date', '9999')
+        )[:7]
+
+        # Overdue milestones
+        overdue_list = sorted(
+            [m for m in milestones
+             if m.get('due_date') and m.get('due_date') < today and m.get('status') != 'Completed'],
+            key=lambda x: x.get('due_date', '0000')
+        )
+
+        # Stats by contract
+        by_contract = {}
+        for m in milestones:
+            cid = m.get('contract_id')
+            if cid not in by_contract:
+                by_contract[cid] = {
+                    'contract_title': m.get('contract_title'),
+                    'total': 0,
+                    'completed': 0,
+                    'progress': []
+                }
+            by_contract[cid]['total'] += 1
+            if m.get('status') == 'Completed':
+                by_contract[cid]['completed'] += 1
+            by_contract[cid]['progress'].append(m.get('percent_complete', 0) or 0)
+
+        # Calculate average progress per contract
+        for cid in by_contract:
+            progress = by_contract[cid]['progress']
+            by_contract[cid]['avg_progress'] = sum(progress) / len(progress) if progress else 0
+            del by_contract[cid]['progress']
+
+        return {
+            'total': total,
+            'completed': completed,
+            'in_progress': in_progress,
+            'pending': pending,
+            'delayed': delayed,
+            'overdue': overdue,
+            'avg_progress': avg_progress,
+            'upcoming': upcoming,
+            'overdue_list': overdue_list,
+            'by_contract': by_contract
+        }
 
     # ==================
     # PAYMENTS
