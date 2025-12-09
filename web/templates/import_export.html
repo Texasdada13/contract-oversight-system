@@ -649,13 +649,11 @@
     // Export functions
     function exportToExcel() {
         showNotification('Generating Excel export...', 'info');
-        setTimeout(() => {
-            showNotification('Excel export ready for download', 'success');
-        }, 1500);
+        window.location.href = '/api/export/excel';
     }
 
     function exportToPDF() {
-        window.open('/report/portfolio', '_blank');
+        window.open('/api/export/pdf', '_blank');
     }
 
     function exportToJSON() {

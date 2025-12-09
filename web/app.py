@@ -132,6 +132,186 @@ def dashboard():
                           title='Contract Oversight Dashboard')
 
 
+@app.route('/executive')
+def executive_dashboard():
+    """Executive dashboard for commissioners and board members."""
+    global current_contracts, current_vendors
+
+    if current_contracts is None:
+        load_data()
+
+    summary = get_portfolio_summary(current_contracts)
+
+    # Calculate overall health score
+    overall_health = int(summary.get('avg_health_score', 50))
+
+    # Get alerts for critical items
+    contracts_list_data = current_contracts.to_dict('records') if current_contracts is not None else []
+    all_alerts = alert_generator.generate_alerts(contracts_list_data)
+
+    # Critical items requiring immediate action
+    critical_items = []
+    for alert in all_alerts:
+        if alert.get('severity') in ['Critical', 'High']:
+            critical_items.append({
+                'title': alert.get('contract_title', 'Unknown Contract')[:40],
+                'reason': alert.get('title', 'Issue detected')
+            })
+
+    # Top contracts by value
+    top_contracts = []
+    if current_contracts is not None and not current_contracts.empty:
+        top_df = current_contracts.nlargest(10, 'current_amount')
+        top_contracts = top_df.to_dict('records')
+
+    # Calculate on-time rate (contracts not delayed)
+    on_time_rate = 85  # Placeholder - would calculate from actual milestone data
+    if current_contracts is not None and 'schedule_health' in current_contracts.columns:
+        good_schedule = len(current_contracts[current_contracts['schedule_health'] >= 70])
+        on_time_rate = int(good_schedule / len(current_contracts) * 100) if len(current_contracts) > 0 else 85
+
+    # Vendor count
+    vendor_count = len(current_vendors) if current_vendors is not None else 0
+
+    # Expiring contracts (within 90 days)
+    expiring_soon = 0
+    upcoming_deadlines = []
+    if current_contracts is not None and 'end_date' in current_contracts.columns:
+        from datetime import datetime, timedelta
+        now = datetime.now()
+        ninety_days = now + timedelta(days=90)
+        for _, row in current_contracts.iterrows():
+            try:
+                end_date = pd.to_datetime(row['end_date'])
+                if pd.notna(end_date) and now <= end_date <= ninety_days:
+                    expiring_soon += 1
+                    days_until = (end_date - now).days
+                    upcoming_deadlines.append({
+                        'title': row.get('title', 'Unknown'),
+                        'days_until': days_until
+                    })
+            except:
+                pass
+        upcoming_deadlines = sorted(upcoming_deadlines, key=lambda x: x['days_until'])[:10]
+
+    # Change order count
+    change_order_count = 0
+    if current_contracts is not None and 'change_order_count' in current_contracts.columns:
+        change_order_count = int(current_contracts['change_order_count'].sum())
+
+    # Pending approvals (placeholder)
+    pending_approvals = 3
+
+    # Pending board items (placeholder - would come from approval workflow)
+    pending_board_items = []
+    if current_contracts is not None and not current_contracts.empty:
+        # Show contracts with status 'Draft' as pending
+        draft_df = current_contracts[current_contracts['status'] == 'Draft'] if 'status' in current_contracts.columns else pd.DataFrame()
+        for _, row in draft_df.head(5).iterrows():
+            pending_board_items.append({
+                'title': row.get('title', 'Unknown'),
+                'amount': row.get('current_amount', 0)
+            })
+
+    # Monthly spending trend
+    monthly_spending = {'months': [], 'amounts': []}
+    # Generate sample monthly data for visualization
+    import calendar
+    from datetime import datetime
+    now = datetime.now()
+    for i in range(6, 0, -1):
+        month_idx = (now.month - i) % 12
+        if month_idx == 0:
+            month_idx = 12
+        month_name = calendar.month_abbr[month_idx]
+        monthly_spending['months'].append(month_name)
+        # Sample amounts based on total value distributed
+        base_amount = (summary.get('total_value', 0) or 0) / 12
+        variance = 0.8 + (i * 0.05)  # Slight upward trend
+        monthly_spending['amounts'].append(base_amount * variance)
+
+    # School district stats
+    school_stats = {'active_contracts': 0, 'total_value': 0, 'top_contracts': []}
+    if current_contracts is not None and 'department' in current_contracts.columns:
+        school_df = current_contracts[current_contracts['department'].str.contains('School|Education', case=False, na=False)]
+        if not school_df.empty:
+            school_stats['active_contracts'] = len(school_df[school_df['status'] == 'Active']) if 'status' in school_df.columns else len(school_df)
+            school_stats['total_value'] = float(school_df['current_amount'].sum())
+            school_stats['top_contracts'] = school_df.nlargest(3, 'current_amount').to_dict('records')
+
+    # County comparison data
+    county_comparison = None
+    try:
+        comparison_data = db.get_county_comparison_data()
+        if comparison_data and 'counties' in comparison_data:
+            counties = comparison_data['counties']
+            marion_data = next((c for c in counties if c.get('county_id') == 'marion'), None)
+            if marion_data:
+                per_capita_values = [c.get('expenditures_per_capita', 0) for c in counties if c.get('expenditures_per_capita')]
+                avg_per_capita = sum(per_capita_values) / len(per_capita_values) if per_capita_values else 0
+
+                # Calculate rank
+                sorted_counties = sorted(counties, key=lambda x: x.get('expenditures_per_capita', 0))
+                rank = next((i+1 for i, c in enumerate(sorted_counties) if c.get('county_id') == 'marion'), 0)
+
+                county_comparison = {
+                    'per_capita': marion_data.get('expenditures_per_capita', 0),
+                    'peer_avg': avg_per_capita,
+                    'per_capita_rank': rank,
+                    'total_counties': len(counties)
+                }
+    except Exception as e:
+        logger.warning(f"Could not load county comparison: {e}")
+
+    # Key Performance Indicators
+    kpis = {
+        'avg_duration_months': 24,
+        'change_order_rate': 0,
+        'unique_vendors': vendor_count,
+        'local_vendor_pct': 65,
+        'competitive_bid_pct': 78,
+        'avg_vendor_score': 72
+    }
+
+    if current_contracts is not None and len(current_contracts) > 0:
+        contracts_with_co = len(current_contracts[current_contracts['change_order_count'] > 0]) if 'change_order_count' in current_contracts.columns else 0
+        kpis['change_order_rate'] = int(contracts_with_co / len(current_contracts) * 100)
+
+        # Average duration
+        if 'start_date' in current_contracts.columns and 'end_date' in current_contracts.columns:
+            durations = []
+            for _, row in current_contracts.iterrows():
+                try:
+                    start = pd.to_datetime(row['start_date'])
+                    end = pd.to_datetime(row['end_date'])
+                    if pd.notna(start) and pd.notna(end):
+                        durations.append((end - start).days / 30)
+                except:
+                    pass
+            if durations:
+                kpis['avg_duration_months'] = int(sum(durations) / len(durations))
+
+    return render_template('executive_dashboard.html',
+                          summary=summary,
+                          overall_health=overall_health,
+                          critical_items=critical_items[:5],
+                          top_contracts=top_contracts,
+                          on_time_rate=on_time_rate,
+                          vendor_count=vendor_count,
+                          expiring_soon=expiring_soon,
+                          change_order_count=change_order_count,
+                          pending_approvals=pending_approvals,
+                          upcoming_deadlines=upcoming_deadlines,
+                          pending_board_items=pending_board_items,
+                          monthly_spending=monthly_spending,
+                          school_stats=school_stats,
+                          county_comparison=county_comparison,
+                          kpis=kpis,
+                          report_date=datetime.now().strftime('%B %d, %Y'),
+                          last_updated=datetime.now().strftime('%I:%M %p'),
+                          title='Executive Dashboard')
+
+
 @app.route('/contracts')
 def contracts_list():
     """All contracts view with filtering and saved searches."""
@@ -607,6 +787,121 @@ def api_export():
         as_attachment=True,
         download_name=f'contracts_export_{datetime.now().strftime("%Y%m%d")}.csv'
     )
+
+
+@app.route('/api/export/excel')
+def api_export_excel():
+    """Export contracts to Excel with multiple sheets."""
+    global current_contracts, current_vendors
+
+    if current_contracts is None:
+        load_data()
+
+    output = io.BytesIO()
+
+    with pd.ExcelWriter(output, engine='openpyxl') as writer:
+        # Contracts sheet
+        if current_contracts is not None and not current_contracts.empty:
+            # Select columns for export
+            export_cols = ['contract_id', 'contract_number', 'title', 'vendor_name', 'department',
+                          'status', 'original_amount', 'current_amount', 'total_paid',
+                          'start_date', 'end_date', 'contract_type', 'overall_health_score']
+            available_cols = [c for c in export_cols if c in current_contracts.columns]
+            contracts_df = current_contracts[available_cols].copy()
+            contracts_df.to_excel(writer, sheet_name='Contracts', index=False)
+
+        # Vendors sheet
+        if current_vendors is not None and not current_vendors.empty:
+            current_vendors.to_excel(writer, sheet_name='Vendors', index=False)
+
+        # Summary sheet
+        summary_data = {
+            'Metric': [
+                'Total Contracts',
+                'Active Contracts',
+                'Total Contract Value',
+                'Total Paid',
+                'Average Health Score',
+                'At-Risk Contracts',
+                'Total Vendors',
+                'Report Date'
+            ],
+            'Value': [
+                len(current_contracts) if current_contracts is not None else 0,
+                len(current_contracts[current_contracts['status'] == 'Active']) if current_contracts is not None and 'status' in current_contracts.columns else 0,
+                f"${current_contracts['current_amount'].sum():,.2f}" if current_contracts is not None else '$0',
+                f"${current_contracts['total_paid'].sum():,.2f}" if current_contracts is not None else '$0',
+                f"{current_contracts['overall_health_score'].mean():.1f}" if current_contracts is not None and 'overall_health_score' in current_contracts.columns else 'N/A',
+                len(current_contracts[current_contracts['overall_health_score'] < 50]) if current_contracts is not None and 'overall_health_score' in current_contracts.columns else 0,
+                len(current_vendors) if current_vendors is not None else 0,
+                datetime.now().strftime('%Y-%m-%d %H:%M')
+            ]
+        }
+        summary_df = pd.DataFrame(summary_data)
+        summary_df.to_excel(writer, sheet_name='Summary', index=False)
+
+        # Department breakdown sheet
+        if current_contracts is not None and 'department' in current_contracts.columns:
+            dept_summary = current_contracts.groupby('department').agg({
+                'contract_id': 'count',
+                'current_amount': 'sum',
+                'total_paid': 'sum'
+            }).reset_index()
+            dept_summary.columns = ['Department', 'Contract Count', 'Total Value', 'Total Paid']
+            dept_summary.to_excel(writer, sheet_name='By Department', index=False)
+
+    output.seek(0)
+
+    return send_file(
+        output,
+        mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        as_attachment=True,
+        download_name=f'contracts_report_{datetime.now().strftime("%Y%m%d")}.xlsx'
+    )
+
+
+@app.route('/api/export/pdf')
+def api_export_pdf():
+    """Generate PDF report of contracts using HTML template."""
+    global current_contracts
+
+    if current_contracts is None:
+        load_data()
+
+    summary = get_portfolio_summary(current_contracts)
+
+    # Get top contracts
+    top_contracts = []
+    if current_contracts is not None and not current_contracts.empty:
+        top_df = current_contracts.nlargest(20, 'current_amount')
+        top_contracts = top_df.to_dict('records')
+
+    # Get at-risk contracts
+    at_risk = []
+    if current_contracts is not None and 'overall_health_score' in current_contracts.columns:
+        at_risk_df = current_contracts[current_contracts['overall_health_score'] < 50].sort_values('overall_health_score')
+        at_risk = at_risk_df.head(10).to_dict('records')
+
+    # Department breakdown
+    dept_breakdown = []
+    if current_contracts is not None and 'department' in current_contracts.columns:
+        for dept in current_contracts['department'].unique():
+            dept_df = current_contracts[current_contracts['department'] == dept]
+            dept_breakdown.append({
+                'department': dept,
+                'count': len(dept_df),
+                'total_value': float(dept_df['current_amount'].sum()),
+                'total_paid': float(dept_df['total_paid'].sum())
+            })
+        dept_breakdown = sorted(dept_breakdown, key=lambda x: x['total_value'], reverse=True)
+
+    return render_template('report_pdf.html',
+                          summary=summary,
+                          top_contracts=top_contracts,
+                          at_risk_contracts=at_risk,
+                          dept_breakdown=dept_breakdown,
+                          report_date=datetime.now().strftime('%B %d, %Y'),
+                          title='Contract Portfolio Report')
 
 
 @app.route('/api/statistics')

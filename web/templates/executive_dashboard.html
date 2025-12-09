@@ -1,0 +1,431 @@
+{% extends "base.html" %}
+
+{% block content %}
+<!-- Executive Dashboard Header with Print Button -->
+<div class="flex justify-between items-center mb-6">
+    <div>
+        <h1 class="text-2xl font-bold text-gray-800 dark:text-white">Executive Summary</h1>
+        <p class="text-sm text-gray-500 dark:text-gray-400">Marion County Contract Oversight - {{ report_date }}</p>
+    </div>
+    <div class="flex space-x-3">
+        <button onclick="window.print()" class="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 flex items-center">
+            <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"></path>
+            </svg>
+            Print
+        </button>
+        <a href="{{ url_for('dashboard') }}" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 flex items-center">
+            <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6z"></path>
+            </svg>
+            Full Dashboard
+        </a>
+    </div>
+</div>
+
+<!-- Overall Health Score Card -->
+<div class="bg-gradient-to-r {% if overall_health >= 70 %}from-green-500 to-green-600{% elif overall_health >= 50 %}from-yellow-500 to-yellow-600{% else %}from-red-500 to-red-600{% endif %} rounded-xl shadow-lg p-6 mb-8 text-white">
+    <div class="grid grid-cols-1 md:grid-cols-4 gap-6">
+        <div class="text-center md:border-r border-white/30">
+            <p class="text-white/80 text-sm uppercase tracking-wide">Overall Portfolio Health</p>
+            <p class="text-5xl font-bold mt-2">{{ overall_health }}<span class="text-2xl">/100</span></p>
+            <p class="text-white/80 text-sm mt-1">
+                {% if overall_health >= 70 %}Good Standing{% elif overall_health >= 50 %}Needs Attention{% else %}Critical{% endif %}
+            </p>
+        </div>
+        <div class="text-center md:border-r border-white/30">
+            <p class="text-white/80 text-sm uppercase tracking-wide">Active Contracts</p>
+            <p class="text-4xl font-bold mt-2">{{ summary.active_count or 0 }}</p>
+            <p class="text-white/80 text-sm mt-1">of {{ summary.total_contracts or 0 }} total</p>
+        </div>
+        <div class="text-center md:border-r border-white/30">
+            <p class="text-white/80 text-sm uppercase tracking-wide">Total Portfolio Value</p>
+            <p class="text-4xl font-bold mt-2">${{ '{:,.0f}'.format((summary.total_value or 0) / 1000000) }}M</p>
+            <p class="text-white/80 text-sm mt-1">${{ '{:,.0f}'.format(summary.total_paid or 0) }} paid</p>
+        </div>
+        <div class="text-center">
+            <p class="text-white/80 text-sm uppercase tracking-wide">Requires Attention</p>
+            <p class="text-4xl font-bold mt-2">{{ summary.at_risk_count or 0 }}</p>
+            <p class="text-white/80 text-sm mt-1">{{ summary.critical_count or 0 }} critical issues</p>
+        </div>
+    </div>
+</div>
+
+<!-- Quick Stats Row -->
+<div class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4 mb-8">
+    <div class="bg-white dark:bg-gray-800 rounded-lg shadow p-4 text-center">
+        <p class="text-xs text-gray-500 dark:text-gray-400 uppercase">Budget Variance</p>
+        <p class="text-2xl font-bold {% if summary.overrun_pct > 5 %}text-red-600{% elif summary.overrun_pct > 0 %}text-yellow-600{% else %}text-green-600{% endif %}">
+            {% if summary.overrun_pct > 0 %}+{% endif %}{{ '{:.1f}'.format(summary.overrun_pct or 0) }}%
+        </p>
+    </div>
+    <div class="bg-white dark:bg-gray-800 rounded-lg shadow p-4 text-center">
+        <p class="text-xs text-gray-500 dark:text-gray-400 uppercase">On-Time Rate</p>
+        <p class="text-2xl font-bold {% if on_time_rate >= 80 %}text-green-600{% elif on_time_rate >= 60 %}text-yellow-600{% else %}text-red-600{% endif %}">{{ on_time_rate }}%</p>
+    </div>
+    <div class="bg-white dark:bg-gray-800 rounded-lg shadow p-4 text-center">
+        <p class="text-xs text-gray-500 dark:text-gray-400 uppercase">Vendor Count</p>
+        <p class="text-2xl font-bold text-gray-800 dark:text-white">{{ vendor_count }}</p>
+    </div>
+    <div class="bg-white dark:bg-gray-800 rounded-lg shadow p-4 text-center">
+        <p class="text-xs text-gray-500 dark:text-gray-400 uppercase">Expiring Soon</p>
+        <p class="text-2xl font-bold {% if expiring_soon > 5 %}text-orange-600{% else %}text-gray-800 dark:text-white{% endif %}">{{ expiring_soon }}</p>
+    </div>
+    <div class="bg-white dark:bg-gray-800 rounded-lg shadow p-4 text-center">
+        <p class="text-xs text-gray-500 dark:text-gray-400 uppercase">Change Orders</p>
+        <p class="text-2xl font-bold {% if change_order_count > 10 %}text-orange-600{% else %}text-gray-800 dark:text-white{% endif %}">{{ change_order_count }}</p>
+    </div>
+    <div class="bg-white dark:bg-gray-800 rounded-lg shadow p-4 text-center">
+        <p class="text-xs text-gray-500 dark:text-gray-400 uppercase">Pending Approvals</p>
+        <p class="text-2xl font-bold {% if pending_approvals > 0 %}text-blue-600{% else %}text-gray-800 dark:text-white{% endif %}">{{ pending_approvals }}</p>
+    </div>
+</div>
+
+<!-- Main Content Grid -->
+<div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
+    <!-- Priority Items Column -->
+    <div class="lg:col-span-1 space-y-6">
+        <!-- Critical Alerts Box -->
+        <div class="bg-white dark:bg-gray-800 rounded-lg shadow">
+            <div class="px-4 py-3 border-b dark:border-gray-700 bg-red-50 dark:bg-red-900/30 rounded-t-lg">
+                <h3 class="text-sm font-semibold text-red-800 dark:text-red-200 flex items-center">
+                    <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path>
+                    </svg>
+                    Items Requiring Immediate Action
+                </h3>
+            </div>
+            <div class="p-4">
+                {% if critical_items %}
+                <ul class="space-y-2">
+                    {% for item in critical_items[:5] %}
+                    <li class="flex items-start text-sm">
+                        <span class="w-2 h-2 bg-red-500 rounded-full mt-1.5 mr-2 flex-shrink-0"></span>
+                        <div>
+                            <p class="text-gray-800 dark:text-white">{{ item.title }}</p>
+                            <p class="text-xs text-gray-500">{{ item.reason }}</p>
+                        </div>
+                    </li>
+                    {% endfor %}
+                </ul>
+                {% else %}
+                <p class="text-sm text-green-600 dark:text-green-400 text-center py-4">
+                    <svg class="w-5 h-5 mx-auto mb-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+                    </svg>
+                    No critical items at this time
+                </p>
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- Upcoming Deadlines -->
+        <div class="bg-white dark:bg-gray-800 rounded-lg shadow">
+            <div class="px-4 py-3 border-b dark:border-gray-700">
+                <h3 class="text-sm font-semibold text-gray-800 dark:text-white flex items-center">
+                    <svg class="w-4 h-4 mr-2 text-orange-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
+                    </svg>
+                    Upcoming Deadlines (30 Days)
+                </h3>
+            </div>
+            <div class="p-4">
+                {% if upcoming_deadlines %}
+                <ul class="space-y-2">
+                    {% for deadline in upcoming_deadlines[:5] %}
+                    <li class="flex items-center justify-between text-sm">
+                        <span class="text-gray-700 dark:text-gray-300">{{ deadline.title[:25] }}{% if deadline.title|length > 25 %}...{% endif %}</span>
+                        <span class="px-2 py-0.5 rounded text-xs {% if deadline.days_until <= 7 %}bg-red-100 text-red-700 dark:bg-red-900 dark:text-red-200{% elif deadline.days_until <= 14 %}bg-orange-100 text-orange-700 dark:bg-orange-900 dark:text-orange-200{% else %}bg-yellow-100 text-yellow-700 dark:bg-yellow-900 dark:text-yellow-200{% endif %}">
+                            {{ deadline.days_until }}d
+                        </span>
+                    </li>
+                    {% endfor %}
+                </ul>
+                {% else %}
+                <p class="text-sm text-gray-500 dark:text-gray-400 text-center py-4">No upcoming deadlines</p>
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- Board Meeting Items -->
+        <div class="bg-white dark:bg-gray-800 rounded-lg shadow">
+            <div class="px-4 py-3 border-b dark:border-gray-700">
+                <h3 class="text-sm font-semibold text-gray-800 dark:text-white flex items-center">
+                    <svg class="w-4 h-4 mr-2 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"></path>
+                    </svg>
+                    Pending Board Approval
+                </h3>
+            </div>
+            <div class="p-4">
+                {% if pending_board_items %}
+                <ul class="space-y-2">
+                    {% for item in pending_board_items[:5] %}
+                    <li class="flex items-center justify-between text-sm">
+                        <span class="text-gray-700 dark:text-gray-300">{{ item.title[:25] }}{% if item.title|length > 25 %}...{% endif %}</span>
+                        <span class="text-gray-500 text-xs">${{ '{:,.0f}'.format(item.amount or 0) }}</span>
+                    </li>
+                    {% endfor %}
+                </ul>
+                {% else %}
+                <p class="text-sm text-gray-500 dark:text-gray-400 text-center py-4">No pending items</p>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <!-- Top Contracts and Charts -->
+    <div class="lg:col-span-2 space-y-6">
+        <!-- Top Contracts by Value -->
+        <div class="bg-white dark:bg-gray-800 rounded-lg shadow">
+            <div class="px-4 py-3 border-b dark:border-gray-700 flex justify-between items-center">
+                <h3 class="text-sm font-semibold text-gray-800 dark:text-white">Top Contracts by Value</h3>
+                <a href="{{ url_for('contracts_list') }}" class="text-xs text-blue-600 dark:text-blue-400 hover:underline">View All</a>
+            </div>
+            <div class="overflow-x-auto">
+                <table class="w-full text-sm">
+                    <thead class="bg-gray-50 dark:bg-gray-700">
+                        <tr>
+                            <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Contract</th>
+                            <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Vendor</th>
+                            <th class="px-4 py-2 text-right text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Value</th>
+                            <th class="px-4 py-2 text-center text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Health</th>
+                            <th class="px-4 py-2 text-center text-xs font-medium text-gray-500 dark:text-gray-300 uppercase">Progress</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-gray-200 dark:divide-gray-600">
+                        {% for contract in top_contracts %}
+                        <tr class="hover:bg-gray-50 dark:hover:bg-gray-700">
+                            <td class="px-4 py-3">
+                                <a href="{{ url_for('contract_detail', contract_id=contract.contract_id) }}" class="text-blue-600 dark:text-blue-400 hover:underline">
+                                    {{ contract.title[:30] }}{% if contract.title|length > 30 %}...{% endif %}
+                                </a>
+                                <p class="text-xs text-gray-500">{{ contract.department }}</p>
+                            </td>
+                            <td class="px-4 py-3 text-gray-700 dark:text-gray-300">{{ contract.vendor_name[:20] }}{% if contract.vendor_name|length > 20 %}...{% endif %}</td>
+                            <td class="px-4 py-3 text-right font-medium text-gray-800 dark:text-white">${{ '{:,.0f}'.format(contract.current_amount or 0) }}</td>
+                            <td class="px-4 py-3 text-center">
+                                <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium
+                                    {% if contract.overall_health_score >= 70 %}bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200
+                                    {% elif contract.overall_health_score >= 50 %}bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200
+                                    {% else %}bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200{% endif %}">
+                                    {{ contract.overall_health_score|int }}
+                                </span>
+                            </td>
+                            <td class="px-4 py-3">
+                                <div class="w-full bg-gray-200 dark:bg-gray-600 rounded-full h-2">
+                                    {% set progress = ((contract.total_paid or 0) / (contract.current_amount or 1) * 100)|int %}
+                                    <div class="bg-blue-500 h-2 rounded-full" style="width: {{ progress }}%"></div>
+                                </div>
+                                <p class="text-xs text-gray-500 text-center mt-0.5">{{ progress }}% spent</p>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- Charts Row -->
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <!-- Spending Trend -->
+            <div class="bg-white dark:bg-gray-800 rounded-lg shadow p-4">
+                <h3 class="text-sm font-semibold text-gray-800 dark:text-white mb-3">Monthly Spending Trend</h3>
+                <div id="spendingTrendChart" style="height: 200px;"></div>
+            </div>
+
+            <!-- Department Distribution -->
+            <div class="bg-white dark:bg-gray-800 rounded-lg shadow p-4">
+                <h3 class="text-sm font-semibold text-gray-800 dark:text-white mb-3">Spending by Department</h3>
+                <div id="deptPieChart" style="height: 200px;"></div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Bottom Section: School Board & County Comparison -->
+<div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+    <!-- School District Highlights -->
+    <div class="bg-white dark:bg-gray-800 rounded-lg shadow">
+        <div class="px-4 py-3 border-b dark:border-gray-700 flex justify-between items-center">
+            <h3 class="text-sm font-semibold text-gray-800 dark:text-white flex items-center">
+                <svg class="w-4 h-4 mr-2 text-purple-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 14l9-5-9-5-9 5 9 5z"></path>
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 14l9-5-9-5-9 5 9 5zm0 0v6"></path>
+                </svg>
+                School District Summary
+            </h3>
+            <a href="{{ url_for('school_board_page') }}" class="text-xs text-blue-600 dark:text-blue-400 hover:underline">View Details</a>
+        </div>
+        <div class="p-4">
+            <div class="grid grid-cols-2 gap-4 mb-4">
+                <div class="text-center p-3 bg-purple-50 dark:bg-purple-900/30 rounded-lg">
+                    <p class="text-xs text-gray-500 dark:text-gray-400">Active Contracts</p>
+                    <p class="text-2xl font-bold text-purple-700 dark:text-purple-300">{{ school_stats.active_contracts }}</p>
+                </div>
+                <div class="text-center p-3 bg-purple-50 dark:bg-purple-900/30 rounded-lg">
+                    <p class="text-xs text-gray-500 dark:text-gray-400">Total Value</p>
+                    <p class="text-2xl font-bold text-purple-700 dark:text-purple-300">${{ '{:,.0f}'.format((school_stats.total_value or 0) / 1000000) }}M</p>
+                </div>
+            </div>
+            {% if school_stats.top_contracts %}
+            <p class="text-xs text-gray-500 dark:text-gray-400 mb-2">Largest School Contracts:</p>
+            <ul class="space-y-1">
+                {% for contract in school_stats.top_contracts[:3] %}
+                <li class="flex justify-between text-sm">
+                    <span class="text-gray-700 dark:text-gray-300">{{ contract.title[:30] }}{% if contract.title|length > 30 %}...{% endif %}</span>
+                    <span class="text-gray-500">${{ '{:,.0f}'.format(contract.current_amount or 0) }}</span>
+                </li>
+                {% endfor %}
+            </ul>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- County Comparison Highlights -->
+    <div class="bg-white dark:bg-gray-800 rounded-lg shadow">
+        <div class="px-4 py-3 border-b dark:border-gray-700 flex justify-between items-center">
+            <h3 class="text-sm font-semibold text-gray-800 dark:text-white flex items-center">
+                <svg class="w-4 h-4 mr-2 text-teal-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path>
+                </svg>
+                Peer County Comparison
+            </h3>
+            <a href="{{ url_for('county_comparison_page') }}" class="text-xs text-blue-600 dark:text-blue-400 hover:underline">View Details</a>
+        </div>
+        <div class="p-4">
+            {% if county_comparison %}
+            <div class="grid grid-cols-2 gap-4 mb-4">
+                <div class="text-center p-3 bg-teal-50 dark:bg-teal-900/30 rounded-lg">
+                    <p class="text-xs text-gray-500 dark:text-gray-400">Per Capita Rank</p>
+                    <p class="text-2xl font-bold text-teal-700 dark:text-teal-300">#{{ county_comparison.per_capita_rank }}</p>
+                    <p class="text-xs text-gray-500">of {{ county_comparison.total_counties }} counties</p>
+                </div>
+                <div class="text-center p-3 bg-teal-50 dark:bg-teal-900/30 rounded-lg">
+                    <p class="text-xs text-gray-500 dark:text-gray-400">Marion Per Capita</p>
+                    <p class="text-2xl font-bold text-teal-700 dark:text-teal-300">${{ '{:,.0f}'.format(county_comparison.per_capita or 0) }}</p>
+                    <p class="text-xs text-gray-500">vs ${{ '{:,.0f}'.format(county_comparison.peer_avg or 0) }} avg</p>
+                </div>
+            </div>
+            <div class="space-y-2">
+                <p class="text-xs text-gray-500 dark:text-gray-400">Spending vs Peer Average:</p>
+                {% set variance = ((county_comparison.per_capita - county_comparison.peer_avg) / county_comparison.peer_avg * 100)|int if county_comparison.peer_avg else 0 %}
+                {% set bar_width = 50 + (variance / 2) %}
+                {% if bar_width > 100 %}{% set bar_width = 100 %}{% endif %}
+                {% if bar_width < 10 %}{% set bar_width = 10 %}{% endif %}
+                <div class="flex items-center">
+                    <div class="flex-1 bg-gray-200 dark:bg-gray-600 rounded-full h-4">
+                        <div class="{% if variance < 0 %}bg-green-500{% else %}bg-orange-500{% endif %} h-4 rounded-full flex items-center justify-end pr-2" style="width: {{ bar_width|int }}%">
+                            <span class="text-xs text-white font-medium">{% if variance > 0 %}+{% endif %}{{ variance }}%</span>
+                        </div>
+                    </div>
+                </div>
+                <p class="text-xs text-gray-500 text-center">
+                    {% if variance < -5 %}Below peer average - efficient spending{% elif variance > 5 %}Above peer average - review recommended{% else %}In line with peer counties{% endif %}
+                </p>
+            </div>
+            {% else %}
+            <p class="text-sm text-gray-500 dark:text-gray-400 text-center py-4">County comparison data not available</p>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<!-- Key Performance Indicators -->
+<div class="bg-white dark:bg-gray-800 rounded-lg shadow p-6 mb-8">
+    <h3 class="text-lg font-semibold text-gray-800 dark:text-white mb-4">Key Performance Indicators</h3>
+    <div class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
+        <div class="text-center p-3 rounded-lg border dark:border-gray-600">
+            <p class="text-xs text-gray-500 dark:text-gray-400 mb-1">Avg Contract Duration</p>
+            <p class="text-xl font-bold text-gray-800 dark:text-white">{{ kpis.avg_duration_months }} mo</p>
+        </div>
+        <div class="text-center p-3 rounded-lg border dark:border-gray-600">
+            <p class="text-xs text-gray-500 dark:text-gray-400 mb-1">Change Order Rate</p>
+            <p class="text-xl font-bold {% if kpis.change_order_rate > 30 %}text-red-600{% elif kpis.change_order_rate > 15 %}text-yellow-600{% else %}text-green-600{% endif %}">{{ kpis.change_order_rate }}%</p>
+        </div>
+        <div class="text-center p-3 rounded-lg border dark:border-gray-600">
+            <p class="text-xs text-gray-500 dark:text-gray-400 mb-1">Vendor Diversity</p>
+            <p class="text-xl font-bold text-gray-800 dark:text-white">{{ kpis.unique_vendors }}</p>
+        </div>
+        <div class="text-center p-3 rounded-lg border dark:border-gray-600">
+            <p class="text-xs text-gray-500 dark:text-gray-400 mb-1">Local Vendor %</p>
+            <p class="text-xl font-bold text-gray-800 dark:text-white">{{ kpis.local_vendor_pct }}%</p>
+        </div>
+        <div class="text-center p-3 rounded-lg border dark:border-gray-600">
+            <p class="text-xs text-gray-500 dark:text-gray-400 mb-1">Competitive Bids</p>
+            <p class="text-xl font-bold {% if kpis.competitive_bid_pct >= 80 %}text-green-600{% elif kpis.competitive_bid_pct >= 60 %}text-yellow-600{% else %}text-red-600{% endif %}">{{ kpis.competitive_bid_pct }}%</p>
+        </div>
+        <div class="text-center p-3 rounded-lg border dark:border-gray-600">
+            <p class="text-xs text-gray-500 dark:text-gray-400 mb-1">Avg Vendor Score</p>
+            <p class="text-xl font-bold {% if kpis.avg_vendor_score >= 70 %}text-green-600{% elif kpis.avg_vendor_score >= 50 %}text-yellow-600{% else %}text-red-600{% endif %}">{{ kpis.avg_vendor_score }}</p>
+        </div>
+    </div>
+</div>
+
+<!-- Footer Note -->
+<div class="text-center text-xs text-gray-400 dark:text-gray-500 py-4">
+    <p>Report generated on {{ report_date }} | Data current as of {{ last_updated }}</p>
+    <p class="mt-1">Contract Oversight System - Marion County, FL</p>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    // Spending Trend Chart
+    const monthlyData = {{ monthly_spending | tojson | safe }};
+    if (monthlyData && monthlyData.months && monthlyData.months.length > 0) {
+        Plotly.newPlot('spendingTrendChart', [{
+            type: 'scatter',
+            mode: 'lines+markers',
+            x: monthlyData.months,
+            y: monthlyData.amounts,
+            line: { color: '#3B82F6', width: 2 },
+            marker: { size: 6 },
+            fill: 'tozeroy',
+            fillcolor: 'rgba(59, 130, 246, 0.1)'
+        }], {
+            margin: { t: 10, b: 30, l: 50, r: 10 },
+            xaxis: { tickangle: -45, tickfont: { size: 10 } },
+            yaxis: {
+                tickformat: '$,.0f',
+                tickfont: { size: 10 }
+            },
+            showlegend: false
+        }, { responsive: true, displayModeBar: false });
+    }
+
+    // Department Pie Chart
+    const deptData = {{ summary.department_distribution | tojson | safe }};
+    if (Object.keys(deptData).length > 0) {
+        Plotly.newPlot('deptPieChart', [{
+            type: 'pie',
+            labels: Object.keys(deptData),
+            values: Object.values(deptData),
+            hole: 0.4,
+            textinfo: 'percent',
+            textposition: 'inside',
+            marker: {
+                colors: ['#3B82F6', '#10B981', '#F59E0B', '#EF4444', '#8B5CF6', '#EC4899', '#6366F1', '#14B8A6']
+            }
+        }], {
+            margin: { t: 10, b: 10, l: 10, r: 10 },
+            showlegend: true,
+            legend: {
+                orientation: 'h',
+                y: -0.2,
+                font: { size: 9 }
+            }
+        }, { responsive: true, displayModeBar: false });
+    }
+</script>
+
+<style>
+    @media print {
+        .sidebar-link, aside, header button, a[href] { display: none !important; }
+        body { background: white !important; }
+        .shadow { box-shadow: none !important; }
+        .dark\:bg-gray-800 { background: white !important; }
+        .dark\:text-white { color: black !important; }
+    }
+</style>
+{% endblock %}
