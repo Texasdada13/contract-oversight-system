@@ -1,0 +1,384 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="space-y-6">
+    <!-- Header -->
+    <div class="flex justify-between items-start">
+        <div>
+            <h1 class="text-3xl font-bold text-gray-800 dark:text-white">Procurement Benchmarking</h1>
+            <p class="text-gray-500 dark:text-gray-400 mt-1">Compare your performance against industry best practices (Coupa 2025 Benchmarks)</p>
+        </div>
+        <div class="flex space-x-3">
+            <select id="fiscalYearSelect" class="px-4 py-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 dark:text-white">
+                <option value="2025">FY 2025</option>
+                <option value="2024">FY 2024</option>
+                <option value="2023">FY 2023</option>
+            </select>
+            <button onclick="recalculateScores()" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 flex items-center">
+                <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
+                </svg>
+                Recalculate
+            </button>
+        </div>
+    </div>
+
+    <!-- Procurement Health Score Card -->
+    <div class="bg-gradient-to-r from-blue-600 to-blue-800 rounded-xl shadow-lg p-6 text-white">
+        <div class="flex justify-between items-center">
+            <div>
+                <h2 class="text-xl font-semibold opacity-90">Procurement Health Score</h2>
+                <p class="text-sm opacity-75 mt-1">Based on 20 industry KPIs from Coupa 2025 Benchmark Report</p>
+            </div>
+            <div class="text-right">
+                <div class="text-6xl font-bold">{{ health_score.overall_score|default(0)|round|int }}</div>
+                <div class="flex items-center justify-end mt-2">
+                    <span class="text-2xl font-semibold px-3 py-1 rounded-lg
+                        {% if health_score.grade == 'A' %}bg-green-500
+                        {% elif health_score.grade == 'B' %}bg-blue-500
+                        {% elif health_score.grade == 'C' %}bg-yellow-500
+                        {% elif health_score.grade == 'D' %}bg-orange-500
+                        {% else %}bg-red-500{% endif %}">
+                        Grade: {{ health_score.grade|default('N/A') }}
+                    </span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Progress Bar -->
+        <div class="mt-6">
+            <div class="flex justify-between text-sm mb-1">
+                <span>Progress to Excellence</span>
+                <span>{{ health_score.overall_score|default(0)|round|int }}%</span>
+            </div>
+            <div class="w-full bg-blue-900 rounded-full h-3">
+                <div class="h-3 rounded-full
+                    {% if health_score.overall_score >= 80 %}bg-green-400
+                    {% elif health_score.overall_score >= 60 %}bg-yellow-400
+                    {% else %}bg-red-400{% endif %}"
+                    style="width: {{ health_score.overall_score|default(0) }}%"></div>
+            </div>
+        </div>
+
+        <div class="grid grid-cols-4 gap-4 mt-6 pt-4 border-t border-blue-500">
+            <div class="text-center">
+                <div class="text-2xl font-bold">{{ kpi_count }}</div>
+                <div class="text-sm opacity-75">KPIs Tracked</div>
+            </div>
+            <div class="text-center">
+                <div class="text-2xl font-bold">{{ categories_above_benchmark }}</div>
+                <div class="text-sm opacity-75">Above Benchmark</div>
+            </div>
+            <div class="text-center">
+                <div class="text-2xl font-bold">{{ categories_below_benchmark }}</div>
+                <div class="text-sm opacity-75">Below Benchmark</div>
+            </div>
+            <div class="text-center">
+                <div class="text-2xl font-bold">{{ health_score.rating|default('N/A') }}</div>
+                <div class="text-sm opacity-75">Overall Rating</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Category Scores Grid -->
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+        {% for cat_id, cat_data in category_scores.items() %}
+        <div class="bg-white dark:bg-gray-800 rounded-lg shadow p-4 hover:shadow-lg transition-shadow cursor-pointer"
+             onclick="showCategoryDetail('{{ cat_id }}')">
+            <div class="flex justify-between items-start mb-3">
+                <h3 class="font-semibold text-gray-700 dark:text-gray-200">{{ cat_data.name }}</h3>
+                <span class="px-2 py-1 text-xs rounded-full
+                    {% if cat_data.score >= 80 %}bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200
+                    {% elif cat_data.score >= 60 %}bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200
+                    {% else %}bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200{% endif %}">
+                    {{ cat_data.score|round|int }}/100
+                </span>
+            </div>
+
+            <!-- Mini progress bar -->
+            <div class="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2 mb-3">
+                <div class="h-2 rounded-full
+                    {% if cat_data.score >= 80 %}bg-green-500
+                    {% elif cat_data.score >= 60 %}bg-yellow-500
+                    {% else %}bg-red-500{% endif %}"
+                    style="width: {{ cat_data.score }}%"></div>
+            </div>
+
+            <div class="text-xs text-gray-500 dark:text-gray-400">
+                {{ cat_data.kpi_count }} KPIs measured
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+
+    <!-- Detailed KPI Table -->
+    <div class="bg-white dark:bg-gray-800 rounded-lg shadow">
+        <div class="px-6 py-4 border-b dark:border-gray-700 flex justify-between items-center">
+            <h3 class="text-lg font-semibold text-gray-700 dark:text-white">KPI Performance vs. Industry Benchmarks</h3>
+            <div class="flex space-x-2">
+                <button onclick="filterKPIs('all')" class="px-3 py-1 text-sm rounded-lg bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600">All</button>
+                <button onclick="filterKPIs('above')" class="px-3 py-1 text-sm rounded-lg bg-green-100 text-green-800 hover:bg-green-200">Above</button>
+                <button onclick="filterKPIs('below')" class="px-3 py-1 text-sm rounded-lg bg-red-100 text-red-800 hover:bg-red-200">Below</button>
+            </div>
+        </div>
+        <div class="overflow-x-auto">
+            <table class="w-full">
+                <thead class="bg-gray-50 dark:bg-gray-700">
+                    <tr>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">KPI</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Category</th>
+                        <th class="px-6 py-3 text-center text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Your Value</th>
+                        <th class="px-6 py-3 text-center text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Benchmark</th>
+                        <th class="px-6 py-3 text-center text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Gap</th>
+                        <th class="px-6 py-3 text-center text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Score</th>
+                        <th class="px-6 py-3 text-center text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Status</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-gray-200 dark:divide-gray-700">
+                    {% for kpi in kpi_scores %}
+                    <tr class="hover:bg-gray-50 dark:hover:bg-gray-700 kpi-row" data-status="{{ 'above' if kpi.score >= 70 else 'below' }}">
+                        <td class="px-6 py-4">
+                            <div class="font-medium text-gray-900 dark:text-white">{{ kpi.name }}</div>
+                            <div class="text-xs text-gray-500 dark:text-gray-400">{{ kpi.description }}</div>
+                        </td>
+                        <td class="px-6 py-4 text-sm text-gray-500 dark:text-gray-400">{{ kpi.category_name }}</td>
+                        <td class="px-6 py-4 text-center">
+                            <span class="font-semibold text-gray-900 dark:text-white">
+                                {{ kpi.actual_value|round(1) }}{% if kpi.unit == 'percent' %}%{% endif %}
+                            </span>
+                        </td>
+                        <td class="px-6 py-4 text-center text-gray-600 dark:text-gray-400">
+                            {{ kpi.benchmark_value }}{% if kpi.unit == 'percent' %}%{% endif %}
+                        </td>
+                        <td class="px-6 py-4 text-center">
+                            <span class="{% if kpi.gap >= 0 %}text-green-600{% else %}text-red-600{% endif %}">
+                                {% if kpi.gap >= 0 %}+{% endif %}{{ kpi.gap|round(1) }}{% if kpi.unit == 'percent' %}%{% endif %}
+                            </span>
+                        </td>
+                        <td class="px-6 py-4 text-center">
+                            <div class="flex items-center justify-center">
+                                <div class="w-16 bg-gray-200 dark:bg-gray-600 rounded-full h-2 mr-2">
+                                    <div class="h-2 rounded-full {% if kpi.score >= 80 %}bg-green-500{% elif kpi.score >= 60 %}bg-yellow-500{% else %}bg-red-500{% endif %}"
+                                         style="width: {{ kpi.score }}%"></div>
+                                </div>
+                                <span class="text-sm">{{ kpi.score|round|int }}</span>
+                            </div>
+                        </td>
+                        <td class="px-6 py-4 text-center">
+                            <span class="px-2 py-1 text-xs rounded-full
+                                {% if kpi.rating == 'Excellent' %}bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200
+                                {% elif kpi.rating == 'Good' %}bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200
+                                {% elif kpi.rating == 'Fair' %}bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200
+                                {% elif kpi.rating == 'Poor' %}bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-200
+                                {% else %}bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200{% endif %}">
+                                {{ kpi.rating }}
+                            </span>
+                        </td>
+                    </tr>
+                    {% else %}
+                    <tr>
+                        <td colspan="7" class="px-6 py-8 text-center text-gray-500 dark:text-gray-400">
+                            <p>No KPI data available. Enter your metrics below to see benchmark comparisons.</p>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- Strengths & Improvements -->
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <!-- Top Strengths -->
+        <div class="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
+            <div class="flex items-center mb-4">
+                <div class="w-10 h-10 bg-green-100 dark:bg-green-900 rounded-full flex items-center justify-center mr-3">
+                    <svg class="w-6 h-6 text-green-600 dark:text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+                    </svg>
+                </div>
+                <h3 class="text-lg font-semibold text-gray-700 dark:text-white">Top Strengths</h3>
+            </div>
+            <ul class="space-y-3">
+                {% for strength in health_score.top_strengths[:5] %}
+                <li class="flex items-start">
+                    <svg class="w-5 h-5 text-green-500 mr-2 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                    </svg>
+                    <span class="text-gray-600 dark:text-gray-300">{{ strength }}</span>
+                </li>
+                {% else %}
+                <li class="text-gray-500 dark:text-gray-400">No strengths identified yet. Add KPI data to see results.</li>
+                {% endfor %}
+            </ul>
+        </div>
+
+        <!-- Priority Improvements -->
+        <div class="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
+            <div class="flex items-center mb-4">
+                <div class="w-10 h-10 bg-orange-100 dark:bg-orange-900 rounded-full flex items-center justify-center mr-3">
+                    <svg class="w-6 h-6 text-orange-600 dark:text-orange-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path>
+                    </svg>
+                </div>
+                <h3 class="text-lg font-semibold text-gray-700 dark:text-white">Priority Improvements</h3>
+            </div>
+            <ul class="space-y-3">
+                {% for improvement in health_score.priority_improvements[:5] %}
+                <li class="flex items-start">
+                    <svg class="w-5 h-5 text-orange-500 mr-2 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7l5 5m0 0l-5 5m5-5H6"></path>
+                    </svg>
+                    <span class="text-gray-600 dark:text-gray-300">{{ improvement }}</span>
+                </li>
+                {% else %}
+                <li class="text-gray-500 dark:text-gray-400">No improvement areas identified yet. Add KPI data to see recommendations.</li>
+                {% endfor %}
+            </ul>
+        </div>
+    </div>
+
+    <!-- KPI Input Form -->
+    <div class="bg-white dark:bg-gray-800 rounded-lg shadow">
+        <div class="px-6 py-4 border-b dark:border-gray-700">
+            <h3 class="text-lg font-semibold text-gray-700 dark:text-white">Enter Your KPI Values</h3>
+            <p class="text-sm text-gray-500 dark:text-gray-400 mt-1">Update your organization's metrics to compare against industry benchmarks</p>
+        </div>
+        <form id="kpiForm" class="p-6">
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                {% for kpi_id, kpi_info in benchmarks.items() %}
+                <div class="space-y-2">
+                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                        {{ kpi_info.name }}
+                        <span class="text-xs text-gray-400 ml-1">(Benchmark: {{ kpi_info.benchmark }}{% if kpi_info.unit == 'percent' %}%{% endif %})</span>
+                    </label>
+                    <div class="flex">
+                        <input type="number" step="0.1" name="{{ kpi_id }}"
+                               value="{{ current_values.get(kpi_id, '') }}"
+                               placeholder="{{ kpi_info.benchmark }}"
+                               class="flex-1 px-3 py-2 border rounded-l-lg dark:bg-gray-700 dark:border-gray-600 dark:text-white focus:ring-2 focus:ring-blue-500">
+                        <span class="px-3 py-2 bg-gray-100 dark:bg-gray-600 border border-l-0 dark:border-gray-600 rounded-r-lg text-gray-500 dark:text-gray-400">
+                            {% if kpi_info.unit == 'percent' %}%
+                            {% elif kpi_info.unit == 'business_hours' %}hrs
+                            {% elif kpi_info.unit == 'business_days' %}days
+                            {% else %}{{ kpi_info.unit }}{% endif %}
+                        </span>
+                    </div>
+                    <p class="text-xs text-gray-400">{{ kpi_info.description[:80] }}{% if kpi_info.description|length > 80 %}...{% endif %}</p>
+                </div>
+                {% endfor %}
+            </div>
+            <div class="mt-6 flex justify-end space-x-3">
+                <button type="button" onclick="estimateFromData()" class="px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700">
+                    Auto-Estimate from Data
+                </button>
+                <button type="submit" class="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">
+                    Save & Calculate Score
+                </button>
+            </div>
+        </form>
+    </div>
+
+    <!-- Benchmark Reference -->
+    <div class="bg-gray-50 dark:bg-gray-800/50 rounded-lg p-6">
+        <h4 class="font-semibold text-gray-700 dark:text-white mb-2">About These Benchmarks</h4>
+        <p class="text-sm text-gray-600 dark:text-gray-400">
+            These benchmarks are based on the <strong>Coupa 2025 Total Spend Management Benchmark Report</strong>,
+            which analyzed data from thousands of organizations to establish industry best practices.
+            The benchmark values shown represent the top quartile median performance - meaning the best performers
+            in each category achieve these levels or better.
+        </p>
+        <div class="mt-4 grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+            <div class="bg-white dark:bg-gray-700 rounded p-3">
+                <div class="font-semibold text-green-600 dark:text-green-400">90-100</div>
+                <div class="text-gray-500 dark:text-gray-400">Excellent</div>
+            </div>
+            <div class="bg-white dark:bg-gray-700 rounded p-3">
+                <div class="font-semibold text-blue-600 dark:text-blue-400">75-89</div>
+                <div class="text-gray-500 dark:text-gray-400">Good</div>
+            </div>
+            <div class="bg-white dark:bg-gray-700 rounded p-3">
+                <div class="font-semibold text-yellow-600 dark:text-yellow-400">60-74</div>
+                <div class="text-gray-500 dark:text-gray-400">Fair</div>
+            </div>
+            <div class="bg-white dark:bg-gray-700 rounded p-3">
+                <div class="font-semibold text-red-600 dark:text-red-400">0-59</div>
+                <div class="text-gray-500 dark:text-gray-400">Needs Improvement</div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    function filterKPIs(status) {
+        const rows = document.querySelectorAll('.kpi-row');
+        rows.forEach(row => {
+            if (status === 'all') {
+                row.style.display = '';
+            } else {
+                row.style.display = row.dataset.status === status ? '' : 'none';
+            }
+        });
+    }
+
+    function showCategoryDetail(categoryId) {
+        // Could show a modal or navigate to detailed view
+        console.log('Show details for category:', categoryId);
+    }
+
+    function recalculateScores() {
+        // Submit the form to recalculate
+        document.getElementById('kpiForm').submit();
+    }
+
+    function estimateFromData() {
+        fetch('/api/benchmarking/estimate')
+            .then(response => response.json())
+            .then(data => {
+                // Fill in estimated values
+                for (const [kpiId, value] of Object.entries(data.estimated_values)) {
+                    const input = document.querySelector(`input[name="${kpiId}"]`);
+                    if (input && !input.value) {
+                        input.value = value.toFixed(1);
+                        input.classList.add('bg-blue-50', 'dark:bg-blue-900/20');
+                    }
+                }
+            })
+            .catch(error => {
+                console.error('Error estimating values:', error);
+                alert('Could not estimate values. Please enter data manually.');
+            });
+    }
+
+    document.getElementById('kpiForm').addEventListener('submit', function(e) {
+        e.preventDefault();
+        const formData = new FormData(this);
+        const data = {};
+        for (const [key, value] of formData.entries()) {
+            if (value) {
+                data[key] = parseFloat(value);
+            }
+        }
+
+        fetch('/api/benchmarking/save', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify(data)
+        })
+        .then(response => response.json())
+        .then(result => {
+            if (result.success) {
+                window.location.reload();
+            } else {
+                alert('Error saving KPI values');
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('Error saving KPI values');
+        });
+    });
+</script>
+{% endblock %}

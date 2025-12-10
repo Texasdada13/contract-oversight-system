@@ -27,6 +27,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from src.database import get_database
 from src.scoring_engine import ContractScoringEngine, VendorScoringEngine, AlertGenerator
+from src.benchmarking import get_benchmarking_engine, COUPA_BENCHMARKS, BENCHMARK_CATEGORIES
 
 app = Flask(__name__)
 app.secret_key = os.environ.get('SECRET_KEY', 'contract-oversight-dev-key')
@@ -2871,6 +2872,202 @@ def api_county_fiscal(county_id):
     fiscal_year = request.args.get('fiscal_year')
     fiscal_data = db.get_county_fiscal_data(county_id, fiscal_year)
     return jsonify(fiscal_data)
+
+
+# ==========================
+# BENCHMARKING
+# ==========================
+
+@app.route('/benchmarking')
+def benchmarking_page():
+    """Procurement benchmarking dashboard based on Coupa 2025 benchmarks."""
+    global current_contracts
+
+    if current_contracts is None:
+        load_data()
+
+    entity_id = 'marion_county'  # Default entity
+    fiscal_year = request.args.get('fiscal_year', str(datetime.now().year))
+
+    # Get benchmarking engine
+    benchmark_engine = get_benchmarking_engine()
+
+    # Get stored KPI values for this entity
+    current_values = db.get_kpi_values(entity_id, fiscal_year)
+
+    # If no stored values, estimate from contract data
+    if not current_values:
+        contracts_list = current_contracts.to_dict('records') if current_contracts is not None else []
+        payments = []  # Would get from db.get_all_payments() if available
+        vendors = current_vendors.to_dict('records') if current_vendors is not None else []
+        current_values = benchmark_engine.estimate_kpis_from_contracts(contracts_list, payments, vendors)
+
+    # Calculate health score
+    health_score_result = benchmark_engine.calculate_health_score(current_values)
+
+    # Prepare category scores for template
+    category_scores = {}
+    for cat_id, cat_name in BENCHMARK_CATEGORIES.items():
+        cat_score = health_score_result.category_scores.get(cat_id)
+        if cat_score:
+            category_scores[cat_id] = {
+                'name': cat_name,
+                'score': cat_score.score,
+                'kpi_count': len(cat_score.kpi_scores)
+            }
+        else:
+            category_scores[cat_id] = {
+                'name': cat_name,
+                'score': 0,
+                'kpi_count': 0
+            }
+
+    # Prepare KPI scores for table
+    kpi_scores = []
+    for cat_score in health_score_result.category_scores.values():
+        for kpi in cat_score.kpi_scores:
+            kpi_scores.append({
+                'name': kpi.name,
+                'category_name': BENCHMARK_CATEGORIES.get(kpi.category, kpi.category),
+                'actual_value': kpi.actual_value,
+                'benchmark_value': kpi.benchmark_value,
+                'unit': kpi.unit,
+                'gap': kpi.gap,
+                'gap_percent': kpi.gap_percent,
+                'score': kpi.score,
+                'rating': kpi.rating,
+                'description': COUPA_BENCHMARKS.get(kpi.kpi_id, {}).get('description', '')
+            })
+
+    # Count categories above/below benchmark
+    categories_above = sum(1 for cat in category_scores.values() if cat['score'] >= 70)
+    categories_below = sum(1 for cat in category_scores.values() if cat['score'] < 70 and cat['kpi_count'] > 0)
+
+    # Prepare benchmark data for the input form
+    benchmarks = {}
+    for kpi_id, kpi_info in COUPA_BENCHMARKS.items():
+        benchmarks[kpi_id] = {
+            'name': kpi_info['name'],
+            'benchmark': kpi_info['benchmark_value'],
+            'unit': kpi_info['unit'],
+            'direction': kpi_info['direction'],
+            'description': kpi_info.get('description', '')
+        }
+
+    # Prepare health score dict for template
+    health_score_dict = {
+        'overall_score': health_score_result.overall_score,
+        'grade': health_score_result.grade,
+        'rating': health_score_result.rating,
+        'top_strengths': health_score_result.top_strengths,
+        'priority_improvements': health_score_result.priority_improvements
+    }
+
+    return render_template('benchmarking.html',
+                          health_score=health_score_dict,
+                          category_scores=category_scores,
+                          kpi_scores=kpi_scores,
+                          kpi_count=len(current_values),
+                          categories_above_benchmark=categories_above,
+                          categories_below_benchmark=categories_below,
+                          benchmarks=benchmarks,
+                          current_values=current_values,
+                          title='Procurement Benchmarking')
+
+
+@app.route('/api/benchmarking/save', methods=['POST'])
+def api_save_benchmarks():
+    """Save KPI values and recalculate scores."""
+    data = request.get_json()
+    entity_id = 'marion_county'
+    fiscal_year = str(datetime.now().year)
+
+    # Save each KPI value
+    for kpi_id, value in data.items():
+        if value is not None:
+            db.save_kpi_value(entity_id, kpi_id, float(value), fiscal_year)
+
+    # Recalculate and save health score
+    benchmark_engine = get_benchmarking_engine()
+    kpi_values = db.get_kpi_values(entity_id, fiscal_year)
+    health_score = benchmark_engine.calculate_health_score(kpi_values)
+
+    # Save the health score
+    score_data = {
+        'overall_score': health_score.overall_score,
+        'grade': health_score.grade,
+        'rating': health_score.rating,
+        'top_strengths': health_score.top_strengths,
+        'priority_improvements': health_score.priority_improvements
+    }
+    db.save_health_score(entity_id, score_data, fiscal_year)
+
+    # Save category scores
+    for cat_id, cat_score in health_score.category_scores.items():
+        db.save_category_score(
+            entity_id, cat_id, cat_score.category_name,
+            cat_score.score, len(cat_score.kpi_scores),
+            cat_score.strengths, cat_score.improvement_areas, fiscal_year
+        )
+
+    return jsonify({'success': True, 'overall_score': health_score.overall_score})
+
+
+@app.route('/api/benchmarking/estimate')
+def api_estimate_benchmarks():
+    """Estimate KPI values from existing contract data."""
+    global current_contracts, current_vendors
+
+    if current_contracts is None:
+        load_data()
+
+    benchmark_engine = get_benchmarking_engine()
+    contracts_list = current_contracts.to_dict('records') if current_contracts is not None else []
+    vendors = current_vendors.to_dict('records') if current_vendors is not None else []
+
+    estimated_values = benchmark_engine.estimate_kpis_from_contracts(contracts_list, [], vendors)
+
+    return jsonify({'estimated_values': estimated_values})
+
+
+@app.route('/api/benchmarking/health-score')
+def api_get_health_score():
+    """Get the current health score for an entity."""
+    entity_id = request.args.get('entity_id', 'marion_county')
+    fiscal_year = request.args.get('fiscal_year')
+
+    health_score = db.get_health_score(entity_id, fiscal_year)
+    if health_score:
+        return jsonify(health_score)
+    return jsonify({'error': 'No health score found'}), 404
+
+
+@app.route('/api/benchmarking/history')
+def api_health_score_history():
+    """Get health score history for an entity."""
+    entity_id = request.args.get('entity_id', 'marion_county')
+    limit = request.args.get('limit', 10, type=int)
+
+    history = db.get_health_score_history(entity_id, limit)
+    return jsonify(history)
+
+
+@app.route('/api/benchmarking/category-scores')
+def api_category_scores():
+    """Get category scores for an entity."""
+    entity_id = request.args.get('entity_id', 'marion_county')
+    fiscal_year = request.args.get('fiscal_year')
+
+    scores = db.get_category_scores(entity_id, fiscal_year)
+    return jsonify(scores)
+
+
+@app.route('/api/benchmarking/benchmarks')
+def api_get_benchmarks():
+    """Get all benchmark definitions."""
+    benchmark_engine = get_benchmarking_engine()
+    summary = benchmark_engine.get_benchmark_summary()
+    return jsonify(summary)
 
 
 # ==========================

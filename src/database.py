@@ -437,6 +437,59 @@ class DatabaseManager:
             )
         ''')
 
+        # Procurement Benchmark KPI Values
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS benchmark_kpi_values (
+                kpi_value_id INTEGER PRIMARY KEY AUTOINCREMENT,
+                entity_id TEXT NOT NULL,
+                entity_type TEXT DEFAULT 'organization',
+                kpi_id TEXT NOT NULL,
+                actual_value REAL,
+                measurement_date TEXT,
+                fiscal_year TEXT,
+                data_source TEXT,
+                notes TEXT,
+                created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+                updated_at TEXT DEFAULT CURRENT_TIMESTAMP,
+                UNIQUE(entity_id, kpi_id, fiscal_year)
+            )
+        ''')
+
+        # Procurement Health Scores (cached calculations)
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS procurement_health_scores (
+                score_id INTEGER PRIMARY KEY AUTOINCREMENT,
+                entity_id TEXT NOT NULL,
+                entity_type TEXT DEFAULT 'organization',
+                fiscal_year TEXT,
+                overall_score REAL,
+                grade TEXT,
+                rating TEXT,
+                category_scores TEXT,
+                top_strengths TEXT,
+                priority_improvements TEXT,
+                calculated_at TEXT DEFAULT CURRENT_TIMESTAMP,
+                UNIQUE(entity_id, fiscal_year)
+            )
+        ''')
+
+        # Benchmark Category Scores
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS benchmark_category_scores (
+                category_score_id INTEGER PRIMARY KEY AUTOINCREMENT,
+                entity_id TEXT NOT NULL,
+                fiscal_year TEXT,
+                category_id TEXT NOT NULL,
+                category_name TEXT,
+                score REAL,
+                kpi_count INTEGER,
+                strengths TEXT,
+                improvement_areas TEXT,
+                created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+                UNIQUE(entity_id, category_id, fiscal_year)
+            )
+        ''')
+
         # Create indexes
         cursor.execute('CREATE INDEX IF NOT EXISTS idx_contracts_vendor ON contracts(vendor_id)')
         cursor.execute('CREATE INDEX IF NOT EXISTS idx_contracts_status ON contracts(status)')
@@ -1504,6 +1557,243 @@ class DatabaseManager:
 
         conn.close()
         return stats
+
+    # ==================
+    # BENCHMARKING
+    # ==================
+
+    def save_kpi_value(self, entity_id: str, kpi_id: str, actual_value: float,
+                       fiscal_year: str = None, entity_type: str = 'organization',
+                       data_source: str = None, notes: str = None) -> bool:
+        """Save a KPI value for an entity."""
+        conn = self._get_connection()
+        cursor = conn.cursor()
+
+        if not fiscal_year:
+            fiscal_year = str(datetime.now().year)
+
+        try:
+            cursor.execute("""
+                INSERT INTO benchmark_kpi_values
+                (entity_id, entity_type, kpi_id, actual_value, fiscal_year, data_source, notes, measurement_date)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                ON CONFLICT(entity_id, kpi_id, fiscal_year) DO UPDATE SET
+                    actual_value = excluded.actual_value,
+                    data_source = excluded.data_source,
+                    notes = excluded.notes,
+                    updated_at = CURRENT_TIMESTAMP
+            """, (entity_id, entity_type, kpi_id, actual_value, fiscal_year, data_source, notes,
+                  datetime.now().isoformat()))
+            conn.commit()
+            return True
+        except Exception as e:
+            logger.error(f"Error saving KPI value: {e}")
+            return False
+        finally:
+            conn.close()
+
+    def get_kpi_values(self, entity_id: str, fiscal_year: str = None) -> Dict[str, float]:
+        """Get all KPI values for an entity."""
+        conn = self._get_connection()
+        cursor = conn.cursor()
+
+        if fiscal_year:
+            cursor.execute("""
+                SELECT kpi_id, actual_value FROM benchmark_kpi_values
+                WHERE entity_id = ? AND fiscal_year = ?
+            """, (entity_id, fiscal_year))
+        else:
+            # Get most recent values
+            cursor.execute("""
+                SELECT kpi_id, actual_value FROM benchmark_kpi_values
+                WHERE entity_id = ?
+                ORDER BY fiscal_year DESC
+            """, (entity_id,))
+
+        rows = cursor.fetchall()
+        conn.close()
+
+        return {row[0]: row[1] for row in rows}
+
+    def save_health_score(self, entity_id: str, score_data: Dict,
+                          fiscal_year: str = None) -> bool:
+        """Save a procurement health score."""
+        conn = self._get_connection()
+        cursor = conn.cursor()
+
+        if not fiscal_year:
+            fiscal_year = str(datetime.now().year)
+
+        try:
+            cursor.execute("""
+                INSERT INTO procurement_health_scores
+                (entity_id, fiscal_year, overall_score, grade, rating, category_scores,
+                 top_strengths, priority_improvements)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                ON CONFLICT(entity_id, fiscal_year) DO UPDATE SET
+                    overall_score = excluded.overall_score,
+                    grade = excluded.grade,
+                    rating = excluded.rating,
+                    category_scores = excluded.category_scores,
+                    top_strengths = excluded.top_strengths,
+                    priority_improvements = excluded.priority_improvements,
+                    calculated_at = CURRENT_TIMESTAMP
+            """, (
+                entity_id,
+                fiscal_year,
+                score_data.get('overall_score'),
+                score_data.get('grade'),
+                score_data.get('rating'),
+                json.dumps(score_data.get('category_scores', {})),
+                json.dumps(score_data.get('top_strengths', [])),
+                json.dumps(score_data.get('priority_improvements', []))
+            ))
+            conn.commit()
+            return True
+        except Exception as e:
+            logger.error(f"Error saving health score: {e}")
+            return False
+        finally:
+            conn.close()
+
+    def get_health_score(self, entity_id: str, fiscal_year: str = None) -> Optional[Dict]:
+        """Get the most recent health score for an entity."""
+        conn = self._get_connection()
+        cursor = conn.cursor()
+
+        if fiscal_year:
+            cursor.execute("""
+                SELECT * FROM procurement_health_scores
+                WHERE entity_id = ? AND fiscal_year = ?
+            """, (entity_id, fiscal_year))
+        else:
+            cursor.execute("""
+                SELECT * FROM procurement_health_scores
+                WHERE entity_id = ?
+                ORDER BY calculated_at DESC LIMIT 1
+            """, (entity_id,))
+
+        row = cursor.fetchone()
+        conn.close()
+
+        if row:
+            result = dict(row)
+            # Parse JSON fields
+            if result.get('category_scores'):
+                result['category_scores'] = json.loads(result['category_scores'])
+            if result.get('top_strengths'):
+                result['top_strengths'] = json.loads(result['top_strengths'])
+            if result.get('priority_improvements'):
+                result['priority_improvements'] = json.loads(result['priority_improvements'])
+            return result
+        return None
+
+    def get_health_score_history(self, entity_id: str, limit: int = 10) -> List[Dict]:
+        """Get health score history for an entity."""
+        conn = self._get_connection()
+        cursor = conn.cursor()
+
+        cursor.execute("""
+            SELECT fiscal_year, overall_score, grade, rating, calculated_at
+            FROM procurement_health_scores
+            WHERE entity_id = ?
+            ORDER BY fiscal_year DESC
+            LIMIT ?
+        """, (entity_id, limit))
+
+        rows = cursor.fetchall()
+        conn.close()
+
+        return [dict(row) for row in rows]
+
+    def save_category_score(self, entity_id: str, category_id: str, category_name: str,
+                            score: float, kpi_count: int, strengths: List[str],
+                            improvement_areas: List[str], fiscal_year: str = None) -> bool:
+        """Save a category-level benchmark score."""
+        conn = self._get_connection()
+        cursor = conn.cursor()
+
+        if not fiscal_year:
+            fiscal_year = str(datetime.now().year)
+
+        try:
+            cursor.execute("""
+                INSERT INTO benchmark_category_scores
+                (entity_id, fiscal_year, category_id, category_name, score, kpi_count, strengths, improvement_areas)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                ON CONFLICT(entity_id, category_id, fiscal_year) DO UPDATE SET
+                    category_name = excluded.category_name,
+                    score = excluded.score,
+                    kpi_count = excluded.kpi_count,
+                    strengths = excluded.strengths,
+                    improvement_areas = excluded.improvement_areas,
+                    created_at = CURRENT_TIMESTAMP
+            """, (
+                entity_id, fiscal_year, category_id, category_name, score, kpi_count,
+                json.dumps(strengths), json.dumps(improvement_areas)
+            ))
+            conn.commit()
+            return True
+        except Exception as e:
+            logger.error(f"Error saving category score: {e}")
+            return False
+        finally:
+            conn.close()
+
+    def get_category_scores(self, entity_id: str, fiscal_year: str = None) -> List[Dict]:
+        """Get category scores for an entity."""
+        conn = self._get_connection()
+        cursor = conn.cursor()
+
+        if fiscal_year:
+            cursor.execute("""
+                SELECT * FROM benchmark_category_scores
+                WHERE entity_id = ? AND fiscal_year = ?
+                ORDER BY category_id
+            """, (entity_id, fiscal_year))
+        else:
+            cursor.execute("""
+                SELECT * FROM benchmark_category_scores
+                WHERE entity_id = ?
+                ORDER BY fiscal_year DESC, category_id
+            """, (entity_id,))
+
+        rows = cursor.fetchall()
+        conn.close()
+
+        result = []
+        for row in rows:
+            item = dict(row)
+            if item.get('strengths'):
+                item['strengths'] = json.loads(item['strengths'])
+            if item.get('improvement_areas'):
+                item['improvement_areas'] = json.loads(item['improvement_areas'])
+            result.append(item)
+
+        return result
+
+    def get_all_kpi_values_detailed(self, entity_id: str, fiscal_year: str = None) -> List[Dict]:
+        """Get all KPI values with full details for an entity."""
+        conn = self._get_connection()
+        cursor = conn.cursor()
+
+        if fiscal_year:
+            cursor.execute("""
+                SELECT * FROM benchmark_kpi_values
+                WHERE entity_id = ? AND fiscal_year = ?
+                ORDER BY kpi_id
+            """, (entity_id, fiscal_year))
+        else:
+            cursor.execute("""
+                SELECT * FROM benchmark_kpi_values
+                WHERE entity_id = ?
+                ORDER BY fiscal_year DESC, kpi_id
+            """, (entity_id,))
+
+        rows = cursor.fetchall()
+        conn.close()
+
+        return [dict(row) for row in rows]
 
 
 # Global instance
