@@ -2,10 +2,10 @@
 
 {% block content %}
 <!-- Executive Dashboard Header with Print Button -->
-<div class="flex justify-between items-center mb-6">
+<div class="flex justify-between items-center mb-4">
     <div>
-        <h1 class="text-2xl font-bold text-gray-800 dark:text-white">Executive Summary</h1>
-        <p class="text-sm text-gray-500 dark:text-gray-400">Marion County Contract Oversight - {{ report_date }}</p>
+        <h1 class="text-3xl font-bold text-gray-900 dark:text-white">Executive Dashboard</h1>
+        <p class="text-sm text-gray-500 dark:text-gray-400">Board-Level Decision Support - Marion County</p>
     </div>
     <div class="flex space-x-3">
         <button onclick="window.print()" class="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 flex items-center">
@@ -20,6 +20,22 @@
             </svg>
             Full Dashboard
         </a>
+    </div>
+</div>
+
+<!-- AI-Generated Executive Summary -->
+<div class="bg-blue-50 dark:bg-blue-900/20 border-l-4 border-blue-500 p-5 mb-6 rounded-r-lg">
+    <div class="flex items-start">
+        <div class="flex-shrink-0">
+            <svg class="w-6 h-6 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+            </svg>
+        </div>
+        <div class="ml-3 flex-1">
+            <h3 class="text-sm font-semibold text-blue-900 dark:text-blue-100 mb-1">Executive Summary</h3>
+            <p class="text-sm text-blue-800 dark:text-blue-200 leading-relaxed">{{ executive_summary }}</p>
+            <p class="text-xs text-blue-600 dark:text-blue-300 mt-2">Generated {{ last_updated }} on {{ report_date }}</p>
+        </div>
     </div>
 </div>
 
@@ -39,8 +55,21 @@
                 </span>
             </p>
             <p class="text-5xl font-bold mt-2">{{ overall_health }}<span class="text-2xl">/100</span></p>
-            <p class="text-white/80 text-sm mt-1">
+            <p class="text-white/80 text-sm mt-1 flex items-center justify-center gap-2">
                 {% if overall_health >= 70 %}Good Standing{% elif overall_health >= 50 %}Needs Attention{% else %}Critical{% endif %}
+                {% if health_trend == 'improving' %}
+                <span class="inline-flex items-center text-xs">
+                    <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                        <path fill-rule="evenodd" d="M5.293 9.707a1 1 0 010-1.414l4-4a1 1 0 011.414 0l4 4a1 1 0 01-1.414 1.414L11 7.414V15a1 1 0 11-2 0V7.414L6.707 9.707a1 1 0 01-1.414 0z" clip-rule="evenodd" />
+                    </svg> +{{health_change}}
+                </span>
+                {% elif health_trend == 'declining' %}
+                <span class="inline-flex items-center text-xs">
+                    <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                        <path fill-rule="evenodd" d="M14.707 10.293a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 111.414-1.414L9 12.586V5a1 1 0 012 0v7.586l2.293-2.293a1 1 0 011.414 0z" clip-rule="evenodd" />
+                    </svg> {{health_change}}
+                </span>
+                {% endif %}
             </p>
         </div>
         <div class="text-center md:border-r border-white/30">
@@ -61,33 +90,29 @@
     </div>
 </div>
 
-<!-- Quick Stats Row -->
-<div class="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4 mb-8">
-    <div class="bg-white dark:bg-gray-800 rounded-lg shadow p-4 text-center">
-        <p class="text-xs text-gray-500 dark:text-gray-400 uppercase">Budget Variance</p>
-        <p class="text-2xl font-bold {% if summary.overrun_pct > 5 %}text-red-600{% elif summary.overrun_pct > 0 %}text-yellow-600{% else %}text-green-600{% endif %}">
+<!-- Key Performance Metrics (Simplified to 4) -->
+<div class="grid grid-cols-2 md:grid-cols-4 gap-6 mb-8">
+    <div class="bg-white dark:bg-gray-800 rounded-xl shadow-lg p-6 text-center border-l-4 {% if summary.overrun_pct > 5 %}border-red-500{% elif summary.overrun_pct > 0 %}border-yellow-500{% else %}border-green-500{% endif %}">
+        <p class="text-xs text-gray-500 dark:text-gray-400 uppercase tracking-wider font-semibold mb-2">Budget Variance</p>
+        <p class="text-3xl font-bold {% if summary.overrun_pct > 5 %}text-red-600{% elif summary.overrun_pct > 0 %}text-yellow-600{% else %}text-green-600{% endif %}">
             {% if summary.overrun_pct > 0 %}+{% endif %}{{ '{:.1f}'.format(summary.overrun_pct or 0) }}%
         </p>
+        <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">{% if summary.overrun_pct > 5 %}Over Budget{% elif summary.overrun_pct > 0 %}Slight Overrun{% else %}On Track{% endif %}</p>
     </div>
-    <div class="bg-white dark:bg-gray-800 rounded-lg shadow p-4 text-center">
-        <p class="text-xs text-gray-500 dark:text-gray-400 uppercase">On-Time Rate</p>
-        <p class="text-2xl font-bold {% if on_time_rate >= 80 %}text-green-600{% elif on_time_rate >= 60 %}text-yellow-600{% else %}text-red-600{% endif %}">{{ on_time_rate }}%</p>
+    <div class="bg-white dark:bg-gray-800 rounded-xl shadow-lg p-6 text-center border-l-4 {% if on_time_rate >= 80 %}border-green-500{% elif on_time_rate >= 60 %}border-yellow-500{% else %}border-red-500{% endif %}">
+        <p class="text-xs text-gray-500 dark:text-gray-400 uppercase tracking-wider font-semibold mb-2">On-Time Delivery</p>
+        <p class="text-3xl font-bold {% if on_time_rate >= 80 %}text-green-600{% elif on_time_rate >= 60 %}text-yellow-600{% else %}text-red-600{% endif %}">{{ on_time_rate }}%</p>
+        <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">{% if on_time_rate >= 80 %}Excellent{% elif on_time_rate >= 60 %}Needs Improvement{% else %}Critical{% endif %}</p>
     </div>
-    <div class="bg-white dark:bg-gray-800 rounded-lg shadow p-4 text-center">
-        <p class="text-xs text-gray-500 dark:text-gray-400 uppercase">Vendor Count</p>
-        <p class="text-2xl font-bold text-gray-800 dark:text-white">{{ vendor_count }}</p>
+    <div class="bg-white dark:bg-gray-800 rounded-xl shadow-lg p-6 text-center border-l-4 border-blue-500">
+        <p class="text-xs text-gray-500 dark:text-gray-400 uppercase tracking-wider font-semibold mb-2">At-Risk Projects</p>
+        <p class="text-3xl font-bold {% if summary.at_risk_count > 10 %}text-red-600{% elif summary.at_risk_count > 5 %}text-yellow-600{% else %}text-gray-800 dark:text-white{% endif %}">{{ summary.at_risk_count or 0 }}</p>
+        <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">of {{ summary.total_contracts or 0 }} total</p>
     </div>
-    <div class="bg-white dark:bg-gray-800 rounded-lg shadow p-4 text-center">
-        <p class="text-xs text-gray-500 dark:text-gray-400 uppercase">Expiring Soon</p>
-        <p class="text-2xl font-bold {% if expiring_soon > 5 %}text-orange-600{% else %}text-gray-800 dark:text-white{% endif %}">{{ expiring_soon }}</p>
-    </div>
-    <div class="bg-white dark:bg-gray-800 rounded-lg shadow p-4 text-center">
-        <p class="text-xs text-gray-500 dark:text-gray-400 uppercase">Change Orders</p>
-        <p class="text-2xl font-bold {% if change_order_count > 10 %}text-orange-600{% else %}text-gray-800 dark:text-white{% endif %}">{{ change_order_count }}</p>
-    </div>
-    <div class="bg-white dark:bg-gray-800 rounded-lg shadow p-4 text-center">
-        <p class="text-xs text-gray-500 dark:text-gray-400 uppercase">Pending Approvals</p>
-        <p class="text-2xl font-bold {% if pending_approvals > 0 %}text-blue-600{% else %}text-gray-800 dark:text-white{% endif %}">{{ pending_approvals }}</p>
+    <div class="bg-white dark:bg-gray-800 rounded-xl shadow-lg p-6 text-center border-l-4 {% if expiring_soon > 5 %}border-orange-500{% else %}border-gray-300{% endif %}">
+        <p class="text-xs text-gray-500 dark:text-gray-400 uppercase tracking-wider font-semibold mb-2">Expiring Soon</p>
+        <p class="text-3xl font-bold {% if expiring_soon > 5 %}text-orange-600{% else %}text-gray-800 dark:text-white{% endif %}">{{ expiring_soon }}</p>
+        <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">Next 90 days</p>
     </div>
 </div>
 
@@ -95,36 +120,63 @@
 <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
     <!-- Priority Items Column -->
     <div class="lg:col-span-1 space-y-6">
-        <!-- Critical Alerts Box -->
-        <div class="bg-white dark:bg-gray-800 rounded-lg shadow">
-            <div class="px-4 py-3 border-b dark:border-gray-700 bg-red-50 dark:bg-red-900/30 rounded-t-lg">
-                <h3 class="text-sm font-semibold text-red-800 dark:text-red-200 flex items-center">
-                    <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <!-- Action Required: Board Decisions -->
+        <div class="bg-white dark:bg-gray-800 rounded-lg shadow-xl border-2 border-red-200 dark:border-red-800">
+            <div class="px-4 py-3 border-b dark:border-gray-700 bg-gradient-to-r from-red-500 to-orange-500 rounded-t-lg">
+                <h3 class="text-sm font-bold text-white flex items-center">
+                    <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path>
                     </svg>
-                    Items Requiring Immediate Action
+                    Action Required: Board Decisions
                 </h3>
             </div>
             <div class="p-4">
-                {% if critical_items %}
-                <ul class="space-y-2">
-                    {% for item in critical_items[:5] %}
-                    <li class="flex items-start text-sm">
-                        <span class="w-2 h-2 bg-red-500 rounded-full mt-1.5 mr-2 flex-shrink-0"></span>
-                        <div>
-                            <p class="text-gray-800 dark:text-white">{{ item.title }}</p>
-                            <p class="text-xs text-gray-500">{{ item.reason }}</p>
+                {% if action_required %}
+                <div class="space-y-4">
+                    {% for item in action_required %}
+                    <div class="border-l-4 {% if item.priority == 'Critical' %}border-red-600 bg-red-50 dark:bg-red-900/20{% elif item.priority == 'High' %}border-orange-500 bg-orange-50 dark:bg-orange-900/20{% else %}border-yellow-500 bg-yellow-50 dark:bg-yellow-900/20{% endif %} p-3 rounded-r">
+                        <div class="flex items-start justify-between mb-2">
+                            <div class="flex-1">
+                                <p class="text-sm font-semibold text-gray-900 dark:text-white">{{ item.title }}</p>
+                                <p class="text-xs text-gray-600 dark:text-gray-300">{{ item.department }}</p>
+                            </div>
+                            <span class="px-2 py-0.5 rounded text-xs font-bold {% if item.priority == 'Critical' %}bg-red-600 text-white{% elif item.priority == 'High' %}bg-orange-600 text-white{% else %}bg-yellow-600 text-white{% endif %}">
+                                {{ item.priority }}
+                            </span>
                         </div>
-                    </li>
+                        <div class="grid grid-cols-2 gap-2 text-xs mb-2">
+                            <div>
+                                <span class="text-gray-500 dark:text-gray-400">Current Budget:</span>
+                                <span class="font-semibold text-gray-800 dark:text-white">${{ '{:,.0f}'.format(item.value) }}</span>
+                            </div>
+                            <div>
+                                <span class="text-gray-500 dark:text-gray-400">Forecast:</span>
+                                <span class="font-semibold {% if item.budget_overrun > 0 %}text-red-600{% else %}text-gray-800 dark:text-white{% endif %}">${{ '{:,.0f}'.format(item.forecast_budget) }}</span>
+                            </div>
+                            <div>
+                                <span class="text-gray-500 dark:text-gray-400">Health Score:</span>
+                                <span class="font-semibold {% if item.health_score < 30 %}text-red-600{% elif item.health_score < 50 %}text-yellow-600{% else %}text-green-600{% endif %}">{{ item.health_score }}/100</span>
+                            </div>
+                            <div>
+                                <span class="text-gray-500 dark:text-gray-400">Risk:</span>
+                                <span class="font-semibold {% if item.risk_category == 'High' %}text-red-600{% elif item.risk_category == 'Medium' %}text-yellow-600{% else %}text-gray-600{% endif %}">{{ item.risk_category }}</span>
+                            </div>
+                        </div>
+                        <div class="bg-white dark:bg-gray-800 p-2 rounded border border-gray-200 dark:border-gray-700">
+                            <p class="text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1">Decision Needed:</p>
+                            <p class="text-xs text-gray-900 dark:text-white font-medium">{{ item.decision_prompt }}</p>
+                        </div>
+                    </div>
                     {% endfor %}
-                </ul>
+                </div>
                 {% else %}
-                <p class="text-sm text-green-600 dark:text-green-400 text-center py-4">
-                    <svg class="w-5 h-5 mx-auto mb-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+                <div class="text-center py-6">
+                    <svg class="w-12 h-12 mx-auto mb-2 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
                     </svg>
-                    No critical items at this time
-                </p>
+                    <p class="text-sm font-semibold text-green-600 dark:text-green-400">No board actions required</p>
+                    <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">All projects are on track</p>
+                </div>
                 {% endif %}
             </div>
         </div>
