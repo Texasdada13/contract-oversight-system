@@ -2,7 +2,7 @@
 
 {% block content %}
 <!-- Key Metrics -->
-<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+<div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6 mb-8 stats-grid">
     <div class="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
         <div class="flex items-center justify-between">
             <div>
@@ -117,7 +117,17 @@
     <!-- At-Risk Contracts -->
     <div class="bg-white dark:bg-gray-800 rounded-lg shadow">
         <div class="px-6 py-4 border-b dark:border-gray-700 flex justify-between items-center">
-            <h3 class="text-lg font-semibold text-gray-800 dark:text-white">At-Risk Contracts</h3>
+            <h3 class="text-lg font-semibold text-gray-800 dark:text-white flex items-center gap-2">
+                At-Risk Contracts
+                <span class="relative">
+                    <button type="button" onclick="toggleHealthLegend(event, 'healthLegendDashboard')" class="health-info-btn" aria-label="Health score information">
+                        <svg class="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
+                            <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clip-rule="evenodd"></path>
+                        </svg>
+                    </button>
+                    <div id="healthLegendDashboard" class="health-legend"></div>
+                </span>
+            </h3>
             <a href="{{ url_for('contracts_list') }}" class="text-sm text-blue-600 dark:text-blue-400 hover:underline">View All</a>
         </div>
         <div class="p-4">
@@ -160,15 +170,73 @@
 <!-- Charts Row -->
 <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
     <!-- Status Distribution -->
-    <div class="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
-        <h3 class="text-lg font-semibold text-gray-800 dark:text-white mb-4">Contract Status</h3>
-        <div id="statusChart" style="height: 300px;"></div>
+    <div class="bg-white dark:bg-gray-800 rounded-lg shadow">
+        <div class="flex justify-between items-center px-6 py-4 border-b dark:border-gray-700">
+            <h3 class="text-lg font-semibold text-gray-800 dark:text-white">Contract Status</h3>
+            <div class="flex items-center space-x-2">
+                <button onclick="toggleDataTable('statusTable')" class="p-1.5 rounded hover:bg-gray-100 dark:hover:bg-gray-700" title="Toggle data table">
+                    <svg class="w-4 h-4 text-gray-500 dark:text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h18M3 14h18m-9-4v8m-7 0h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"></path>
+                    </svg>
+                </button>
+                <button onclick="exportChart('statusChart', 'status-distribution')" class="p-1.5 rounded hover:bg-gray-100 dark:hover:bg-gray-700" title="Export as PNG">
+                    <svg class="w-4 h-4 text-gray-500 dark:text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path>
+                    </svg>
+                </button>
+            </div>
+        </div>
+        <div class="p-6">
+            <div id="statusChart" style="height: 280px;"></div>
+            <p class="text-xs text-gray-500 dark:text-gray-400 text-center mt-2">Click a segment to filter contracts by status</p>
+            <div id="statusTable" class="hidden mt-4 border dark:border-gray-700 rounded-lg overflow-hidden">
+                <table class="w-full text-sm">
+                    <thead class="bg-gray-50 dark:bg-gray-700">
+                        <tr>
+                            <th class="px-4 py-2 text-left text-gray-600 dark:text-gray-300">Status</th>
+                            <th class="px-4 py-2 text-right text-gray-600 dark:text-gray-300">Count</th>
+                            <th class="px-4 py-2 text-right text-gray-600 dark:text-gray-300">%</th>
+                        </tr>
+                    </thead>
+                    <tbody id="statusTableBody" class="divide-y dark:divide-gray-700"></tbody>
+                </table>
+            </div>
+        </div>
     </div>
 
     <!-- Department Spending -->
-    <div class="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
-        <h3 class="text-lg font-semibold text-gray-800 dark:text-white mb-4">Spending by Department</h3>
-        <div id="departmentChart" style="height: 300px;"></div>
+    <div class="bg-white dark:bg-gray-800 rounded-lg shadow">
+        <div class="flex justify-between items-center px-6 py-4 border-b dark:border-gray-700">
+            <h3 class="text-lg font-semibold text-gray-800 dark:text-white">Spending by Department</h3>
+            <div class="flex items-center space-x-2">
+                <button onclick="toggleDataTable('deptTable')" class="p-1.5 rounded hover:bg-gray-100 dark:hover:bg-gray-700" title="Toggle data table">
+                    <svg class="w-4 h-4 text-gray-500 dark:text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h18M3 14h18m-9-4v8m-7 0h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"></path>
+                    </svg>
+                </button>
+                <button onclick="exportChart('departmentChart', 'department-spending')" class="p-1.5 rounded hover:bg-gray-100 dark:hover:bg-gray-700" title="Export as PNG">
+                    <svg class="w-4 h-4 text-gray-500 dark:text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path>
+                    </svg>
+                </button>
+            </div>
+        </div>
+        <div class="p-6">
+            <div id="departmentChart" style="height: 280px;"></div>
+            <p class="text-xs text-gray-500 dark:text-gray-400 text-center mt-2">Click a bar to filter contracts by department</p>
+            <div id="deptTable" class="hidden mt-4 border dark:border-gray-700 rounded-lg overflow-hidden">
+                <table class="w-full text-sm">
+                    <thead class="bg-gray-50 dark:bg-gray-700">
+                        <tr>
+                            <th class="px-4 py-2 text-left text-gray-600 dark:text-gray-300">Department</th>
+                            <th class="px-4 py-2 text-right text-gray-600 dark:text-gray-300">Contracts</th>
+                            <th class="px-4 py-2 text-right text-gray-600 dark:text-gray-300">%</th>
+                        </tr>
+                    </thead>
+                    <tbody id="deptTableBody" class="divide-y dark:divide-gray-700"></tbody>
+                </table>
+            </div>
+        </div>
     </div>
 </div>
 
@@ -189,18 +257,22 @@
                 </div>
                 <div class="flex-1">
                     <p class="text-sm text-gray-800 dark:text-white">
+                        {% if change.notes %}
+                        {{ change.notes }}
+                        {% else %}
                         <span class="font-medium">{{ change.changed_by or 'System' }}</span>
                         {{ change.action|lower }}d
-                        {% if change.contract_title %}
-                        <a href="{{ url_for('contract_detail', contract_id=change.record_id) }}" class="text-blue-600 dark:text-blue-400 hover:underline">{{ change.contract_title[:30] }}{% if change.contract_title|length > 30 %}...{% endif %}</a>
-                        {% else %}
-                        {{ change.table_name }}
+                        {% if change.field_name %}{{ change.field_name }}{% endif %}
                         {% endif %}
                     </p>
-                    {% if change.field_name %}
-                    <p class="text-xs text-gray-500 dark:text-gray-400">{{ change.field_name }}: {{ (change.old_value or '')[:20] }} → {{ (change.new_value or '')[:20] }}</p>
+                    {% if change.contract_title %}
+                    <p class="text-xs text-gray-600 dark:text-gray-300">
+                        <a href="{{ url_for('contract_detail', contract_id=change.record_id) }}" class="text-blue-600 dark:text-blue-400 hover:underline">{{ change.contract_title[:40] }}{% if change.contract_title|length > 40 %}...{% endif %}</a>
+                    </p>
                     {% endif %}
-                    <p class="text-xs text-gray-400 dark:text-gray-500">{{ change.changed_at }}</p>
+                    <p class="text-xs text-gray-400 dark:text-gray-500 mt-1">
+                        {{ change.changed_by.split(',')[0] if change.changed_by and ',' in change.changed_by else (change.changed_by or 'System') }} · {{ change.changed_at|format_date }}
+                    </p>
                 </div>
             </div>
             {% endfor %}
@@ -214,6 +286,43 @@
 
 {% block scripts %}
 <script>
+    // Helper functions for chart interactivity
+    function toggleDataTable(tableId) {
+        const table = document.getElementById(tableId);
+        if (table) {
+            table.classList.toggle('hidden');
+        }
+    }
+
+    function exportChart(chartId, filename) {
+        Plotly.downloadImage(chartId, {
+            format: 'png',
+            width: 800,
+            height: 600,
+            filename: filename + '-' + new Date().toISOString().split('T')[0]
+        }).then(function() {
+            showSuccess('Chart exported successfully!');
+        }).catch(function(err) {
+            showError('Failed to export chart');
+            console.error(err);
+        });
+    }
+
+    function populateDataTable(tableBodyId, data, total) {
+        const tbody = document.getElementById(tableBodyId);
+        if (!tbody) return;
+
+        tbody.innerHTML = Object.entries(data)
+            .sort((a, b) => b[1] - a[1])
+            .map(([label, value]) => `
+                <tr class="hover:bg-gray-50 dark:hover:bg-gray-700">
+                    <td class="px-4 py-2 text-gray-800 dark:text-gray-200">${label}</td>
+                    <td class="px-4 py-2 text-right text-gray-800 dark:text-gray-200">${value}</td>
+                    <td class="px-4 py-2 text-right text-gray-500 dark:text-gray-400">${((value / total) * 100).toFixed(1)}%</td>
+                </tr>
+            `).join('');
+    }
+
     // Status Distribution Chart
     const statusData = {{ summary.status_distribution | tojson | safe }};
     if (Object.keys(statusData).length > 0) {
@@ -224,32 +333,127 @@
             'Cancelled': '#EF4444'
         };
 
+        const statusTotal = Object.values(statusData).reduce((a, b) => a + b, 0);
+
         Plotly.newPlot('statusChart', [{
             type: 'pie',
             labels: Object.keys(statusData),
             values: Object.values(statusData),
             marker: { colors: Object.keys(statusData).map(s => statusColors[s] || '#6B7280') },
-            hole: 0.4
+            hole: 0.4,
+            textinfo: 'label+percent',
+            hoverinfo: 'label+value+percent',
+            hoverlabel: { bgcolor: '#1f2937', font: { color: 'white' } }
         }], {
             margin: { t: 20, b: 20, l: 20, r: 20 },
             showlegend: true,
-            legend: { orientation: 'h', y: -0.1 }
-        }, { responsive: true });
+            legend: { orientation: 'h', y: -0.1 },
+            paper_bgcolor: 'transparent',
+            plot_bgcolor: 'transparent'
+        }, {
+            responsive: true,
+            displayModeBar: false
+        });
+
+        // Click handler for drill-down
+        document.getElementById('statusChart').on('plotly_click', function(data) {
+            if (data.points && data.points[0]) {
+                const status = data.points[0].label;
+                window.location.href = `/contracts?status=${encodeURIComponent(status)}`;
+            }
+        });
+
+        // Populate data table
+        populateDataTable('statusTableBody', statusData, statusTotal);
     }
 
     // Department Chart
     const deptData = {{ summary.department_distribution | tojson | safe }};
     if (Object.keys(deptData).length > 0) {
+        const deptTotal = Object.values(deptData).reduce((a, b) => a + b, 0);
+
         Plotly.newPlot('departmentChart', [{
             type: 'bar',
             x: Object.keys(deptData),
             y: Object.values(deptData),
-            marker: { color: '#3B82F6' }
+            marker: {
+                color: '#3B82F6',
+                line: { color: '#1D4ED8', width: 1 }
+            },
+            hoverinfo: 'x+y',
+            hoverlabel: { bgcolor: '#1f2937', font: { color: 'white' } }
         }], {
-            margin: { t: 20, b: 60, l: 40, r: 20 },
-            xaxis: { tickangle: -45 },
-            yaxis: { title: 'Contracts' }
-        }, { responsive: true });
+            margin: { t: 20, b: 60, l: 50, r: 20 },
+            xaxis: {
+                tickangle: -45,
+                tickfont: { size: 11 }
+            },
+            yaxis: {
+                title: 'Contracts',
+                gridcolor: 'rgba(156, 163, 175, 0.2)'
+            },
+            paper_bgcolor: 'transparent',
+            plot_bgcolor: 'transparent',
+            bargap: 0.3
+        }, {
+            responsive: true,
+            displayModeBar: false
+        });
+
+        // Click handler for drill-down
+        document.getElementById('departmentChart').on('plotly_click', function(data) {
+            if (data.points && data.points[0]) {
+                const dept = data.points[0].x;
+                window.location.href = `/contracts?department=${encodeURIComponent(dept)}`;
+            }
+        });
+
+        // Populate data table
+        populateDataTable('deptTableBody', deptData, deptTotal);
+
+        // Add hover effect for bars
+        const deptChart = document.getElementById('departmentChart');
+        deptChart.on('plotly_hover', function() {
+            deptChart.style.cursor = 'pointer';
+        });
+        deptChart.on('plotly_unhover', function() {
+            deptChart.style.cursor = 'default';
+        });
     }
+
+    // Update charts for dark mode
+    function updateChartsForDarkMode() {
+        const isDark = document.documentElement.classList.contains('dark');
+        const textColor = isDark ? '#e5e7eb' : '#374151';
+        const gridColor = isDark ? 'rgba(75, 85, 99, 0.3)' : 'rgba(156, 163, 175, 0.2)';
+
+        if (Object.keys(statusData).length > 0) {
+            Plotly.relayout('statusChart', {
+                'legend.font.color': textColor
+            });
+        }
+
+        if (Object.keys(deptData).length > 0) {
+            Plotly.relayout('departmentChart', {
+                'xaxis.tickfont.color': textColor,
+                'yaxis.tickfont.color': textColor,
+                'yaxis.titlefont.color': textColor,
+                'yaxis.gridcolor': gridColor
+            });
+        }
+    }
+
+    // Listen for dark mode changes
+    const observer = new MutationObserver(function(mutations) {
+        mutations.forEach(function(mutation) {
+            if (mutation.attributeName === 'class') {
+                updateChartsForDarkMode();
+            }
+        });
+    });
+    observer.observe(document.documentElement, { attributes: true });
+
+    // Initial dark mode check
+    document.addEventListener('DOMContentLoaded', updateChartsForDarkMode);
 </script>
 {% endblock %}

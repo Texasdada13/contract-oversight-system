@@ -124,13 +124,13 @@
                 <tr>
                     <td class="px-6 py-3 text-sm text-gray-600 dark:text-gray-400">Start Date</td>
                     {% for contract in contracts %}
-                    <td class="px-6 py-3 text-sm text-gray-800 dark:text-white">{{ contract.start_date }}</td>
+                    <td class="px-6 py-3 text-sm text-gray-800 dark:text-white">{{ contract.start_date|format_date }}</td>
                     {% endfor %}
                 </tr>
                 <tr class="bg-gray-50 dark:bg-gray-700/50">
                     <td class="px-6 py-3 text-sm text-gray-600 dark:text-gray-400">End Date</td>
                     {% for contract in contracts %}
-                    <td class="px-6 py-3 text-sm text-gray-800 dark:text-white">{{ contract.current_end_date or contract.end_date }}</td>
+                    <td class="px-6 py-3 text-sm text-gray-800 dark:text-white">{{ (contract.current_end_date or contract.end_date)|format_date }}</td>
                     {% endfor %}
                 </tr>
                 <tr>

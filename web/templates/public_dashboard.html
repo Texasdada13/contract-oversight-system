@@ -174,7 +174,7 @@
                                 {% endif %}
                             </td>
                             <td class="px-6 py-4 text-sm text-gray-500">
-                                {{ contract.start_date }} - {{ contract.end_date }}
+                                {{ contract.start_date|format_date }} - {{ contract.end_date|format_date }}
                             </td>
                         </tr>
                         {% endfor %}

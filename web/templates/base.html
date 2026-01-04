@@ -14,10 +14,41 @@
     <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
     <style>
         .sidebar-link {
-            @apply flex items-center px-4 py-3 text-gray-600 dark:text-gray-300 hover:bg-blue-50 dark:hover:bg-gray-700 hover:text-blue-700 dark:hover:text-blue-400 transition-colors;
+            @apply flex items-center px-4 py-2.5 text-gray-600 dark:text-gray-300 hover:bg-blue-50 dark:hover:bg-gray-700 hover:text-blue-700 dark:hover:text-blue-400 transition-colors text-sm;
         }
         .sidebar-link.active {
             @apply bg-blue-50 dark:bg-gray-700 text-blue-700 dark:text-blue-400 border-r-4 border-blue-700;
+        }
+        .sidebar-collapsed .sidebar-link span {
+            @apply hidden;
+        }
+        .sidebar-collapsed .sidebar-link {
+            @apply justify-center px-2;
+        }
+        .sidebar-collapsed .sidebar-link svg {
+            @apply mr-0;
+        }
+        .sidebar-collapsed .section-header span,
+        .sidebar-collapsed .section-header svg.chevron,
+        .sidebar-collapsed .sidebar-footer p {
+            @apply hidden;
+        }
+        .sidebar-collapsed .section-header {
+            @apply justify-center py-3;
+        }
+        .section-content {
+            max-height: 0;
+            overflow: hidden;
+            transition: max-height 0.3s ease-out;
+        }
+        .section-content.expanded {
+            max-height: 500px;
+        }
+        .chevron {
+            transition: transform 0.3s ease;
+        }
+        .chevron.rotated {
+            transform: rotate(180deg);
         }
         .health-critical { @apply bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200; }
         .health-high { @apply bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-200; }
@@ -28,6 +59,997 @@
         .status-completed { @apply bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200; }
         .status-draft { @apply bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-200; }
         .status-cancelled { @apply bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200; }
+
+        /* Standardized Button Styles */
+        .btn {
+            @apply inline-flex items-center justify-center px-4 py-2 text-sm font-medium rounded-lg transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed;
+        }
+        .btn-sm {
+            @apply px-3 py-1.5 text-xs;
+        }
+        .btn-lg {
+            @apply px-6 py-3 text-base;
+        }
+        .btn-primary {
+            @apply bg-blue-600 text-white hover:bg-blue-700 focus:ring-blue-500 dark:bg-blue-500 dark:hover:bg-blue-600;
+        }
+        .btn-secondary {
+            @apply bg-gray-600 text-white hover:bg-gray-700 focus:ring-gray-500 dark:bg-gray-500 dark:hover:bg-gray-600;
+        }
+        .btn-success {
+            @apply bg-green-600 text-white hover:bg-green-700 focus:ring-green-500 dark:bg-green-500 dark:hover:bg-green-600;
+        }
+        .btn-danger {
+            @apply bg-red-600 text-white hover:bg-red-700 focus:ring-red-500 dark:bg-red-500 dark:hover:bg-red-600;
+        }
+        .btn-warning {
+            @apply bg-yellow-500 text-white hover:bg-yellow-600 focus:ring-yellow-400 dark:bg-yellow-500 dark:hover:bg-yellow-600;
+        }
+        .btn-outline {
+            @apply border border-gray-300 text-gray-700 bg-white hover:bg-gray-50 focus:ring-gray-500 dark:border-gray-600 dark:text-gray-300 dark:bg-transparent dark:hover:bg-gray-700;
+        }
+        .btn-outline-primary {
+            @apply border border-blue-600 text-blue-600 bg-transparent hover:bg-blue-50 focus:ring-blue-500 dark:border-blue-400 dark:text-blue-400 dark:hover:bg-blue-900/20;
+        }
+        .btn-ghost {
+            @apply text-gray-600 bg-transparent hover:bg-gray-100 focus:ring-gray-500 dark:text-gray-300 dark:hover:bg-gray-700;
+        }
+        .btn-icon {
+            @apply p-2 rounded-lg;
+        }
+
+        /* Breadcrumb Styles */
+        .breadcrumb {
+            @apply flex items-center text-sm text-gray-500 dark:text-gray-400;
+        }
+        .breadcrumb-item {
+            @apply flex items-center;
+        }
+        .breadcrumb-item a {
+            @apply hover:text-blue-600 dark:hover:text-blue-400 transition-colors;
+        }
+        .breadcrumb-item.active {
+            @apply text-gray-800 dark:text-white font-medium;
+        }
+        .breadcrumb-separator {
+            @apply mx-2 text-gray-400;
+        }
+
+        /* Empty State Styles */
+        .empty-state {
+            @apply text-center py-12 px-6;
+        }
+        .empty-state-icon {
+            @apply w-16 h-16 mx-auto mb-4 text-gray-300 dark:text-gray-600;
+        }
+        .empty-state-title {
+            @apply text-lg font-medium text-gray-800 dark:text-white mb-2;
+        }
+        .empty-state-description {
+            @apply text-gray-500 dark:text-gray-400 text-sm mb-6 max-w-md mx-auto;
+        }
+        .empty-state-compact {
+            @apply py-6;
+        }
+        .empty-state-compact .empty-state-icon {
+            @apply w-10 h-10 mb-2;
+        }
+        .empty-state-compact .empty-state-title {
+            @apply text-base mb-1;
+        }
+
+        /* Sidebar transition */
+        .sidebar {
+            transition: width 0.3s ease, transform 0.3s ease;
+        }
+        .sidebar-collapsed {
+            width: 4.5rem !important;
+        }
+
+        /* Mobile sidebar styles */
+        @media (max-width: 1023px) {
+            .sidebar {
+                position: fixed;
+                left: 0;
+                top: 0;
+                bottom: 0;
+                z-index: 50;
+                transform: translateX(-100%);
+            }
+            .sidebar.mobile-open {
+                transform: translateX(0);
+            }
+            .sidebar-collapsed {
+                width: 16rem !important;
+                transform: translateX(-100%);
+            }
+            .sidebar-collapsed.mobile-open {
+                transform: translateX(0);
+            }
+        }
+
+        /* Overlay for mobile */
+        .sidebar-overlay {
+            position: fixed;
+            inset: 0;
+            background-color: rgba(0, 0, 0, 0.5);
+            z-index: 40;
+            opacity: 0;
+            visibility: hidden;
+            transition: opacity 0.3s ease, visibility 0.3s ease;
+        }
+        .sidebar-overlay.active {
+            opacity: 1;
+            visibility: visible;
+        }
+
+        /* Tablet-Specific Responsive Styles (768px - 1024px) */
+        @media (min-width: 768px) and (max-width: 1024px) {
+            /* Ensure touch targets are at least 44px */
+            button, a.btn, input[type="submit"], input[type="button"],
+            select, .sidebar-link, .nav-link {
+                min-height: 44px;
+                min-width: 44px;
+            }
+
+            /* Adjust card grids for tablet */
+            .tablet-cols-2 {
+                grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+            }
+
+            .tablet-cols-3 {
+                grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+            }
+
+            /* Stats cards: 2 columns on tablet */
+            .stats-grid {
+                grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+            }
+
+            /* Larger tap targets for table actions */
+            table button, table a {
+                padding: 0.625rem !important;
+            }
+
+            /* Improved spacing for cards */
+            .card, .bg-white.rounded-lg, .dark\:bg-gray-800.rounded-lg {
+                padding: 1.25rem;
+            }
+
+            /* Form inputs larger on tablet */
+            input, select, textarea {
+                font-size: 16px !important; /* Prevents zoom on iOS */
+                padding: 0.75rem !important;
+            }
+
+            /* Modal sizing for tablet */
+            .modal-content, [role="dialog"] > div {
+                max-width: 90vw !important;
+                max-height: 85vh !important;
+            }
+
+            /* Chart container adjustments */
+            [id$="Chart"] {
+                min-height: 280px;
+            }
+
+            /* Filter form layout */
+            .filter-form {
+                grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+            }
+        }
+
+        /* Touch-friendly styles for all mobile/tablet */
+        @media (max-width: 1024px) {
+            /* Larger click areas */
+            .dropdown-item, .menu-item {
+                padding: 0.875rem 1rem;
+            }
+
+            /* Better spacing between interactive elements */
+            .action-buttons > * {
+                margin: 0.25rem;
+            }
+
+            /* Scroll snap for horizontal scrolling */
+            .scroll-snap-x {
+                scroll-snap-type: x mandatory;
+                -webkit-overflow-scrolling: touch;
+            }
+
+            .scroll-snap-x > * {
+                scroll-snap-align: start;
+            }
+        }
+
+        /* Form Validation Styles */
+        .form-field {
+            position: relative;
+        }
+        .form-field input,
+        .form-field select,
+        .form-field textarea {
+            transition: border-color 0.2s ease, box-shadow 0.2s ease;
+        }
+        .form-field.is-valid input,
+        .form-field.is-valid select,
+        .form-field.is-valid textarea {
+            border-color: #10b981 !important;
+        }
+        .form-field.is-invalid input,
+        .form-field.is-invalid select,
+        .form-field.is-invalid textarea {
+            border-color: #ef4444 !important;
+        }
+        .form-field.is-invalid input:focus,
+        .form-field.is-invalid select:focus,
+        .form-field.is-invalid textarea:focus {
+            box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.2) !important;
+        }
+        .validation-icon {
+            position: absolute;
+            right: 0.75rem;
+            top: 50%;
+            transform: translateY(-50%);
+            pointer-events: none;
+        }
+        .validation-icon.valid {
+            color: #10b981;
+        }
+        .validation-icon.invalid {
+            color: #ef4444;
+        }
+        .error-message {
+            display: none;
+            font-size: 0.75rem;
+            color: #ef4444;
+            margin-top: 0.25rem;
+        }
+        .form-field.is-invalid .error-message {
+            display: block;
+        }
+        .dark .error-message {
+            color: #f87171;
+        }
+
+        /* Recently Viewed Dropdown Styles */
+        .recent-dropdown {
+            position: relative;
+        }
+        .recent-dropdown-menu {
+            position: absolute;
+            top: 100%;
+            right: 0;
+            margin-top: 0.5rem;
+            min-width: 320px;
+            max-width: 400px;
+            background: white;
+            border-radius: 0.5rem;
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+            border: 1px solid #e5e7eb;
+            opacity: 0;
+            visibility: hidden;
+            transform: translateY(-8px);
+            transition: all 0.2s ease;
+            z-index: 50;
+        }
+        .dark .recent-dropdown-menu {
+            background: #1f2937;
+            border-color: #374151;
+        }
+        .recent-dropdown.open .recent-dropdown-menu {
+            opacity: 1;
+            visibility: visible;
+            transform: translateY(0);
+        }
+        .recent-item {
+            display: flex;
+            align-items: center;
+            padding: 0.75rem 1rem;
+            border-bottom: 1px solid #f3f4f6;
+            transition: background-color 0.15s ease;
+            text-decoration: none;
+            color: inherit;
+        }
+        .dark .recent-item {
+            border-color: #374151;
+        }
+        .recent-item:hover {
+            background-color: #f9fafb;
+        }
+        .dark .recent-item:hover {
+            background-color: #374151;
+        }
+        .recent-item:last-child {
+            border-bottom: none;
+        }
+        .recent-item-icon {
+            flex-shrink: 0;
+            width: 2rem;
+            height: 2rem;
+            border-radius: 0.375rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-right: 0.75rem;
+        }
+        .recent-item-content {
+            flex: 1;
+            min-width: 0;
+        }
+        .recent-item-title {
+            font-weight: 500;
+            font-size: 0.875rem;
+            color: #1f2937;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        .dark .recent-item-title {
+            color: #f9fafb;
+        }
+        .recent-item-meta {
+            font-size: 0.75rem;
+            color: #6b7280;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        .dark .recent-item-meta {
+            color: #9ca3af;
+        }
+        .recent-item-time {
+            flex-shrink: 0;
+            font-size: 0.75rem;
+            color: #9ca3af;
+            margin-left: 0.5rem;
+        }
+        .dark .recent-item-time {
+            color: #6b7280;
+        }
+
+        /* Skeleton Loader Animation */
+        @keyframes shimmer {
+            0% { background-position: -200% 0; }
+            100% { background-position: 200% 0; }
+        }
+        .skeleton {
+            background: linear-gradient(90deg, #e5e7eb 25%, #f3f4f6 50%, #e5e7eb 75%);
+            background-size: 200% 100%;
+            animation: shimmer 1.5s infinite;
+            border-radius: 0.375rem;
+        }
+        .dark .skeleton {
+            background: linear-gradient(90deg, #374151 25%, #4b5563 50%, #374151 75%);
+            background-size: 200% 100%;
+        }
+
+        /* Tooltip Styles */
+        .tooltip {
+            position: relative;
+        }
+        .tooltip-content {
+            visibility: hidden;
+            opacity: 0;
+            position: absolute;
+            z-index: 100;
+            background-color: #1f2937;
+            color: white;
+            padding: 0.5rem 0.75rem;
+            border-radius: 0.375rem;
+            font-size: 0.75rem;
+            white-space: normal;
+            max-width: 300px;
+            word-wrap: break-word;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+            transition: opacity 0.2s ease, visibility 0.2s ease;
+            pointer-events: none;
+        }
+        .tooltip-content.tooltip-top {
+            bottom: 100%;
+            left: 50%;
+            transform: translateX(-50%);
+            margin-bottom: 0.5rem;
+        }
+        .tooltip-content.tooltip-bottom {
+            top: 100%;
+            left: 50%;
+            transform: translateX(-50%);
+            margin-top: 0.5rem;
+        }
+        .tooltip-content.tooltip-left {
+            right: 100%;
+            top: 50%;
+            transform: translateY(-50%);
+            margin-right: 0.5rem;
+        }
+        .tooltip-content.tooltip-right {
+            left: 100%;
+            top: 50%;
+            transform: translateY(-50%);
+            margin-left: 0.5rem;
+        }
+        .tooltip:hover .tooltip-content,
+        .tooltip:focus .tooltip-content {
+            visibility: visible;
+            opacity: 1;
+        }
+        /* Arrow for tooltips */
+        .tooltip-content::after {
+            content: '';
+            position: absolute;
+            border: 6px solid transparent;
+        }
+        .tooltip-content.tooltip-top::after {
+            top: 100%;
+            left: 50%;
+            transform: translateX(-50%);
+            border-top-color: #1f2937;
+        }
+        .tooltip-content.tooltip-bottom::after {
+            bottom: 100%;
+            left: 50%;
+            transform: translateX(-50%);
+            border-bottom-color: #1f2937;
+        }
+        /* Truncate with ellipsis class */
+        .truncate-tooltip {
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+            cursor: default;
+        }
+        .skeleton-text { height: 1rem; margin-bottom: 0.5rem; }
+        .skeleton-text-sm { height: 0.75rem; margin-bottom: 0.375rem; }
+        .skeleton-text-lg { height: 1.5rem; margin-bottom: 0.75rem; }
+
+        /* Health Score Legend Styles */
+        .health-legend {
+            display: none;
+            position: absolute;
+            z-index: 100;
+            background-color: white;
+            border: 1px solid #e5e7eb;
+            border-radius: 0.5rem;
+            padding: 1rem;
+            box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1);
+            min-width: 280px;
+            top: 100%;
+            left: 50%;
+            transform: translateX(-50%);
+            margin-top: 0.5rem;
+        }
+        .dark .health-legend {
+            background-color: #374151;
+            border-color: #4b5563;
+        }
+        .health-legend.show {
+            display: block;
+        }
+        .health-legend-title {
+            font-weight: 600;
+            font-size: 0.875rem;
+            margin-bottom: 0.75rem;
+            color: #111827;
+            border-bottom: 1px solid #e5e7eb;
+            padding-bottom: 0.5rem;
+        }
+        .dark .health-legend-title {
+            color: #f9fafb;
+            border-bottom-color: #4b5563;
+        }
+        .health-legend-item {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            padding: 0.375rem 0;
+            font-size: 0.8125rem;
+        }
+        .health-legend-badge {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 3rem;
+            padding: 0.25rem 0.5rem;
+            border-radius: 0.375rem;
+            font-weight: 600;
+            font-size: 0.75rem;
+        }
+        .health-legend-desc {
+            color: #4b5563;
+            flex: 1;
+        }
+        .dark .health-legend-desc {
+            color: #d1d5db;
+        }
+        .health-info-btn {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 1.25rem;
+            height: 1.25rem;
+            border-radius: 50%;
+            background-color: #e5e7eb;
+            color: #6b7280;
+            cursor: pointer;
+            transition: background-color 0.2s, color 0.2s;
+            flex-shrink: 0;
+        }
+        .health-info-btn:hover {
+            background-color: #d1d5db;
+            color: #374151;
+        }
+        .dark .health-info-btn {
+            background-color: #4b5563;
+            color: #9ca3af;
+        }
+        .dark .health-info-btn:hover {
+            background-color: #6b7280;
+            color: #f9fafb;
+        }
+
+        /* Toast Notification Styles */
+        .toast-container {
+            position: fixed;
+            top: 1rem;
+            right: 1rem;
+            z-index: 9999;
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+            max-width: 400px;
+            pointer-events: none;
+        }
+        .toast {
+            display: flex;
+            align-items: flex-start;
+            gap: 0.75rem;
+            padding: 1rem;
+            border-radius: 0.5rem;
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+            pointer-events: auto;
+            animation: slideIn 0.3s ease-out;
+            max-width: 100%;
+        }
+        .toast.toast-success {
+            background-color: #ecfdf5;
+            border-left: 4px solid #10b981;
+        }
+        .dark .toast.toast-success {
+            background-color: #064e3b;
+        }
+        .toast.toast-error {
+            background-color: #fef2f2;
+            border-left: 4px solid #ef4444;
+        }
+        .dark .toast.toast-error {
+            background-color: #7f1d1d;
+        }
+        .toast.toast-warning {
+            background-color: #fffbeb;
+            border-left: 4px solid #f59e0b;
+        }
+        .dark .toast.toast-warning {
+            background-color: #78350f;
+        }
+        .toast.toast-info {
+            background-color: #eff6ff;
+            border-left: 4px solid #3b82f6;
+        }
+        .dark .toast.toast-info {
+            background-color: #1e3a8a;
+        }
+        .toast-icon {
+            flex-shrink: 0;
+            width: 1.25rem;
+            height: 1.25rem;
+        }
+        .toast-success .toast-icon { color: #10b981; }
+        .toast-error .toast-icon { color: #ef4444; }
+        .toast-warning .toast-icon { color: #f59e0b; }
+        .toast-info .toast-icon { color: #3b82f6; }
+        .toast-content {
+            flex: 1;
+            min-width: 0;
+        }
+        .toast-title {
+            font-weight: 600;
+            font-size: 0.875rem;
+            color: #111827;
+            margin-bottom: 0.25rem;
+        }
+        .dark .toast-title {
+            color: #f9fafb;
+        }
+        .toast-message {
+            font-size: 0.875rem;
+            color: #4b5563;
+        }
+        .dark .toast-message {
+            color: #d1d5db;
+        }
+        .toast-close {
+            flex-shrink: 0;
+            padding: 0.25rem;
+            color: #9ca3af;
+            cursor: pointer;
+            transition: color 0.2s;
+        }
+        .toast-close:hover {
+            color: #4b5563;
+        }
+        .dark .toast-close:hover {
+            color: #d1d5db;
+        }
+        .toast.hiding {
+            animation: slideOut 0.3s ease-in forwards;
+        }
+        @keyframes slideIn {
+            from {
+                transform: translateX(100%);
+                opacity: 0;
+            }
+            to {
+                transform: translateX(0);
+                opacity: 1;
+            }
+        }
+        @keyframes slideOut {
+            from {
+                transform: translateX(0);
+                opacity: 1;
+            }
+            to {
+                transform: translateX(100%);
+                opacity: 0;
+            }
+        }
+
+        .skeleton-circle { border-radius: 50%; }
+        .skeleton-card { height: 8rem; border-radius: 0.5rem; }
+        .skeleton-chart { height: 16rem; border-radius: 0.5rem; }
+        .skeleton-table-row { height: 3rem; margin-bottom: 0.25rem; }
+
+        /* Button Loading State */
+        .btn-loading {
+            position: relative;
+            color: transparent !important;
+            pointer-events: none;
+        }
+        .btn-loading::after {
+            content: '';
+            position: absolute;
+            width: 1rem;
+            height: 1rem;
+            top: 50%;
+            left: 50%;
+            margin-left: -0.5rem;
+            margin-top: -0.5rem;
+            border: 2px solid transparent;
+            border-top-color: currentColor;
+            border-radius: 50%;
+            animation: spin 0.6s linear infinite;
+        }
+        .btn-loading.btn-primary::after { border-top-color: white; }
+        .btn-loading.btn-secondary::after { border-top-color: white; }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        /* Loading Overlay */
+        .loading-overlay {
+            position: fixed;
+            inset: 0;
+            background: rgba(255, 255, 255, 0.8);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 100;
+            opacity: 0;
+            visibility: hidden;
+            transition: opacity 0.2s, visibility 0.2s;
+        }
+        .dark .loading-overlay {
+            background: rgba(17, 24, 39, 0.8);
+        }
+        .loading-overlay.active {
+            opacity: 1;
+            visibility: visible;
+        }
+        .loading-spinner {
+            width: 3rem;
+            height: 3rem;
+            border: 3px solid #e5e7eb;
+            border-top-color: #3b82f6;
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+        }
+        .dark .loading-spinner {
+            border-color: #374151;
+            border-top-color: #60a5fa;
+        }
+
+        /* Progress Bar */
+        .progress-bar {
+            height: 0.5rem;
+            background: #e5e7eb;
+            border-radius: 9999px;
+            overflow: hidden;
+        }
+        .dark .progress-bar {
+            background: #374151;
+        }
+        .progress-bar-fill {
+            height: 100%;
+            background: #3b82f6;
+            border-radius: 9999px;
+            transition: width 0.3s ease;
+        }
+
+        /* Accessibility: Enhanced Color Contrast */
+        /* WCAG 2.1 Level AA requires 4.5:1 for normal text, 3:1 for large text */
+
+        /* Light Mode Contrast Improvements */
+        .text-gray-400 {
+            color: #6b7280 !important; /* gray-500 for better contrast */
+        }
+
+        .text-gray-500 {
+            color: #4b5563 !important; /* gray-600 for better contrast */
+        }
+
+        /* Placeholder text should be readable but distinguishable */
+        ::placeholder {
+            color: #6b7280 !important;
+            opacity: 1;
+        }
+
+        /* Section headers need better contrast on white */
+        .section-header {
+            color: #4b5563 !important;
+        }
+
+        /* Dark Mode Contrast Improvements */
+        .dark .text-gray-400 {
+            color: #9ca3af !important; /* brighter gray for dark bg */
+        }
+
+        .dark .text-gray-500 {
+            color: #d1d5db !important; /* even brighter for better contrast */
+        }
+
+        .dark ::placeholder {
+            color: #9ca3af !important;
+        }
+
+        .dark .section-header {
+            color: #9ca3af !important;
+        }
+
+        /* Breadcrumb separator - ensure visibility */
+        .breadcrumb-separator {
+            color: #6b7280 !important;
+        }
+
+        .dark .breadcrumb-separator {
+            color: #9ca3af !important;
+        }
+
+        /* Empty state icons - ensure visibility */
+        .empty-state-icon {
+            color: #9ca3af !important;
+        }
+
+        .dark .empty-state-icon {
+            color: #6b7280 !important;
+        }
+
+        /* Toast messages - ensure readability */
+        .toast-message {
+            color: #374151;
+        }
+
+        .dark .toast-message {
+            color: #e5e7eb;
+        }
+
+        /* Form labels should be clearly readable */
+        label {
+            color: #374151;
+        }
+
+        .dark label {
+            color: #e5e7eb;
+        }
+
+        /* Error messages - keep red but ensure contrast */
+        .error-message {
+            color: #dc2626 !important;
+        }
+
+        .dark .error-message {
+            color: #fca5a5 !important;
+        }
+
+        /* Success text */
+        .text-green-600 {
+            color: #059669 !important;
+        }
+
+        .dark .text-green-600 {
+            color: #34d399 !important;
+        }
+
+        /* Print Styles */
+        @media print {
+            /* Hide non-essential elements */
+            .sidebar,
+            .sidebar-overlay,
+            #mobileMenuBtn,
+            .toast-container,
+            .recent-dropdown,
+            button[onclick*="toggleDarkMode"],
+            button[onclick*="export"],
+            button[onclick*="toggleDataTable"],
+            .btn-primary:not(.print-show),
+            .btn-secondary:not(.print-show),
+            .btn-danger,
+            .btn-warning,
+            [role="dialog"],
+            .confirmation-modal,
+            nav.breadcrumb {
+                display: none !important;
+            }
+
+            /* Reset backgrounds and colors for printing */
+            body, main, .bg-white, .bg-gray-100, .bg-gray-800 {
+                background: white !important;
+                color: black !important;
+            }
+
+            /* Dark mode text adjustments */
+            .dark .text-white,
+            .dark .text-gray-100,
+            .dark .text-gray-200,
+            .dark .text-gray-300 {
+                color: black !important;
+            }
+
+            /* Adjust main content for full width */
+            main {
+                margin: 0 !important;
+                padding: 0 !important;
+                width: 100% !important;
+            }
+
+            .flex-1 {
+                flex: none !important;
+                width: 100% !important;
+            }
+
+            /* Page header for print */
+            @page {
+                size: A4;
+                margin: 1.5cm 1cm;
+            }
+
+            /* First page header */
+            body::before {
+                content: "Contract Oversight System - Printed " attr(data-print-date);
+                display: block;
+                font-size: 10pt;
+                color: #666;
+                border-bottom: 1px solid #ccc;
+                padding-bottom: 8px;
+                margin-bottom: 16px;
+            }
+
+            /* Add page breaks */
+            .page-break-before {
+                page-break-before: always;
+            }
+
+            .page-break-after {
+                page-break-after: always;
+            }
+
+            .avoid-break {
+                page-break-inside: avoid;
+            }
+
+            /* Card styling for print */
+            .shadow, .shadow-sm, .shadow-lg {
+                box-shadow: none !important;
+                border: 1px solid #e5e7eb !important;
+            }
+
+            .rounded-lg {
+                border-radius: 0 !important;
+            }
+
+            /* Table optimizations */
+            table {
+                border-collapse: collapse !important;
+                width: 100% !important;
+            }
+
+            th, td {
+                border: 1px solid #ccc !important;
+                padding: 8px !important;
+                text-align: left !important;
+            }
+
+            thead {
+                background: #f3f4f6 !important;
+            }
+
+            /* Charts - Show data tables instead of hidden charts */
+            [id$="Chart"] {
+                display: none !important;
+            }
+
+            [id$="Table"]:not(.hidden),
+            .print-show-table {
+                display: block !important;
+            }
+
+            /* Make sure links are visible */
+            a {
+                color: black !important;
+                text-decoration: underline !important;
+            }
+
+            a[href]::after {
+                content: " (" attr(href) ")";
+                font-size: 8pt;
+                color: #666;
+            }
+
+            a[href^="/"]::after,
+            a[href^="#"]::after {
+                content: "";
+            }
+
+            /* Status badges for print */
+            .status-active, .status-completed, .status-draft, .status-cancelled,
+            .health-critical, .health-high, .health-medium, .health-low {
+                border: 1px solid currentColor !important;
+                background: transparent !important;
+            }
+
+            /* Progress bars for print */
+            .progress-bar {
+                border: 1px solid #ccc !important;
+                background: white !important;
+            }
+
+            .progress-bar-fill {
+                background: #999 !important;
+            }
+
+            /* Footer with page numbers */
+            @page {
+                @bottom-center {
+                    content: "Page " counter(page) " of " counter(pages);
+                }
+            }
+        }
+
+        /* Print button that shows when in print preview */
+        .print-only {
+            display: none;
+        }
+
+        @media print {
+            .print-only {
+                display: block !important;
+            }
+
+            .no-print {
+                display: none !important;
+            }
+        }
     </style>
     <script>
         if (localStorage.getItem('darkMode') === 'true' ||
@@ -37,262 +1059,1839 @@
     </script>
 </head>
 <body class="bg-gray-100 dark:bg-gray-900">
+    <!-- Skip to Main Content Link (Accessibility) -->
+    <a href="#main-content" class="sr-only focus:not-sr-only focus:absolute focus:top-4 focus:left-4 focus:z-[200] bg-blue-600 text-white px-4 py-2 rounded-lg shadow-lg font-medium transition-all focus:outline-none focus:ring-2 focus:ring-blue-400 focus:ring-offset-2">
+        Skip to main content
+    </a>
+
+    <!-- Mobile Sidebar Overlay -->
+    <div id="sidebarOverlay" class="sidebar-overlay lg:hidden" onclick="closeMobileSidebar()"></div>
+
+    <!-- Loading Overlay -->
+    <div id="loadingOverlay" class="loading-overlay">
+        <div class="text-center">
+            <div class="loading-spinner mx-auto mb-4"></div>
+            <p id="loadingMessage" class="text-gray-600 dark:text-gray-300 text-sm">Loading...</p>
+        </div>
+    </div>
+
     <div class="flex h-screen">
         <!-- Sidebar -->
-        <aside class="w-64 bg-white dark:bg-gray-800 shadow-lg flex-shrink-0">
-            <div class="p-6 border-b dark:border-gray-700">
-                <h1 class="text-xl font-bold text-gray-800 dark:text-white">Contract Oversight</h1>
-                <p class="text-sm text-gray-500 dark:text-gray-400">Transparency System</p>
+        <aside id="sidebar" class="sidebar w-64 bg-white dark:bg-gray-800 shadow-lg flex-shrink-0 flex flex-col overflow-hidden" role="complementary" aria-label="Sidebar navigation">
+            <!-- Header -->
+            <div class="p-4 border-b dark:border-gray-700 flex items-center justify-between">
+                <div class="sidebar-title">
+                    <h1 class="text-lg font-bold text-gray-800 dark:text-white">Contract Oversight</h1>
+                    <p class="text-xs text-gray-500 dark:text-gray-400">Transparency System</p>
+                </div>
+                <div class="flex items-center">
+                    <!-- Close button for mobile -->
+                    <button onclick="closeMobileSidebar()" class="lg:hidden p-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 mr-1" title="Close Menu">
+                        <svg class="w-5 h-5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                        </svg>
+                    </button>
+                    <!-- Collapse button for desktop -->
+                    <button onclick="toggleSidebarCollapse()" class="hidden lg:block p-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700" title="Toggle Sidebar">
+                        <svg id="collapseIcon" class="w-5 h-5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 19l-7-7 7-7m8 14l-7-7 7-7"></path>
+                        </svg>
+                    </button>
+                </div>
             </div>
-            <nav class="mt-4">
-                <a href="{{ url_for('executive_dashboard') }}" class="sidebar-link {% if request.endpoint == 'executive_dashboard' %}active{% endif %}">
-                    <svg class="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 17V7m0 10a2 2 0 01-2 2H5a2 2 0 01-2-2V7a2 2 0 012-2h2a2 2 0 012 2m0 10a2 2 0 002 2h2a2 2 0 002-2M9 7a2 2 0 012-2h2a2 2 0 012 2m0 10V7m0 10a2 2 0 002 2h2a2 2 0 002-2V7a2 2 0 00-2-2h-2a2 2 0 00-2 2"></path>
-                    </svg>
-                    Executive Summary
-                </a>
-                <a href="{{ url_for('dashboard') }}" class="sidebar-link {% if request.endpoint == 'dashboard' %}active{% endif %}">
-                    <svg class="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z"></path>
-                    </svg>
-                    Dashboard
-                </a>
-                <a href="{{ url_for('contracts_list') }}" class="sidebar-link {% if request.endpoint == 'contracts_list' %}active{% endif %}">
-                    <svg class="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
-                    </svg>
-                    Contracts
-                </a>
-                <a href="{{ url_for('school_board_page') }}" class="sidebar-link {% if request.endpoint == 'school_board_page' %}active{% endif %}">
-                    <svg class="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 14l9-5-9-5-9 5 9 5z"></path>
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 14l9-5-9-5-9 5 9 5zm0 0v6m-4-3l4 3 4-3"></path>
-                    </svg>
-                    School Board
-                </a>
-                <a href="{{ url_for('county_comparison_page') }}" class="sidebar-link {% if request.endpoint == 'county_comparison_page' %}active{% endif %}">
-                    <svg class="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path>
-                    </svg>
-                    County Comparison
-                </a>
-                <a href="{{ url_for('vendors_list') }}" class="sidebar-link {% if request.endpoint == 'vendors_list' %}active{% endif %}">
-                    <svg class="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"></path>
-                    </svg>
-                    Vendors
-                </a>
-                <a href="{{ url_for('alerts_page') }}" class="sidebar-link {% if request.endpoint == 'alerts_page' %}active{% endif %}">
-                    <svg class="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path>
-                    </svg>
-                    Alerts & Issues
-                </a>
-                <div class="border-t dark:border-gray-700 my-2 mx-4"></div>
-                <p class="px-4 py-2 text-xs font-semibold text-gray-400 uppercase">Analytics</p>
-                <a href="{{ url_for('analytics_dashboard') }}" class="sidebar-link {% if request.endpoint == 'analytics_dashboard' %}active{% endif %}">
-                    <svg class="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path>
-                    </svg>
-                    Analytics
-                </a>
-                <a href="{{ url_for('risk_assessment_page') }}" class="sidebar-link {% if request.endpoint == 'risk_assessment_page' %}active{% endif %}">
-                    <svg class="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path>
-                    </svg>
-                    Risk Assessment
-                </a>
-                <a href="{{ url_for('budget_planner_page') }}" class="sidebar-link {% if request.endpoint == 'budget_planner_page' %}active{% endif %}">
-                    <svg class="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z"></path>
-                    </svg>
-                    Budget Planner
-                </a>
-                <a href="{{ url_for('spending_dashboard') }}" class="sidebar-link {% if request.endpoint == 'spending_dashboard' %}active{% endif %}">
-                    <svg class="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-                    </svg>
-                    Spending
-                </a>
-                <a href="{{ url_for('timeline_view') }}" class="sidebar-link {% if request.endpoint == 'timeline_view' %}active{% endif %}">
-                    <svg class="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
-                    </svg>
-                    Timeline
-                </a>
-                <a href="{{ url_for('vendor_performance_dashboard') }}" class="sidebar-link {% if request.endpoint == 'vendor_performance_dashboard' %}active{% endif %}">
-                    <svg class="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z"></path>
-                    </svg>
-                    Vendor Scores
-                </a>
-                <a href="{{ url_for('vendor_compliance_page') }}" class="sidebar-link {% if request.endpoint == 'vendor_compliance_page' %}active{% endif %}">
-                    <svg class="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"></path>
-                    </svg>
-                    Compliance
-                </a>
-                <a href="{{ url_for('benchmarking_page') }}" class="sidebar-link {% if request.endpoint == 'benchmarking_page' %}active{% endif %}">
-                    <svg class="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 17V7m0 10a2 2 0 01-2 2H5a2 2 0 01-2-2V7a2 2 0 012-2h2a2 2 0 012 2m0 10a2 2 0 002 2h2a2 2 0 002-2M9 7a2 2 0 012-2h2a2 2 0 012 2m0 10V7m0 10a2 2 0 002 2h2a2 2 0 002-2V7a2 2 0 00-2-2h-2a2 2 0 00-2 2"></path>
-                    </svg>
-                    Benchmarking
-                </a>
-                <div class="border-t dark:border-gray-700 my-2 mx-4"></div>
-                <p class="px-4 py-2 text-xs font-semibold text-gray-400 uppercase">Management</p>
-                <a href="{{ url_for('contract_templates') }}" class="sidebar-link {% if request.endpoint == 'contract_templates' %}active{% endif %}">
-                    <svg class="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7v8a2 2 0 002 2h6M8 7V5a2 2 0 012-2h4.586a1 1 0 01.707.293l4.414 4.414a1 1 0 01.293.707V15a2 2 0 01-2 2h-2M8 7H6a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2v-2"></path>
-                    </svg>
-                    Templates
-                </a>
-                <a href="{{ url_for('renewals_dashboard') }}" class="sidebar-link {% if request.endpoint == 'renewals_dashboard' %}active{% endif %}">
-                    <svg class="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
-                    </svg>
-                    Renewals
-                </a>
-                <a href="{{ url_for('audit_trail') }}" class="sidebar-link {% if request.endpoint == 'audit_trail' %}active{% endif %}">
-                    <svg class="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01"></path>
-                    </svg>
-                    Audit Trail
-                </a>
-                <a href="{{ url_for('activity_log_page') }}" class="sidebar-link {% if request.endpoint == 'activity_log_page' %}active{% endif %}">
-                    <svg class="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-                    </svg>
-                    Activity Log
-                </a>
-                <a href="{{ url_for('approvals_page') }}" class="sidebar-link {% if request.endpoint == 'approvals_page' %}active{% endif %}">
-                    <svg class="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-                    </svg>
-                    Approvals
-                </a>
-                <a href="{{ url_for('notifications_page') }}" class="sidebar-link {% if request.endpoint == 'notifications_page' %}active{% endif %}">
-                    <svg class="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"></path>
-                    </svg>
-                    Notifications
-                </a>
-                <a href="{{ url_for('import_export_page') }}" class="sidebar-link {% if request.endpoint == 'import_export_page' %}active{% endif %}">
-                    <svg class="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"></path>
-                    </svg>
-                    Import/Export
-                </a>
-                <div class="border-t dark:border-gray-700 my-2 mx-4"></div>
-                <p class="px-4 py-2 text-xs font-semibold text-gray-400 uppercase">Governance</p>
-                <a href="{{ url_for('meetings_page') }}" class="sidebar-link {% if request.endpoint == 'meetings_page' %}active{% endif %}">
-                    <svg class="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
-                    </svg>
-                    Meetings & Agendas
-                </a>
-                <a href="{{ url_for('voting_records_page') }}" class="sidebar-link {% if request.endpoint == 'voting_records_page' %}active{% endif %}">
-                    <svg class="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"></path>
-                    </svg>
-                    Voting Records
-                </a>
-                <a href="{{ url_for('conflicts_page') }}" class="sidebar-link {% if request.endpoint == 'conflicts_page' %}active{% endif %}">
-                    <svg class="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path>
-                    </svg>
-                    Conflicts of Interest
-                </a>
-                <a href="{{ url_for('constituent_portal_page') }}" class="sidebar-link {% if request.endpoint == 'constituent_portal_page' %}active{% endif %}">
-                    <svg class="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"></path>
-                    </svg>
-                    Constituent Portal
-                </a>
-                <div class="border-t dark:border-gray-700 my-2 mx-4"></div>
-                <p class="px-4 py-2 text-xs font-semibold text-gray-400 uppercase">Finance</p>
-                <a href="{{ url_for('fund_accounting_page') }}" class="sidebar-link {% if request.endpoint == 'fund_accounting_page' %}active{% endif %}">
-                    <svg class="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"></path>
-                    </svg>
-                    Fund Accounting
-                </a>
-                <a href="{{ url_for('grants_page') }}" class="sidebar-link {% if request.endpoint == 'grants_page' %}active{% endif %}">
-                    <svg class="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-                    </svg>
-                    Grant Management
-                </a>
-                <a href="{{ url_for('procurement_page') }}" class="sidebar-link {% if request.endpoint == 'procurement_page' %}active{% endif %}">
-                    <svg class="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01"></path>
-                    </svg>
-                    Procurement Pipeline
-                </a>
-                <div class="border-t dark:border-gray-700 my-2 mx-4"></div>
-                <p class="px-4 py-2 text-xs font-semibold text-gray-400 uppercase">Compliance</p>
-                <a href="{{ url_for('policy_compliance_page') }}" class="sidebar-link {% if request.endpoint == 'policy_compliance_page' %}active{% endif %}">
-                    <svg class="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"></path>
-                    </svg>
-                    Policy Compliance
-                </a>
-                <div class="border-t dark:border-gray-700 my-2 mx-4"></div>
-                <a href="{{ url_for('portfolio_report') }}" class="sidebar-link" target="_blank">
-                    <svg class="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"></path>
-                    </svg>
-                    Print Report
-                </a>
-                <a href="{{ url_for('public_dashboard') }}" class="sidebar-link {% if request.endpoint == 'public_dashboard' %}active{% endif %}">
-                    <svg class="w-5 h-5 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3.055 11H5a2 2 0 012 2v1a2 2 0 002 2 2 2 0 012 2v2.945M8 3.935V5.5A2.5 2.5 0 0010.5 8h.5a2 2 0 012 2 2 2 0 104 0 2 2 0 012-2h1.064M15 20.488V18a2 2 0 012-2h3.064M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-                    </svg>
-                    Public View
-                </a>
+
+            <!-- Scrollable Nav -->
+            <nav class="flex-1 overflow-y-auto py-2" role="navigation" aria-label="Main navigation">
+                <!-- Main Navigation (Always Visible) -->
+                <div class="px-2 mb-2">
+                    <a href="{{ url_for('executive_dashboard') }}" class="sidebar-link rounded-lg {% if request.endpoint == 'executive_dashboard' %}active{% endif %}">
+                        <svg class="w-5 h-5 mr-3 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 17V7m0 10a2 2 0 01-2 2H5a2 2 0 01-2-2V7a2 2 0 012-2h2a2 2 0 012 2m0 10a2 2 0 002 2h2a2 2 0 002-2M9 7a2 2 0 012-2h2a2 2 0 012 2m0 10V7m0 10a2 2 0 002 2h2a2 2 0 002-2V7a2 2 0 00-2-2h-2a2 2 0 00-2 2"></path>
+                        </svg>
+                        <span>Executive Summary</span>
+                    </a>
+                    <a href="{{ url_for('dashboard') }}" class="sidebar-link rounded-lg {% if request.endpoint == 'dashboard' %}active{% endif %}">
+                        <svg class="w-5 h-5 mr-3 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z"></path>
+                        </svg>
+                        <span>Dashboard</span>
+                    </a>
+                    <a href="{{ url_for('contracts_list') }}" class="sidebar-link rounded-lg {% if request.endpoint == 'contracts_list' %}active{% endif %}">
+                        <svg class="w-5 h-5 mr-3 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+                        </svg>
+                        <span>Contracts</span>
+                    </a>
+                    <a href="{{ url_for('vendors_list') }}" class="sidebar-link rounded-lg {% if request.endpoint == 'vendors_list' %}active{% endif %}">
+                        <svg class="w-5 h-5 mr-3 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"></path>
+                        </svg>
+                        <span>Vendors</span>
+                    </a>
+                    <a href="{{ url_for('alerts_page') }}" class="sidebar-link rounded-lg {% if request.endpoint == 'alerts_page' %}active{% endif %}">
+                        <svg class="w-5 h-5 mr-3 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path>
+                        </svg>
+                        <span>Alerts & Issues</span>
+                    </a>
+                </div>
+
+                <!-- Analytics Section -->
+                <div class="border-t dark:border-gray-700 mx-2" role="region" aria-labelledby="analytics-heading">
+                    <button id="analytics-heading" onclick="toggleSection('analytics')" class="section-header w-full flex items-center justify-between px-4 py-2 text-xs font-semibold text-gray-400 uppercase hover:bg-gray-50 dark:hover:bg-gray-700" aria-expanded="false" aria-controls="section-analytics">
+                        <div class="flex items-center">
+                            <svg class="w-4 h-4 mr-2 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path>
+                            </svg>
+                            <span>Analytics</span>
+                        </div>
+                        <svg class="chevron w-4 h-4" id="chevron-analytics" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+                        </svg>
+                    </button>
+                    <div id="section-analytics" class="section-content">
+                        <a href="{{ url_for('analytics_dashboard') }}" class="sidebar-link {% if request.endpoint == 'analytics_dashboard' %}active{% endif %}">
+                            <svg class="w-5 h-5 mr-3 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path>
+                            </svg>
+                            <span>Analytics</span>
+                        </a>
+                        <a href="{{ url_for('risk_assessment_page') }}" class="sidebar-link {% if request.endpoint == 'risk_assessment_page' %}active{% endif %}">
+                            <svg class="w-5 h-5 mr-3 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path>
+                            </svg>
+                            <span>Risk Assessment</span>
+                        </a>
+                        <a href="{{ url_for('budget_planner_page') }}" class="sidebar-link {% if request.endpoint == 'budget_planner_page' %}active{% endif %}">
+                            <svg class="w-5 h-5 mr-3 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z"></path>
+                            </svg>
+                            <span>Budget Planner</span>
+                        </a>
+                        <a href="{{ url_for('spending_dashboard') }}" class="sidebar-link {% if request.endpoint == 'spending_dashboard' %}active{% endif %}">
+                            <svg class="w-5 h-5 mr-3 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                            </svg>
+                            <span>Spending</span>
+                        </a>
+                        <a href="{{ url_for('timeline_view') }}" class="sidebar-link {% if request.endpoint == 'timeline_view' %}active{% endif %}">
+                            <svg class="w-5 h-5 mr-3 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
+                            </svg>
+                            <span>Timeline</span>
+                        </a>
+                        <a href="{{ url_for('vendor_performance_dashboard') }}" class="sidebar-link {% if request.endpoint == 'vendor_performance_dashboard' %}active{% endif %}">
+                            <svg class="w-5 h-5 mr-3 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z"></path>
+                            </svg>
+                            <span>Vendor Scores</span>
+                        </a>
+                        <a href="{{ url_for('vendor_compliance_page') }}" class="sidebar-link {% if request.endpoint == 'vendor_compliance_page' %}active{% endif %}">
+                            <svg class="w-5 h-5 mr-3 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"></path>
+                            </svg>
+                            <span>Compliance</span>
+                        </a>
+                        <a href="{{ url_for('benchmarking_page') }}" class="sidebar-link {% if request.endpoint == 'benchmarking_page' %}active{% endif %}">
+                            <svg class="w-5 h-5 mr-3 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 17V7m0 10a2 2 0 01-2 2H5a2 2 0 01-2-2V7a2 2 0 012-2h2a2 2 0 012 2m0 10a2 2 0 002 2h2a2 2 0 002-2M9 7a2 2 0 012-2h2a2 2 0 012 2m0 10V7m0 10a2 2 0 002 2h2a2 2 0 002-2V7a2 2 0 00-2-2h-2a2 2 0 00-2 2"></path>
+                            </svg>
+                            <span>Benchmarking</span>
+                        </a>
+                        <a href="{{ url_for('county_comparison_page') }}" class="sidebar-link {% if request.endpoint == 'county_comparison_page' %}active{% endif %}">
+                            <svg class="w-5 h-5 mr-3 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path>
+                            </svg>
+                            <span>County Comparison</span>
+                        </a>
+                    </div>
+                </div>
+
+                <!-- Management Section -->
+                <div class="border-t dark:border-gray-700 mx-2">
+                    <button onclick="toggleSection('management')" class="section-header w-full flex items-center justify-between px-4 py-2 text-xs font-semibold text-gray-400 uppercase hover:bg-gray-50 dark:hover:bg-gray-700">
+                        <div class="flex items-center">
+                            <svg class="w-4 h-4 mr-2 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path>
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
+                            </svg>
+                            <span>Management</span>
+                        </div>
+                        <svg class="chevron w-4 h-4" id="chevron-management" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+                        </svg>
+                    </button>
+                    <div id="section-management" class="section-content">
+                        <a href="{{ url_for('contract_templates') }}" class="sidebar-link {% if request.endpoint == 'contract_templates' %}active{% endif %}">
+                            <svg class="w-5 h-5 mr-3 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7v8a2 2 0 002 2h6M8 7V5a2 2 0 012-2h4.586a1 1 0 01.707.293l4.414 4.414a1 1 0 01.293.707V15a2 2 0 01-2 2h-2M8 7H6a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2v-2"></path>
+                            </svg>
+                            <span>Templates</span>
+                        </a>
+                        <a href="{{ url_for('renewals_dashboard') }}" class="sidebar-link {% if request.endpoint == 'renewals_dashboard' %}active{% endif %}">
+                            <svg class="w-5 h-5 mr-3 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
+                            </svg>
+                            <span>Renewals</span>
+                        </a>
+                        <a href="{{ url_for('audit_trail') }}" class="sidebar-link {% if request.endpoint == 'audit_trail' %}active{% endif %}">
+                            <svg class="w-5 h-5 mr-3 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01"></path>
+                            </svg>
+                            <span>Audit Trail</span>
+                        </a>
+                        <a href="{{ url_for('activity_log_page') }}" class="sidebar-link {% if request.endpoint == 'activity_log_page' %}active{% endif %}">
+                            <svg class="w-5 h-5 mr-3 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                            </svg>
+                            <span>Activity Log</span>
+                        </a>
+                        <a href="{{ url_for('approvals_page') }}" class="sidebar-link {% if request.endpoint == 'approvals_page' %}active{% endif %}">
+                            <svg class="w-5 h-5 mr-3 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                            </svg>
+                            <span>Approvals</span>
+                        </a>
+                        <a href="{{ url_for('notifications_page') }}" class="sidebar-link {% if request.endpoint == 'notifications_page' %}active{% endif %}">
+                            <svg class="w-5 h-5 mr-3 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"></path>
+                            </svg>
+                            <span>Notifications</span>
+                        </a>
+                        <a href="{{ url_for('import_export_page') }}" class="sidebar-link {% if request.endpoint == 'import_export_page' %}active{% endif %}">
+                            <svg class="w-5 h-5 mr-3 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"></path>
+                            </svg>
+                            <span>Import/Export</span>
+                        </a>
+                    </div>
+                </div>
+
+                <!-- Governance Section -->
+                <div class="border-t dark:border-gray-700 mx-2">
+                    <button onclick="toggleSection('governance')" class="section-header w-full flex items-center justify-between px-4 py-2 text-xs font-semibold text-gray-400 uppercase hover:bg-gray-50 dark:hover:bg-gray-700">
+                        <div class="flex items-center">
+                            <svg class="w-4 h-4 mr-2 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"></path>
+                            </svg>
+                            <span>Governance</span>
+                        </div>
+                        <svg class="chevron w-4 h-4" id="chevron-governance" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+                        </svg>
+                    </button>
+                    <div id="section-governance" class="section-content">
+                        <a href="{{ url_for('school_board_page') }}" class="sidebar-link {% if request.endpoint == 'school_board_page' %}active{% endif %}">
+                            <svg class="w-5 h-5 mr-3 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 14l9-5-9-5-9 5 9 5z"></path>
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 14l9-5-9-5-9 5 9 5zm0 0v6m-4-3l4 3 4-3"></path>
+                            </svg>
+                            <span>School Board</span>
+                        </a>
+                        <a href="{{ url_for('meetings_page') }}" class="sidebar-link {% if request.endpoint == 'meetings_page' %}active{% endif %}">
+                            <svg class="w-5 h-5 mr-3 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
+                            </svg>
+                            <span>Meetings & Agendas</span>
+                        </a>
+                        <a href="{{ url_for('voting_records_page') }}" class="sidebar-link {% if request.endpoint == 'voting_records_page' %}active{% endif %}">
+                            <svg class="w-5 h-5 mr-3 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"></path>
+                            </svg>
+                            <span>Voting Records</span>
+                        </a>
+                        <a href="{{ url_for('conflicts_page') }}" class="sidebar-link {% if request.endpoint == 'conflicts_page' %}active{% endif %}">
+                            <svg class="w-5 h-5 mr-3 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path>
+                            </svg>
+                            <span>Conflicts of Interest</span>
+                        </a>
+                        <a href="{{ url_for('constituent_portal_page') }}" class="sidebar-link {% if request.endpoint == 'constituent_portal_page' %}active{% endif %}">
+                            <svg class="w-5 h-5 mr-3 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"></path>
+                            </svg>
+                            <span>Constituent Portal</span>
+                        </a>
+                    </div>
+                </div>
+
+                <!-- Finance Section -->
+                <div class="border-t dark:border-gray-700 mx-2">
+                    <button onclick="toggleSection('finance')" class="section-header w-full flex items-center justify-between px-4 py-2 text-xs font-semibold text-gray-400 uppercase hover:bg-gray-50 dark:hover:bg-gray-700">
+                        <div class="flex items-center">
+                            <svg class="w-4 h-4 mr-2 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                            </svg>
+                            <span>Finance</span>
+                        </div>
+                        <svg class="chevron w-4 h-4" id="chevron-finance" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+                        </svg>
+                    </button>
+                    <div id="section-finance" class="section-content">
+                        <a href="{{ url_for('fund_accounting_page') }}" class="sidebar-link {% if request.endpoint == 'fund_accounting_page' %}active{% endif %}">
+                            <svg class="w-5 h-5 mr-3 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"></path>
+                            </svg>
+                            <span>Fund Accounting</span>
+                        </a>
+                        <a href="{{ url_for('grants_page') }}" class="sidebar-link {% if request.endpoint == 'grants_page' %}active{% endif %}">
+                            <svg class="w-5 h-5 mr-3 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                            </svg>
+                            <span>Grant Management</span>
+                        </a>
+                        <a href="{{ url_for('procurement_page') }}" class="sidebar-link {% if request.endpoint == 'procurement_page' %}active{% endif %}">
+                            <svg class="w-5 h-5 mr-3 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01"></path>
+                            </svg>
+                            <span>Procurement Pipeline</span>
+                        </a>
+                    </div>
+                </div>
+
+                <!-- Compliance Section -->
+                <div class="border-t dark:border-gray-700 mx-2">
+                    <button onclick="toggleSection('compliance')" class="section-header w-full flex items-center justify-between px-4 py-2 text-xs font-semibold text-gray-400 uppercase hover:bg-gray-50 dark:hover:bg-gray-700">
+                        <div class="flex items-center">
+                            <svg class="w-4 h-4 mr-2 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"></path>
+                            </svg>
+                            <span>Compliance</span>
+                        </div>
+                        <svg class="chevron w-4 h-4" id="chevron-compliance" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+                        </svg>
+                    </button>
+                    <div id="section-compliance" class="section-content">
+                        <a href="{{ url_for('policy_compliance_page') }}" class="sidebar-link {% if request.endpoint == 'policy_compliance_page' %}active{% endif %}">
+                            <svg class="w-5 h-5 mr-3 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"></path>
+                            </svg>
+                            <span>Policy Compliance</span>
+                        </a>
+                    </div>
+                </div>
+
+                <!-- Quick Links -->
+                <div class="border-t dark:border-gray-700 mx-2 mt-2 pt-2">
+                    <a href="{{ url_for('portfolio_report') }}" class="sidebar-link rounded-lg" target="_blank">
+                        <svg class="w-5 h-5 mr-3 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"></path>
+                        </svg>
+                        <span>Print Report</span>
+                    </a>
+                    <a href="{{ url_for('public_dashboard') }}" class="sidebar-link rounded-lg {% if request.endpoint == 'public_dashboard' %}active{% endif %}">
+                        <svg class="w-5 h-5 mr-3 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3.055 11H5a2 2 0 012 2v1a2 2 0 002 2 2 2 0 012 2v2.945M8 3.935V5.5A2.5 2.5 0 0010.5 8h.5a2 2 0 012 2 2 2 0 104 0 2 2 0 012-2h1.064M15 20.488V18a2 2 0 012-2h3.064M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                        </svg>
+                        <span>Public View</span>
+                    </a>
+                </div>
             </nav>
-            <div class="absolute bottom-0 w-64 p-4 border-t dark:border-gray-700">
+
+            <!-- Footer -->
+            <div class="sidebar-footer p-4 border-t dark:border-gray-700">
                 <p class="text-xs text-gray-400">Government Contract</p>
                 <p class="text-xs text-gray-400">Transparency Initiative</p>
             </div>
         </aside>
 
         <!-- Main Content -->
-        <main class="flex-1 overflow-y-auto">
-            <header class="bg-white dark:bg-gray-800 shadow-sm px-8 py-4 flex justify-between items-center">
-                <h2 class="text-2xl font-semibold text-gray-800 dark:text-white">{{ title }}</h2>
-                <div class="flex items-center space-x-4">
-                    <button onclick="toggleDarkMode()" class="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700">
-                        <svg class="w-5 h-5 text-gray-500 dark:text-yellow-400 hidden dark:block" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z"></path>
-                        </svg>
-                        <svg class="w-5 h-5 text-gray-500 block dark:hidden" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z"></path>
+        <main id="main-content" class="flex-1 overflow-y-auto" role="main" aria-label="Main content">
+            <header class="bg-white dark:bg-gray-800 shadow-sm px-4 lg:px-8 py-4 flex justify-between items-center" role="banner">
+                <div class="flex items-center">
+                    <!-- Mobile Hamburger Menu Button -->
+                    <button id="mobileMenuBtn" onclick="toggleMobileSidebar()" class="lg:hidden p-2 mr-3 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700" title="Open Menu">
+                        <svg class="w-6 h-6 text-gray-600 dark:text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"></path>
                         </svg>
                     </button>
-                    <span class="text-sm text-gray-500 dark:text-gray-400">{{ now().strftime('%B %d, %Y') }}</span>
+                    <h2 class="text-xl lg:text-2xl font-semibold text-gray-800 dark:text-white">{{ title }}</h2>
+                </div>
+                <div class="flex items-center space-x-2 lg:space-x-4">
+                    <!-- Recently Viewed Dropdown -->
+                    <div id="recentDropdown" class="recent-dropdown hidden sm:block">
+                        <button onclick="toggleRecentDropdown()" class="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors relative" aria-label="Recently viewed contracts" title="Recently viewed (Press R)">
+                            <svg class="w-5 h-5 text-gray-500 dark:text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                            </svg>
+                            <span id="recentBadge" class="absolute -top-1 -right-1 w-4 h-4 bg-blue-500 text-white text-xs rounded-full hidden items-center justify-center font-medium">0</span>
+                        </button>
+                        <div class="recent-dropdown-menu">
+                            <div class="px-4 py-3 border-b dark:border-gray-700 flex justify-between items-center">
+                                <h3 class="font-semibold text-gray-800 dark:text-white text-sm">Recently Viewed</h3>
+                                <button onclick="clearRecentlyViewed()" class="text-xs text-gray-500 hover:text-red-600 dark:text-gray-400 dark:hover:text-red-400 transition-colors" title="Clear history">
+                                    Clear all
+                                </button>
+                            </div>
+                            <div id="recentList" class="max-h-80 overflow-y-auto">
+                                <!-- Items populated by JavaScript -->
+                                <div class="px-4 py-8 text-center text-gray-500 dark:text-gray-400 text-sm">
+                                    <svg class="w-8 h-8 mx-auto mb-2 text-gray-300 dark:text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                                    </svg>
+                                    No recently viewed contracts
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Dark Mode Toggle Switch -->
+                    <div class="flex items-center space-x-2 bg-gray-100 dark:bg-gray-700 rounded-full px-3 py-1.5 border border-gray-200 dark:border-gray-600 shadow-sm">
+                        <svg class="w-4 h-4 text-yellow-500" fill="currentColor" viewBox="0 0 20 20">
+                            <path fill-rule="evenodd" d="M10 2a1 1 0 011 1v1a1 1 0 11-2 0V3a1 1 0 011-1zm4 8a4 4 0 11-8 0 4 4 0 018 0zm-.464 4.95l.707.707a1 1 0 001.414-1.414l-.707-.707a1 1 0 00-1.414 1.414zm2.12-10.607a1 1 0 010 1.414l-.706.707a1 1 0 11-1.414-1.414l.707-.707a1 1 0 011.414 0zM17 11a1 1 0 100-2h-1a1 1 0 100 2h1zm-7 4a1 1 0 011 1v1a1 1 0 11-2 0v-1a1 1 0 011-1zM5.05 6.464A1 1 0 106.465 5.05l-.708-.707a1 1 0 00-1.414 1.414l.707.707zm1.414 8.486l-.707.707a1 1 0 01-1.414-1.414l.707-.707a1 1 0 011.414 1.414zM4 11a1 1 0 100-2H3a1 1 0 000 2h1z" clip-rule="evenodd"></path>
+                        </svg>
+                        <button onclick="toggleDarkMode()"
+                                class="relative w-12 h-6 rounded-full transition-colors duration-300 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 dark:focus:ring-offset-gray-800"
+                                :class="isDark ? 'bg-blue-600' : 'bg-gray-300'"
+                                role="switch"
+                                aria-checked="false"
+                                aria-label="Toggle dark mode"
+                                id="darkModeToggle">
+                            <span class="absolute left-0.5 top-0.5 w-5 h-5 bg-white rounded-full shadow-md transform transition-transform duration-300 dark:translate-x-6"></span>
+                        </button>
+                        <svg class="w-4 h-4 text-indigo-400" fill="currentColor" viewBox="0 0 20 20">
+                            <path d="M17.293 13.293A8 8 0 016.707 2.707a8.001 8.001 0 1010.586 10.586z"></path>
+                        </svg>
+                    </div>
+                    <span class="text-sm text-gray-500 dark:text-gray-400 hidden sm:inline">{{ now().strftime('%B %d, %Y') }}</span>
                 </div>
             </header>
-            <div class="p-8">
+            <div class="p-4 lg:p-8">
+                <!-- Breadcrumb Navigation -->
+                {% block breadcrumb %}{% endblock %}
+
                 {% block content %}{% endblock %}
             </div>
         </main>
     </div>
 
+    <!-- Toast Notification Container -->
+    <div id="toastContainer" class="toast-container" aria-live="polite" aria-atomic="true"></div>
+
+    <!-- Global Confirmation Modal -->
+    <div id="confirmModal" class="fixed inset-0 bg-black bg-opacity-50 hidden items-center justify-center z-[100]" role="dialog" aria-modal="true" aria-labelledby="confirmModal-title">
+        <div class="bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-md w-full mx-4 transform transition-all">
+            <div class="p-6">
+                <div class="flex items-center mb-4">
+                    <!-- Icon container - changes based on type -->
+                    <div id="confirmModalIcon" class="flex-shrink-0 w-12 h-12 rounded-full flex items-center justify-center mr-4">
+                        <!-- Warning icon (default) -->
+                        <svg class="confirm-icon-warning w-6 h-6 text-yellow-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path>
+                        </svg>
+                        <!-- Danger icon -->
+                        <svg class="confirm-icon-danger w-6 h-6 text-red-600 hidden" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
+                        </svg>
+                        <!-- Info icon -->
+                        <svg class="confirm-icon-info w-6 h-6 text-blue-600 hidden" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                        </svg>
+                    </div>
+                    <div>
+                        <h3 id="confirmModal-title" class="text-lg font-semibold text-gray-800 dark:text-white">Confirm Action</h3>
+                        <p id="confirmModal-message" class="text-sm text-gray-600 dark:text-gray-400 mt-1">Are you sure you want to proceed?</p>
+                    </div>
+                </div>
+                <!-- Optional details section -->
+                <div id="confirmModal-details" class="hidden mb-4 p-3 bg-gray-50 dark:bg-gray-700 rounded-lg text-sm text-gray-700 dark:text-gray-300">
+                </div>
+            </div>
+            <div class="flex justify-end gap-3 px-6 py-4 bg-gray-50 dark:bg-gray-700/50 rounded-b-lg">
+                <button id="confirmModal-cancel" class="px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-600 font-medium transition-colors">
+                    Cancel
+                </button>
+                <button id="confirmModal-confirm" class="px-4 py-2 rounded-lg font-medium transition-colors">
+                    Confirm
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Keyboard Shortcuts Help Modal -->
+    <div id="keyboardShortcutsModal" class="fixed inset-0 bg-black bg-opacity-50 hidden items-center justify-center z-[100]" role="dialog" aria-modal="true" aria-labelledby="keyboardShortcutsModal-title">
+        <div class="bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-lg w-full mx-4 max-h-[80vh] overflow-hidden">
+            <div class="flex justify-between items-center px-6 py-4 border-b dark:border-gray-700">
+                <h3 id="keyboardShortcutsModal-title" class="text-lg font-semibold text-gray-800 dark:text-white">Keyboard Shortcuts</h3>
+                <button onclick="closeKeyboardShortcutsHelp()" class="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200" aria-label="Close">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                    </svg>
+                </button>
+            </div>
+            <div class="p-6 overflow-y-auto max-h-[60vh]">
+                <div class="space-y-4">
+                    <div>
+                        <h4 class="text-sm font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-2">Navigation</h4>
+                        <div class="space-y-2">
+                            <div class="flex justify-between items-center">
+                                <span class="text-gray-700 dark:text-gray-300">Go to Dashboard</span>
+                                <div class="flex gap-1"><kbd class="px-2 py-1 bg-gray-100 dark:bg-gray-700 rounded text-xs font-mono">g</kbd><span class="text-gray-400">then</span><kbd class="px-2 py-1 bg-gray-100 dark:bg-gray-700 rounded text-xs font-mono">h</kbd></div>
+                            </div>
+                            <div class="flex justify-between items-center">
+                                <span class="text-gray-700 dark:text-gray-300">Go to Contracts</span>
+                                <div class="flex gap-1"><kbd class="px-2 py-1 bg-gray-100 dark:bg-gray-700 rounded text-xs font-mono">g</kbd><span class="text-gray-400">then</span><kbd class="px-2 py-1 bg-gray-100 dark:bg-gray-700 rounded text-xs font-mono">c</kbd></div>
+                            </div>
+                        </div>
+                    </div>
+                    <div>
+                        <h4 class="text-sm font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-2">Actions</h4>
+                        <div class="space-y-2">
+                            <div class="flex justify-between items-center">
+                                <span class="text-gray-700 dark:text-gray-300">Focus search</span>
+                                <div class="flex gap-2">
+                                    <kbd class="px-2 py-1 bg-gray-100 dark:bg-gray-700 rounded text-xs font-mono">/</kbd>
+                                    <span class="text-gray-400">or</span>
+                                    <kbd class="px-2 py-1 bg-gray-100 dark:bg-gray-700 rounded text-xs font-mono">Ctrl+K</kbd>
+                                </div>
+                            </div>
+                            <div class="flex justify-between items-center">
+                                <span class="text-gray-700 dark:text-gray-300">New contract</span>
+                                <kbd class="px-2 py-1 bg-gray-100 dark:bg-gray-700 rounded text-xs font-mono">n</kbd>
+                            </div>
+                            <div class="flex justify-between items-center">
+                                <span class="text-gray-700 dark:text-gray-300">Toggle dark mode</span>
+                                <kbd class="px-2 py-1 bg-gray-100 dark:bg-gray-700 rounded text-xs font-mono">d</kbd>
+                            </div>
+                            <div class="flex justify-between items-center">
+                                <span class="text-gray-700 dark:text-gray-300">Recently viewed</span>
+                                <kbd class="px-2 py-1 bg-gray-100 dark:bg-gray-700 rounded text-xs font-mono">r</kbd>
+                            </div>
+                        </div>
+                    </div>
+                    <div>
+                        <h4 class="text-sm font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-2">General</h4>
+                        <div class="space-y-2">
+                            <div class="flex justify-between items-center">
+                                <span class="text-gray-700 dark:text-gray-300">Close modal / Clear selection</span>
+                                <kbd class="px-2 py-1 bg-gray-100 dark:bg-gray-700 rounded text-xs font-mono">Esc</kbd>
+                            </div>
+                            <div class="flex justify-between items-center">
+                                <span class="text-gray-700 dark:text-gray-300">Show this help</span>
+                                <kbd class="px-2 py-1 bg-gray-100 dark:bg-gray-700 rounded text-xs font-mono">?</kbd>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="px-6 py-4 bg-gray-50 dark:bg-gray-700/50 border-t dark:border-gray-700 text-center">
+                <span class="text-sm text-gray-500 dark:text-gray-400">Press <kbd class="px-1.5 py-0.5 bg-gray-200 dark:bg-gray-600 rounded text-xs font-mono">Esc</kbd> to close</span>
+            </div>
+        </div>
+    </div>
+
     <script>
+        // Dark Mode Toggle
         function toggleDarkMode() {
             const html = document.documentElement;
+            const toggle = document.getElementById('darkModeToggle');
             if (html.classList.contains('dark')) {
                 html.classList.remove('dark');
                 localStorage.setItem('darkMode', 'false');
+                if (toggle) {
+                    toggle.classList.remove('bg-blue-600');
+                    toggle.classList.add('bg-gray-300');
+                    toggle.setAttribute('aria-checked', 'false');
+                }
             } else {
                 html.classList.add('dark');
                 localStorage.setItem('darkMode', 'true');
+                if (toggle) {
+                    toggle.classList.remove('bg-gray-300');
+                    toggle.classList.add('bg-blue-600');
+                    toggle.setAttribute('aria-checked', 'true');
+                }
             }
         }
 
+        // Initialize dark mode toggle button state on page load
+        function initDarkModeToggle() {
+            const html = document.documentElement;
+            const toggle = document.getElementById('darkModeToggle');
+            if (toggle) {
+                if (html.classList.contains('dark')) {
+                    toggle.classList.remove('bg-gray-300');
+                    toggle.classList.add('bg-blue-600');
+                    toggle.setAttribute('aria-checked', 'true');
+                } else {
+                    toggle.classList.remove('bg-blue-600');
+                    toggle.classList.add('bg-gray-300');
+                    toggle.setAttribute('aria-checked', 'false');
+                }
+            }
+        }
+
+        // Health Score Legend
+        function createHealthLegendHTML() {
+            return `
+                <div class="health-legend-title">Health Score Guide</div>
+                <div class="health-legend-item">
+                    <span class="health-legend-badge bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200">0-29</span>
+                    <span class="health-legend-desc"><strong>Critical</strong> — Immediate attention required</span>
+                </div>
+                <div class="health-legend-item">
+                    <span class="health-legend-badge bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-200">30-49</span>
+                    <span class="health-legend-desc"><strong>At Risk</strong> — Active monitoring needed</span>
+                </div>
+                <div class="health-legend-item">
+                    <span class="health-legend-badge bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200">50-69</span>
+                    <span class="health-legend-desc"><strong>Warning</strong> — Some concerns present</span>
+                </div>
+                <div class="health-legend-item">
+                    <span class="health-legend-badge bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200">70-100</span>
+                    <span class="health-legend-desc"><strong>Healthy</strong> — Contract on track</span>
+                </div>
+            `;
+        }
+
+        function toggleHealthLegend(event, legendId) {
+            event.stopPropagation();
+            const legend = document.getElementById(legendId);
+            if (legend) {
+                legend.classList.toggle('show');
+                // Close when clicking outside
+                if (legend.classList.contains('show')) {
+                    setTimeout(() => {
+                        document.addEventListener('click', function closeOnClickOutside(e) {
+                            if (!legend.contains(e.target) && !e.target.closest('.health-info-btn')) {
+                                legend.classList.remove('show');
+                                document.removeEventListener('click', closeOnClickOutside);
+                            }
+                        });
+                    }, 0);
+                }
+            }
+        }
+
+        function initHealthLegends() {
+            document.querySelectorAll('.health-legend').forEach(legend => {
+                if (!legend.innerHTML.trim()) {
+                    legend.innerHTML = createHealthLegendHTML();
+                }
+            });
+        }
+
+        // ====== Confirmation Modal System ======
+        let confirmModalCallback = null;
+        let confirmModalTrigger = null;
+
+        /**
+         * Show a confirmation dialog before performing a destructive action
+         * @param {Object} options - Configuration options
+         * @param {string} options.title - Modal title
+         * @param {string} options.message - Confirmation message
+         * @param {string} [options.details] - Optional additional details to show
+         * @param {string} [options.type='warning'] - Type: 'warning', 'danger', or 'info'
+         * @param {string} [options.confirmText='Confirm'] - Text for confirm button
+         * @param {string} [options.cancelText='Cancel'] - Text for cancel button
+         * @param {Function} options.onConfirm - Callback when confirmed
+         * @param {Function} [options.onCancel] - Callback when cancelled
+         */
+        function showConfirmDialog(options) {
+            const modal = document.getElementById('confirmModal');
+            const title = document.getElementById('confirmModal-title');
+            const message = document.getElementById('confirmModal-message');
+            const details = document.getElementById('confirmModal-details');
+            const iconContainer = document.getElementById('confirmModalIcon');
+            const confirmBtn = document.getElementById('confirmModal-confirm');
+            const cancelBtn = document.getElementById('confirmModal-cancel');
+
+            // Set content
+            title.textContent = options.title || 'Confirm Action';
+            message.textContent = options.message || 'Are you sure you want to proceed?';
+
+            // Handle details
+            if (options.details) {
+                details.innerHTML = options.details;
+                details.classList.remove('hidden');
+            } else {
+                details.classList.add('hidden');
+            }
+
+            // Set type styling
+            const type = options.type || 'warning';
+            const icons = modal.querySelectorAll('[class*="confirm-icon-"]');
+            icons.forEach(icon => icon.classList.add('hidden'));
+            const activeIcon = modal.querySelector('.confirm-icon-' + type);
+            if (activeIcon) activeIcon.classList.remove('hidden');
+
+            // Set icon background color
+            iconContainer.className = 'flex-shrink-0 w-12 h-12 rounded-full flex items-center justify-center mr-4';
+            if (type === 'danger') {
+                iconContainer.classList.add('bg-red-100', 'dark:bg-red-900/30');
+                confirmBtn.className = 'px-4 py-2 rounded-lg font-medium transition-colors bg-red-600 text-white hover:bg-red-700';
+            } else if (type === 'info') {
+                iconContainer.classList.add('bg-blue-100', 'dark:bg-blue-900/30');
+                confirmBtn.className = 'px-4 py-2 rounded-lg font-medium transition-colors bg-blue-600 text-white hover:bg-blue-700';
+            } else {
+                iconContainer.classList.add('bg-yellow-100', 'dark:bg-yellow-900/30');
+                confirmBtn.className = 'px-4 py-2 rounded-lg font-medium transition-colors bg-yellow-600 text-white hover:bg-yellow-700';
+            }
+
+            // Set button text
+            confirmBtn.textContent = options.confirmText || 'Confirm';
+            cancelBtn.textContent = options.cancelText || 'Cancel';
+
+            // Store callbacks
+            confirmModalCallback = options.onConfirm;
+            confirmModalTrigger = document.activeElement;
+
+            // Show modal
+            modal.classList.remove('hidden');
+            modal.classList.add('flex');
+
+            // Focus confirm button
+            setTimeout(() => confirmBtn.focus(), 50);
+
+            // Set up event handlers
+            const handleConfirm = () => {
+                closeConfirmModal();
+                if (typeof confirmModalCallback === 'function') {
+                    confirmModalCallback();
+                }
+            };
+
+            const handleCancel = () => {
+                closeConfirmModal();
+                if (typeof options.onCancel === 'function') {
+                    options.onCancel();
+                }
+            };
+
+            // Remove old listeners and add new ones
+            const newConfirmBtn = confirmBtn.cloneNode(true);
+            const newCancelBtn = cancelBtn.cloneNode(true);
+            confirmBtn.parentNode.replaceChild(newConfirmBtn, confirmBtn);
+            cancelBtn.parentNode.replaceChild(newCancelBtn, cancelBtn);
+
+            newConfirmBtn.addEventListener('click', handleConfirm);
+            newCancelBtn.addEventListener('click', handleCancel);
+
+            // Close on backdrop click
+            modal.onclick = function(e) {
+                if (e.target === modal) handleCancel();
+            };
+
+            // Handle escape key
+            const handleEscape = function(e) {
+                if (e.key === 'Escape') {
+                    handleCancel();
+                    document.removeEventListener('keydown', handleEscape);
+                }
+            };
+            document.addEventListener('keydown', handleEscape);
+        }
+
+        function closeConfirmModal() {
+            const modal = document.getElementById('confirmModal');
+            modal.classList.add('hidden');
+            modal.classList.remove('flex');
+
+            // Return focus
+            if (confirmModalTrigger) {
+                confirmModalTrigger.focus();
+                confirmModalTrigger = null;
+            }
+            confirmModalCallback = null;
+        }
+
+        /**
+         * Helper function for confirming delete operations
+         * @param {string} itemType - Type of item (e.g., "milestone", "contract")
+         * @param {string} [itemName] - Optional name of the item
+         * @param {Function} onConfirm - Callback when confirmed
+         */
+        function confirmDelete(itemType, itemName, onConfirm) {
+            const itemDesc = itemName ? `"${itemName}"` : `this ${itemType}`;
+            showConfirmDialog({
+                title: `Delete ${itemType.charAt(0).toUpperCase() + itemType.slice(1)}`,
+                message: `Are you sure you want to delete ${itemDesc}? This action cannot be undone.`,
+                type: 'danger',
+                confirmText: 'Delete',
+                onConfirm: onConfirm
+            });
+        }
+
+        /**
+         * Helper function for confirming bulk operations
+         * @param {string} action - Description of the action
+         * @param {number} count - Number of items affected
+         * @param {string} itemType - Type of items (e.g., "contracts")
+         * @param {Function} onConfirm - Callback when confirmed
+         */
+        function confirmBulkAction(action, count, itemType, onConfirm) {
+            showConfirmDialog({
+                title: `Confirm ${action}`,
+                message: `Are you sure you want to ${action.toLowerCase()} ${count} ${itemType}?`,
+                details: `<p class="font-medium">${count} ${itemType} will be affected.</p>`,
+                type: 'warning',
+                confirmText: action,
+                onConfirm: onConfirm
+            });
+        }
+
+        // ====== Toast Notification System ======
+        const toastIcons = {
+            success: `<svg class="toast-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+            </svg>`,
+            error: `<svg class="toast-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+            </svg>`,
+            warning: `<svg class="toast-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path>
+            </svg>`,
+            info: `<svg class="toast-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+            </svg>`
+        };
+
+        /**
+         * Show a toast notification
+         * @param {Object} options - Toast options
+         * @param {string} options.message - The message to display
+         * @param {string} [options.title] - Optional title
+         * @param {string} [options.type='info'] - Type: 'success', 'error', 'warning', 'info'
+         * @param {number} [options.duration=5000] - Duration in ms (0 = no auto-dismiss)
+         */
+        function showToast(options) {
+            const container = document.getElementById('toastContainer');
+            if (!container) return;
+
+            const type = options.type || 'info';
+            const duration = options.duration !== undefined ? options.duration : 5000;
+
+            const toast = document.createElement('div');
+            toast.className = `toast toast-${type}`;
+            toast.setAttribute('role', 'alert');
+
+            toast.innerHTML = `
+                ${toastIcons[type] || toastIcons.info}
+                <div class="toast-content">
+                    ${options.title ? `<div class="toast-title">${options.title}</div>` : ''}
+                    <div class="toast-message">${options.message}</div>
+                </div>
+                <button class="toast-close" aria-label="Dismiss notification">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                    </svg>
+                </button>
+            `;
+
+            // Add close functionality
+            const closeBtn = toast.querySelector('.toast-close');
+            closeBtn.addEventListener('click', () => dismissToast(toast));
+
+            container.appendChild(toast);
+
+            // Auto-dismiss
+            if (duration > 0) {
+                setTimeout(() => dismissToast(toast), duration);
+            }
+
+            return toast;
+        }
+
+        function dismissToast(toast) {
+            if (!toast || toast.classList.contains('hiding')) return;
+
+            toast.classList.add('hiding');
+            setTimeout(() => {
+                if (toast.parentNode) {
+                    toast.parentNode.removeChild(toast);
+                }
+            }, 300);
+        }
+
+        // Convenience functions
+        function showSuccess(message, title = 'Success') {
+            return showToast({ message, title, type: 'success' });
+        }
+
+        function showError(message, title = 'Error') {
+            return showToast({ message, title, type: 'error', duration: 8000 });
+        }
+
+        function showWarning(message, title = 'Warning') {
+            return showToast({ message, title, type: 'warning' });
+        }
+
+        function showInfo(message, title = '') {
+            return showToast({ message, title, type: 'info' });
+        }
+
+        // Sidebar Section Toggle
+        function toggleSection(sectionName) {
+            const section = document.getElementById('section-' + sectionName);
+            const chevron = document.getElementById('chevron-' + sectionName);
+
+            if (section.classList.contains('expanded')) {
+                section.classList.remove('expanded');
+                chevron.classList.remove('rotated');
+            } else {
+                section.classList.add('expanded');
+                chevron.classList.add('rotated');
+            }
+
+            // Save state
+            saveSidebarState();
+        }
+
+        // Sidebar Collapse Toggle
+        function toggleSidebarCollapse() {
+            const sidebar = document.getElementById('sidebar');
+            const icon = document.getElementById('collapseIcon');
+            const title = document.querySelector('.sidebar-title');
+
+            if (sidebar.classList.contains('sidebar-collapsed')) {
+                sidebar.classList.remove('sidebar-collapsed');
+                icon.innerHTML = '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 19l-7-7 7-7m8 14l-7-7 7-7"></path>';
+                title.style.display = 'block';
+            } else {
+                sidebar.classList.add('sidebar-collapsed');
+                icon.innerHTML = '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 5l7 7-7 7M5 5l7 7-7 7"></path>';
+                title.style.display = 'none';
+            }
+
+            // Save state
+            localStorage.setItem('sidebarCollapsed', sidebar.classList.contains('sidebar-collapsed'));
+        }
+
+        // Save sidebar section states
+        function saveSidebarState() {
+            const sections = ['analytics', 'management', 'governance', 'finance', 'compliance'];
+            const state = {};
+            sections.forEach(s => {
+                const section = document.getElementById('section-' + s);
+                state[s] = section.classList.contains('expanded');
+            });
+            localStorage.setItem('sidebarSections', JSON.stringify(state));
+        }
+
+        // Load sidebar state on page load
+        function loadSidebarState() {
+            // Load collapsed state
+            const collapsed = localStorage.getItem('sidebarCollapsed') === 'true';
+            if (collapsed) {
+                const sidebar = document.getElementById('sidebar');
+                const icon = document.getElementById('collapseIcon');
+                const title = document.querySelector('.sidebar-title');
+                sidebar.classList.add('sidebar-collapsed');
+                icon.innerHTML = '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 5l7 7-7 7M5 5l7 7-7 7"></path>';
+                title.style.display = 'none';
+            }
+
+            // Load section states
+            const savedState = localStorage.getItem('sidebarSections');
+            if (savedState) {
+                const state = JSON.parse(savedState);
+                Object.keys(state).forEach(sectionName => {
+                    if (state[sectionName]) {
+                        const section = document.getElementById('section-' + sectionName);
+                        const chevron = document.getElementById('chevron-' + sectionName);
+                        if (section && chevron) {
+                            section.classList.add('expanded');
+                            chevron.classList.add('rotated');
+                        }
+                    }
+                });
+            } else {
+                // Default: expand Analytics section
+                const analyticsSection = document.getElementById('section-analytics');
+                const analyticsChevron = document.getElementById('chevron-analytics');
+                if (analyticsSection && analyticsChevron) {
+                    analyticsSection.classList.add('expanded');
+                    analyticsChevron.classList.add('rotated');
+                }
+            }
+        }
+
+        // Utility function
         function formatCurrency(amount) {
             return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(amount);
         }
+
+        // Colorblind-friendly chart palette (Wong palette)
+        const accessibleColors = {
+            primary: ['#0072B2', '#E69F00', '#009E73', '#CC79A7', '#F0E442', '#56B4E9', '#D55E00', '#000000'],
+            status: {
+                'Active': '#009E73',      // Green (safe)
+                'Completed': '#0072B2',   // Blue
+                'Draft': '#999999',       // Gray
+                'Cancelled': '#D55E00',   // Orange-red
+                'On Hold': '#E69F00'      // Orange
+            },
+            health: {
+                healthy: '#009E73',    // Green
+                warning: '#E69F00',    // Orange
+                atRisk: '#D55E00',     // Red-orange
+                critical: '#CC0000'    // Dark red
+            },
+            sequential: ['#f7fbff', '#deebf7', '#c6dbef', '#9ecae1', '#6baed6', '#4292c6', '#2171b5', '#084594']
+        };
+
+        // Default Plotly layout for accessibility
+        const accessibleLayout = {
+            font: { family: 'system-ui, -apple-system, sans-serif', size: 12 },
+            paper_bgcolor: 'rgba(0,0,0,0)',
+            plot_bgcolor: 'rgba(0,0,0,0)',
+            hoverlabel: { font: { size: 14 } }
+        };
+
+        // Accessible chart config
+        const accessibleConfig = {
+            responsive: true,
+            displayModeBar: true,
+            modeBarButtonsToRemove: ['lasso2d', 'select2d'],
+            displaylogo: false
+        };
+
+        // Helper to create accessible pie chart
+        function createAccessiblePie(elementId, labels, values, options = {}) {
+            const colors = options.colors || accessibleColors.primary.slice(0, labels.length);
+            const data = [{
+                type: 'pie',
+                labels: labels,
+                values: values,
+                marker: { colors: colors, line: { color: '#ffffff', width: 2 } },
+                hole: options.donut ? 0.4 : 0,
+                textinfo: 'label+percent',
+                textposition: 'outside',
+                hovertemplate: '<b>%{label}</b><br>Value: %{value}<br>Percent: %{percent}<extra></extra>'
+            }];
+            const layout = {
+                ...accessibleLayout,
+                margin: { t: 40, b: 40, l: 40, r: 40 },
+                showlegend: true,
+                legend: { orientation: 'h', y: -0.2 },
+                ...options.layout
+            };
+            Plotly.newPlot(elementId, data, layout, accessibleConfig);
+        }
+
+        // Helper to create accessible bar chart
+        function createAccessibleBar(elementId, x, y, options = {}) {
+            const data = [{
+                type: 'bar',
+                x: x,
+                y: y,
+                marker: {
+                    color: options.color || accessibleColors.primary[0],
+                    line: { color: '#ffffff', width: 1 }
+                },
+                text: y.map(v => v.toLocaleString()),
+                textposition: 'outside',
+                hovertemplate: '<b>%{x}</b><br>Value: %{y:,.0f}<extra></extra>'
+            }];
+            const layout = {
+                ...accessibleLayout,
+                margin: { t: 20, b: 80, l: 60, r: 20 },
+                xaxis: { tickangle: -45, title: options.xTitle || '' },
+                yaxis: { title: options.yTitle || '' },
+                ...options.layout
+            };
+            Plotly.newPlot(elementId, data, layout, accessibleConfig);
+        }
+
+        // Loading State Utilities
+        function showLoading(message = 'Loading...') {
+            const overlay = document.getElementById('loadingOverlay');
+            const msgEl = document.getElementById('loadingMessage');
+            if (msgEl) msgEl.textContent = message;
+            if (overlay) overlay.classList.add('active');
+        }
+
+        function hideLoading() {
+            const overlay = document.getElementById('loadingOverlay');
+            if (overlay) overlay.classList.remove('active');
+        }
+
+        function setButtonLoading(button, loading = true) {
+            if (loading) {
+                button.classList.add('btn-loading');
+                button.disabled = true;
+            } else {
+                button.classList.remove('btn-loading');
+                button.disabled = false;
+            }
+        }
+
+        // Progress Bar Utility
+        function updateProgress(elementId, current, total, message = '') {
+            const progressEl = document.getElementById(elementId);
+            if (progressEl) {
+                const fillEl = progressEl.querySelector('.progress-bar-fill');
+                const msgEl = progressEl.querySelector('.progress-message');
+                const percent = Math.round((current / total) * 100);
+                if (fillEl) fillEl.style.width = percent + '%';
+                if (msgEl && message) msgEl.textContent = message;
+            }
+        }
+
+        // Skeleton Loader Utilities
+        function showSkeletons(containerId) {
+            const container = document.getElementById(containerId);
+            const content = container?.querySelector('.content');
+            const skeleton = container?.querySelector('.skeleton-container');
+            if (content) content.classList.add('hidden');
+            if (skeleton) skeleton.classList.remove('hidden');
+        }
+
+        function hideSkeletons(containerId) {
+            const container = document.getElementById(containerId);
+            const content = container?.querySelector('.content');
+            const skeleton = container?.querySelector('.skeleton-container');
+            if (content) content.classList.remove('hidden');
+            if (skeleton) skeleton.classList.add('hidden');
+        }
+
+        // Mobile Sidebar Toggle
+        function toggleMobileSidebar() {
+            const sidebar = document.getElementById('sidebar');
+            const overlay = document.getElementById('sidebarOverlay');
+
+            if (sidebar.classList.contains('mobile-open')) {
+                closeMobileSidebar();
+            } else {
+                sidebar.classList.add('mobile-open');
+                overlay.classList.add('active');
+                document.body.style.overflow = 'hidden';
+            }
+        }
+
+        function closeMobileSidebar() {
+            const sidebar = document.getElementById('sidebar');
+            const overlay = document.getElementById('sidebarOverlay');
+
+            sidebar.classList.remove('mobile-open');
+            overlay.classList.remove('active');
+            document.body.style.overflow = '';
+        }
+
+        // Close mobile sidebar on navigation (for single-page feel)
+        document.querySelectorAll('.sidebar-link').forEach(link => {
+            link.addEventListener('click', function() {
+                if (window.innerWidth < 1024) {
+                    closeMobileSidebar();
+                }
+            });
+        });
+
+        // Close mobile sidebar on escape key
+        document.addEventListener('keydown', function(e) {
+            if (e.key === 'Escape') {
+                closeMobileSidebar();
+                // Also close any open accessible modals
+                closeAccessibleModal();
+            }
+        });
+
+        // ====== Accessible Modal System ======
+        let currentModal = null;
+        let lastFocusedElement = null;
+
+        function openAccessibleModal(modalId, triggerElement) {
+            const modal = document.getElementById(modalId);
+            if (!modal) return;
+
+            // Store the element that triggered the modal
+            lastFocusedElement = triggerElement || document.activeElement;
+
+            // Show modal
+            modal.classList.remove('hidden');
+            modal.classList.add('flex');
+            currentModal = modal;
+
+            // Prevent background scroll
+            document.body.style.overflow = 'hidden';
+
+            // Add ARIA attributes
+            modal.setAttribute('role', 'dialog');
+            modal.setAttribute('aria-modal', 'true');
+
+            // Find and set aria-labelledby if there's a heading
+            const heading = modal.querySelector('h3, h2, [role="heading"]');
+            if (heading) {
+                if (!heading.id) heading.id = modalId + '-title';
+                modal.setAttribute('aria-labelledby', heading.id);
+            }
+
+            // Focus the first focusable element in the modal
+            requestAnimationFrame(() => {
+                const focusableElements = getFocusableElements(modal);
+                if (focusableElements.length > 0) {
+                    focusableElements[0].focus();
+                }
+            });
+
+            // Add focus trap event listener
+            modal.addEventListener('keydown', trapFocus);
+        }
+
+        function closeAccessibleModal(modalId) {
+            const modal = modalId ? document.getElementById(modalId) : currentModal;
+            if (!modal) return;
+
+            // Hide modal
+            modal.classList.add('hidden');
+            modal.classList.remove('flex');
+
+            // Restore background scroll
+            document.body.style.overflow = '';
+
+            // Remove focus trap event listener
+            modal.removeEventListener('keydown', trapFocus);
+
+            // Return focus to trigger element
+            if (lastFocusedElement && typeof lastFocusedElement.focus === 'function') {
+                lastFocusedElement.focus();
+            }
+
+            currentModal = null;
+            lastFocusedElement = null;
+        }
+
+        function getFocusableElements(container) {
+            const focusableSelectors = [
+                'button:not([disabled])',
+                'a[href]',
+                'input:not([disabled]):not([type="hidden"])',
+                'select:not([disabled])',
+                'textarea:not([disabled])',
+                '[tabindex]:not([tabindex="-1"])'
+            ];
+            return Array.from(container.querySelectorAll(focusableSelectors.join(', ')))
+                .filter(el => el.offsetParent !== null); // Filter out hidden elements
+        }
+
+        function trapFocus(e) {
+            if (e.key !== 'Tab') return;
+
+            const modal = currentModal;
+            if (!modal) return;
+
+            const focusableElements = getFocusableElements(modal);
+            if (focusableElements.length === 0) return;
+
+            const firstElement = focusableElements[0];
+            const lastElement = focusableElements[focusableElements.length - 1];
+
+            if (e.shiftKey) {
+                // Shift + Tab: if on first element, go to last
+                if (document.activeElement === firstElement) {
+                    e.preventDefault();
+                    lastElement.focus();
+                }
+            } else {
+                // Tab: if on last element, go to first
+                if (document.activeElement === lastElement) {
+                    e.preventDefault();
+                    firstElement.focus();
+                }
+            }
+        }
+
+        // Helper to add close-on-backdrop-click behavior
+        function setupModalBackdropClose(modalId, closeFunction) {
+            const modal = document.getElementById(modalId);
+            if (modal) {
+                modal.addEventListener('click', function(e) {
+                    if (e.target === this) {
+                        if (typeof closeFunction === 'function') {
+                            closeFunction();
+                        } else {
+                            closeAccessibleModal(modalId);
+                        }
+                    }
+                });
+            }
+        }
+
+        // Handle window resize
+        window.addEventListener('resize', function() {
+            if (window.innerWidth >= 1024) {
+                closeMobileSidebar();
+            }
+        });
+
+        // ====== Tooltip System ======
+        // Initialize tooltips for truncated text elements
+        function initTruncateTooltips() {
+            document.querySelectorAll('.truncate-tooltip, [data-tooltip]').forEach(el => {
+                // Skip if already initialized
+                if (el.querySelector('.tooltip-content')) return;
+
+                // Check if text is actually truncated or has explicit tooltip
+                const isTruncated = el.scrollWidth > el.clientWidth;
+                const tooltipText = el.getAttribute('data-tooltip') || el.textContent.trim();
+
+                if (isTruncated || el.hasAttribute('data-tooltip')) {
+                    el.classList.add('tooltip');
+                    const tooltipContent = document.createElement('span');
+                    tooltipContent.className = 'tooltip-content tooltip-top';
+                    tooltipContent.textContent = tooltipText;
+                    el.appendChild(tooltipContent);
+                }
+            });
+        }
+
+        // Create tooltip dynamically (for programmatic use)
+        function createTooltip(element, text, position = 'top') {
+            element.classList.add('tooltip');
+            const existing = element.querySelector('.tooltip-content');
+            if (existing) existing.remove();
+
+            const tooltipContent = document.createElement('span');
+            tooltipContent.className = `tooltip-content tooltip-${position}`;
+            tooltipContent.textContent = text;
+            element.appendChild(tooltipContent);
+        }
+
+        // Remove tooltip
+        function removeTooltip(element) {
+            element.classList.remove('tooltip');
+            const tooltip = element.querySelector('.tooltip-content');
+            if (tooltip) tooltip.remove();
+        }
+
+        // ====== Keyboard Shortcuts ======
+        const keyboardShortcuts = [
+            { key: '/', description: 'Focus search', action: 'focusSearch' },
+            { key: 'Ctrl+K', description: 'Focus search', action: 'focusSearch' },
+            { key: 'n', description: 'New contract (contracts page)', action: 'newContract' },
+            { key: '?', description: 'Show keyboard shortcuts', action: 'showHelp' },
+            { key: 'Escape', description: 'Close modals / Clear selection', action: 'escape' },
+            { key: 'd', description: 'Toggle dark mode', action: 'toggleDark' },
+            { key: 'g h', description: 'Go to Dashboard', action: 'goDashboard' },
+            { key: 'g c', description: 'Go to Contracts', action: 'goContracts' },
+        ];
+
+        let pendingKey = null;
+        let pendingKeyTimeout = null;
+
+        function handleKeyboardShortcut(e) {
+            // Don't trigger if user is typing in an input
+            const target = e.target;
+            if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.tagName === 'SELECT' || target.isContentEditable) {
+                // Allow Escape to still work
+                if (e.key === 'Escape') {
+                    target.blur();
+                }
+                return;
+            }
+
+            // Don't trigger if a modal is open (except for Escape)
+            const openModal = document.querySelector('.fixed[role="dialog"]:not(.hidden)');
+            if (openModal && e.key !== 'Escape') {
+                return;
+            }
+
+            const key = e.key;
+            const ctrlKey = e.ctrlKey || e.metaKey;
+
+            // Handle Ctrl+K
+            if (ctrlKey && key === 'k') {
+                e.preventDefault();
+                focusSearch();
+                return;
+            }
+
+            // Handle two-key sequences (g + key)
+            if (pendingKey === 'g') {
+                clearTimeout(pendingKeyTimeout);
+                pendingKey = null;
+                if (key === 'h') {
+                    window.location.href = '/';
+                    return;
+                } else if (key === 'c') {
+                    window.location.href = '/contracts';
+                    return;
+                }
+            }
+
+            if (key === 'g') {
+                pendingKey = 'g';
+                pendingKeyTimeout = setTimeout(() => { pendingKey = null; }, 1000);
+                return;
+            }
+
+            // Single key shortcuts
+            switch (key) {
+                case '/':
+                    e.preventDefault();
+                    focusSearch();
+                    break;
+                case 'n':
+                    if (typeof openAddContractModal === 'function') {
+                        openAddContractModal();
+                    }
+                    break;
+                case '?':
+                    e.preventDefault();
+                    showKeyboardShortcutsHelp();
+                    break;
+                case 'Escape':
+                    // Close any open modals
+                    if (openModal) {
+                        const closeBtn = openModal.querySelector('[onclick*="close"], [aria-label="Close"]');
+                        if (closeBtn) closeBtn.click();
+                    }
+                    // Clear selection if on contracts page
+                    if (typeof clearSelection === 'function') {
+                        clearSelection();
+                    }
+                    break;
+                case 'd':
+                    toggleDarkMode();
+                    break;
+                case 'r':
+                    toggleRecentDropdown();
+                    break;
+            }
+        }
+
+        function focusSearch() {
+            const searchInput = document.getElementById('searchInput') ||
+                               document.querySelector('input[type="search"]') ||
+                               document.querySelector('input[name="search"]') ||
+                               document.querySelector('input[placeholder*="Search"]');
+            if (searchInput) {
+                searchInput.focus();
+                searchInput.select();
+            }
+        }
+
+        function showKeyboardShortcutsHelp() {
+            const modal = document.getElementById('keyboardShortcutsModal');
+            if (modal) {
+                modal.classList.remove('hidden');
+                modal.classList.add('flex');
+            }
+        }
+
+        function closeKeyboardShortcutsHelp() {
+            const modal = document.getElementById('keyboardShortcutsModal');
+            if (modal) {
+                modal.classList.add('hidden');
+                modal.classList.remove('flex');
+            }
+        }
+
+        // ====== Recently Viewed Contracts ======
+        const RECENT_CONTRACTS_KEY = 'recentlyViewedContracts';
+        const MAX_RECENT_CONTRACTS = 10;
+
+        function getRecentlyViewed() {
+            try {
+                const stored = localStorage.getItem(RECENT_CONTRACTS_KEY);
+                return stored ? JSON.parse(stored) : [];
+            } catch (e) {
+                console.error('Error reading recently viewed:', e);
+                return [];
+            }
+        }
+
+        function saveRecentlyViewed(items) {
+            try {
+                localStorage.setItem(RECENT_CONTRACTS_KEY, JSON.stringify(items));
+            } catch (e) {
+                console.error('Error saving recently viewed:', e);
+            }
+        }
+
+        function addToRecentlyViewed(contract) {
+            if (!contract || !contract.id) return;
+
+            const items = getRecentlyViewed();
+
+            // Remove existing entry for this contract (to update position)
+            const filtered = items.filter(item => item.id !== contract.id);
+
+            // Add to beginning
+            filtered.unshift({
+                id: contract.id,
+                title: contract.title || `Contract #${contract.id}`,
+                vendor: contract.vendor || '',
+                status: contract.status || '',
+                viewedAt: new Date().toISOString()
+            });
+
+            // Keep only the most recent items
+            const trimmed = filtered.slice(0, MAX_RECENT_CONTRACTS);
+
+            saveRecentlyViewed(trimmed);
+            updateRecentDropdown();
+        }
+
+        function clearRecentlyViewed() {
+            saveRecentlyViewed([]);
+            updateRecentDropdown();
+            closeRecentDropdown();
+            showInfo('History cleared');
+        }
+
+        function toggleRecentDropdown() {
+            const dropdown = document.getElementById('recentDropdown');
+            if (dropdown) {
+                dropdown.classList.toggle('open');
+            }
+        }
+
+        function closeRecentDropdown() {
+            const dropdown = document.getElementById('recentDropdown');
+            if (dropdown) {
+                dropdown.classList.remove('open');
+            }
+        }
+
+        function formatTimeAgo(dateString) {
+            const date = new Date(dateString);
+            const now = new Date();
+            const seconds = Math.floor((now - date) / 1000);
+
+            if (seconds < 60) return 'Just now';
+            if (seconds < 3600) return `${Math.floor(seconds / 60)}m ago`;
+            if (seconds < 86400) return `${Math.floor(seconds / 3600)}h ago`;
+            if (seconds < 604800) return `${Math.floor(seconds / 86400)}d ago`;
+            return date.toLocaleDateString();
+        }
+
+        function getStatusColor(status) {
+            const colors = {
+                'Active': 'bg-green-100 text-green-600 dark:bg-green-900/30 dark:text-green-400',
+                'Completed': 'bg-blue-100 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400',
+                'Draft': 'bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-400',
+                'Cancelled': 'bg-red-100 text-red-600 dark:bg-red-900/30 dark:text-red-400',
+                'Pending': 'bg-yellow-100 text-yellow-600 dark:bg-yellow-900/30 dark:text-yellow-400'
+            };
+            return colors[status] || 'bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-400';
+        }
+
+        function updateRecentDropdown() {
+            const items = getRecentlyViewed();
+            const list = document.getElementById('recentList');
+            const badge = document.getElementById('recentBadge');
+
+            if (!list) return;
+
+            // Update badge
+            if (badge) {
+                if (items.length > 0) {
+                    badge.textContent = items.length;
+                    badge.classList.remove('hidden');
+                    badge.classList.add('flex');
+                } else {
+                    badge.classList.add('hidden');
+                    badge.classList.remove('flex');
+                }
+            }
+
+            // Update list
+            if (items.length === 0) {
+                list.innerHTML = `
+                    <div class="px-4 py-8 text-center text-gray-500 dark:text-gray-400 text-sm">
+                        <svg class="w-8 h-8 mx-auto mb-2 text-gray-300 dark:text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                        </svg>
+                        No recently viewed contracts
+                    </div>`;
+                return;
+            }
+
+            list.innerHTML = items.map(item => `
+                <a href="/contracts/${item.id}" class="recent-item" onclick="closeRecentDropdown()">
+                    <div class="recent-item-icon ${getStatusColor(item.status)}">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+                        </svg>
+                    </div>
+                    <div class="recent-item-content">
+                        <div class="recent-item-title">${escapeHtml(item.title)}</div>
+                        <div class="recent-item-meta">${escapeHtml(item.vendor || 'No vendor')}</div>
+                    </div>
+                    <span class="recent-item-time">${formatTimeAgo(item.viewedAt)}</span>
+                </a>
+            `).join('');
+        }
+
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        // ====== Form Validation System ======
+        const validationRules = {
+            required: (value) => value && value.trim() !== '',
+            email: (value) => !value || /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value),
+            minLength: (value, min) => !value || value.length >= min,
+            maxLength: (value, max) => !value || value.length <= max,
+            number: (value) => !value || !isNaN(parseFloat(value)),
+            positiveNumber: (value) => !value || (parseFloat(value) > 0),
+            date: (value) => !value || !isNaN(Date.parse(value)),
+            dateAfter: (value, compareValue) => {
+                if (!value || !compareValue) return true;
+                return new Date(value) > new Date(compareValue);
+            },
+            pattern: (value, regex) => !value || regex.test(value)
+        };
+
+        const validationMessages = {
+            required: 'This field is required',
+            email: 'Please enter a valid email address',
+            minLength: (min) => `Must be at least ${min} characters`,
+            maxLength: (max) => `Must be no more than ${max} characters`,
+            number: 'Please enter a valid number',
+            positiveNumber: 'Must be a positive number',
+            date: 'Please enter a valid date',
+            dateAfter: 'End date must be after start date',
+            pattern: 'Invalid format'
+        };
+
+        function validateField(field, rules = {}) {
+            const value = field.value;
+            const fieldContainer = field.closest('.form-field') || field.parentElement;
+            let isValid = true;
+            let errorMessage = '';
+
+            // Check required
+            if (field.hasAttribute('required') || rules.required) {
+                if (!validationRules.required(value)) {
+                    isValid = false;
+                    errorMessage = validationMessages.required;
+                }
+            }
+
+            // Check other rules only if field has a value or is required
+            if (isValid && value) {
+                for (const [rule, param] of Object.entries(rules)) {
+                    if (rule === 'required') continue;
+
+                    const ruleFn = validationRules[rule];
+                    if (ruleFn && !ruleFn(value, param)) {
+                        isValid = false;
+                        errorMessage = typeof validationMessages[rule] === 'function'
+                            ? validationMessages[rule](param)
+                            : validationMessages[rule];
+                        break;
+                    }
+                }
+            }
+
+            // Update UI
+            updateFieldValidation(fieldContainer, field, isValid, errorMessage);
+            return isValid;
+        }
+
+        function updateFieldValidation(container, field, isValid, errorMessage) {
+            // Remove existing states
+            container.classList.remove('is-valid', 'is-invalid');
+
+            // Remove existing validation icons
+            const existingIcon = container.querySelector('.validation-icon');
+            if (existingIcon) existingIcon.remove();
+
+            // Get or create error message element
+            let errorEl = container.querySelector('.error-message');
+            if (!errorEl) {
+                errorEl = document.createElement('span');
+                errorEl.className = 'error-message';
+                container.appendChild(errorEl);
+            }
+
+            // Only show validation state if field has been interacted with
+            if (field.dataset.touched === 'true') {
+                if (isValid) {
+                    container.classList.add('is-valid');
+                    // Add checkmark icon for valid fields
+                    if (field.value) {
+                        const icon = document.createElement('span');
+                        icon.className = 'validation-icon valid';
+                        icon.innerHTML = '<svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>';
+
+                        // Position the icon correctly
+                        const inputWrapper = document.createElement('div');
+                        inputWrapper.style.position = 'relative';
+                        if (!field.parentElement.classList.contains('input-wrapper')) {
+                            field.parentElement.insertBefore(inputWrapper, field);
+                            inputWrapper.appendChild(field);
+                            inputWrapper.classList.add('input-wrapper');
+                            inputWrapper.appendChild(icon);
+                        } else {
+                            field.parentElement.appendChild(icon);
+                        }
+                    }
+                } else {
+                    container.classList.add('is-invalid');
+                    errorEl.textContent = errorMessage;
+                }
+            }
+        }
+
+        function initFormValidation(formId, fieldRules = {}) {
+            const form = document.getElementById(formId);
+            if (!form) return;
+
+            const submitBtn = form.querySelector('button[type="submit"]');
+
+            // Add blur validation to all required fields
+            form.querySelectorAll('input, select, textarea').forEach(field => {
+                field.addEventListener('blur', function() {
+                    this.dataset.touched = 'true';
+                    const rules = fieldRules[this.name] || {};
+                    validateField(this, rules);
+                    updateSubmitButton(form, submitBtn, fieldRules);
+                });
+
+                field.addEventListener('input', function() {
+                    if (this.dataset.touched === 'true') {
+                        const rules = fieldRules[this.name] || {};
+                        validateField(this, rules);
+                        updateSubmitButton(form, submitBtn, fieldRules);
+                    }
+                });
+            });
+
+            // Validate all fields on form submit
+            form.addEventListener('submit', function(e) {
+                let allValid = true;
+                form.querySelectorAll('input, select, textarea').forEach(field => {
+                    field.dataset.touched = 'true';
+                    const rules = fieldRules[field.name] || {};
+                    if (!validateField(field, rules)) {
+                        allValid = false;
+                    }
+                });
+
+                if (!allValid) {
+                    e.preventDefault();
+                    // Focus first invalid field
+                    const firstInvalid = form.querySelector('.is-invalid input, .is-invalid select, .is-invalid textarea');
+                    if (firstInvalid) firstInvalid.focus();
+                }
+            });
+        }
+
+        function updateSubmitButton(form, submitBtn, fieldRules) {
+            if (!submitBtn) return;
+
+            let allValid = true;
+            form.querySelectorAll('input[required], select[required], textarea[required]').forEach(field => {
+                const rules = fieldRules[field.name] || {};
+                // Check if field would be valid
+                const value = field.value;
+                if (!validationRules.required(value)) {
+                    allValid = false;
+                } else {
+                    for (const [rule, param] of Object.entries(rules)) {
+                        if (rule === 'required') continue;
+                        const ruleFn = validationRules[rule];
+                        if (ruleFn && !ruleFn(value, param)) {
+                            allValid = false;
+                            break;
+                        }
+                    }
+                }
+            });
+
+            // Update button state
+            submitBtn.disabled = !allValid;
+            if (allValid) {
+                submitBtn.classList.remove('opacity-50', 'cursor-not-allowed');
+            } else {
+                submitBtn.classList.add('opacity-50', 'cursor-not-allowed');
+            }
+        }
+
+        // ====== User Preferences System ======
+        const USER_PREFS_KEY = 'userPreferences';
+
+        function getUserPreferences() {
+            try {
+                const stored = localStorage.getItem(USER_PREFS_KEY);
+                return stored ? JSON.parse(stored) : {};
+            } catch (e) {
+                console.error('Error reading user preferences:', e);
+                return {};
+            }
+        }
+
+        function saveUserPreferences(prefs) {
+            try {
+                localStorage.setItem(USER_PREFS_KEY, JSON.stringify(prefs));
+            } catch (e) {
+                console.error('Error saving user preferences:', e);
+            }
+        }
+
+        function getPreference(key, defaultValue = null) {
+            const prefs = getUserPreferences();
+            return prefs[key] !== undefined ? prefs[key] : defaultValue;
+        }
+
+        function setPreference(key, value) {
+            const prefs = getUserPreferences();
+            prefs[key] = value;
+            saveUserPreferences(prefs);
+        }
+
+        function getPagePreference(page, key, defaultValue = null) {
+            const prefs = getUserPreferences();
+            const pagePrefs = prefs[`page_${page}`] || {};
+            return pagePrefs[key] !== undefined ? pagePrefs[key] : defaultValue;
+        }
+
+        function setPagePreference(page, key, value) {
+            const prefs = getUserPreferences();
+            if (!prefs[`page_${page}`]) {
+                prefs[`page_${page}`] = {};
+            }
+            prefs[`page_${page}`][key] = value;
+            saveUserPreferences(prefs);
+        }
+
+        function clearPreferences() {
+            try {
+                localStorage.removeItem(USER_PREFS_KEY);
+                showInfo('Preferences cleared');
+            } catch (e) {
+                console.error('Error clearing preferences:', e);
+            }
+        }
+
+        // Close dropdown when clicking outside
+        document.addEventListener('click', function(e) {
+            const dropdown = document.getElementById('recentDropdown');
+            if (dropdown && !dropdown.contains(e.target)) {
+                closeRecentDropdown();
+            }
+        });
+
+        // Initialize on DOM load
+        document.addEventListener('DOMContentLoaded', function() {
+            loadSidebarState();
+            initTruncateTooltips();
+            initDarkModeToggle();
+            initHealthLegends();
+            updateRecentDropdown();
+
+            // Add keyboard shortcut listener
+            document.addEventListener('keydown', handleKeyboardShortcut);
+        });
+
+        // Re-initialize tooltips when content changes (for dynamic content)
+        const tooltipObserver = new MutationObserver(function(mutations) {
+            mutations.forEach(function(mutation) {
+                if (mutation.addedNodes.length > 0) {
+                    setTimeout(initTruncateTooltips, 100);
+                }
+            });
+        });
+        document.addEventListener('DOMContentLoaded', function() {
+            tooltipObserver.observe(document.body, { childList: true, subtree: true });
+        });
     </script>
 
     {% block scripts %}{% endblock %}

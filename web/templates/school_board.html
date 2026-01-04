@@ -141,7 +141,7 @@
                         <p class="text-xs text-gray-500 dark:text-gray-400 truncate">{{ m.contract_title }}</p>
                     </div>
                     <div class="text-right ml-2">
-                        <p class="text-xs font-medium text-blue-600">{{ m.due_date }}</p>
+                        <p class="text-xs font-medium text-blue-600">{{ m.due_date|format_date }}</p>
                     </div>
                 </div>
                 {% endfor %}
@@ -163,7 +163,7 @@
                         <p class="text-xs text-gray-500 dark:text-gray-400 truncate">{{ m.contract_title }}</p>
                     </div>
                     <div class="text-right ml-2">
-                        <p class="text-xs font-medium text-red-600">Due: {{ m.due_date }}</p>
+                        <p class="text-xs font-medium text-red-600">Due: {{ m.due_date|format_date }}</p>
                     </div>
                 </div>
                 {% endfor %}
@@ -304,7 +304,7 @@
                         ${{ '{:,.0f}'.format(contract.current_amount) }}
                     </td>
                     <td class="px-6 py-4 whitespace-nowrap text-gray-500 dark:text-gray-400">
-                        {{ contract.start_date }} - {{ contract.current_end_date }}
+                        {{ contract.start_date|format_date }} - {{ contract.current_end_date|format_date }}
                     </td>
                 </tr>
                 {% endfor %}

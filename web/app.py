@@ -39,6 +39,59 @@ contract_scorer = ContractScoringEngine()
 vendor_scorer = VendorScoringEngine()
 alert_generator = AlertGenerator()
 
+
+# ====== Custom Template Filters ======
+
+@app.template_filter('format_date')
+def format_date_filter(value, format_str='%b %d, %Y'):
+    """Format a date string or datetime object consistently.
+
+    Args:
+        value: Date string (YYYY-MM-DD) or datetime object
+        format_str: Output format (default: 'Jan 15, 2025')
+
+    Returns:
+        Formatted date string or empty string if invalid
+    """
+    if not value:
+        return ''
+
+    try:
+        if isinstance(value, str):
+            # Handle common date formats
+            for input_format in ['%Y-%m-%d', '%Y-%m-%d %H:%M:%S', '%m/%d/%Y', '%d/%m/%Y']:
+                try:
+                    dt = datetime.strptime(value.split(' ')[0] if ' ' in value else value, input_format.split(' ')[0])
+                    return dt.strftime(format_str)
+                except ValueError:
+                    continue
+            return value  # Return original if no format matches
+        elif isinstance(value, datetime):
+            return value.strftime(format_str)
+        else:
+            return str(value)
+    except Exception:
+        return str(value) if value else ''
+
+
+@app.template_filter('format_date_short')
+def format_date_short_filter(value):
+    """Format date as short format (Jan 15)."""
+    return format_date_filter(value, '%b %d')
+
+
+@app.template_filter('format_date_full')
+def format_date_full_filter(value):
+    """Format date as full format (January 15, 2025)."""
+    return format_date_filter(value, '%B %d, %Y')
+
+
+@app.template_filter('format_date_iso')
+def format_date_iso_filter(value):
+    """Format date as ISO format (2025-01-15)."""
+    return format_date_filter(value, '%Y-%m-%d')
+
+
 # Global data cache
 current_contracts = None
 current_vendors = None
@@ -81,6 +134,7 @@ def get_portfolio_summary(df: pd.DataFrame) -> Dict:
         'completed_count': len(df[df['status'] == 'Completed']),
         'status_distribution': df['status'].value_counts().to_dict() if 'status' in df.columns else {},
         'department_distribution': df['department'].value_counts().to_dict() if 'department' in df.columns else {},
+        'department_spending': df.groupby('department')['current_amount'].sum().to_dict() if 'department' in df.columns and 'current_amount' in df.columns else {},
         'type_distribution': df['contract_type'].value_counts().to_dict() if 'contract_type' in df.columns else {}
     }
 
@@ -315,7 +369,7 @@ def executive_dashboard():
 
 @app.route('/contracts')
 def contracts_list():
-    """All contracts view with filtering and saved searches."""
+    """All contracts view with filtering, pagination, and saved searches."""
     global current_contracts, current_vendors
 
     if current_contracts is None:
@@ -350,12 +404,39 @@ def contracts_list():
         elif health == 'healthy':
             df = df[df['overall_health_score'] >= 70]
 
-    contracts = df.to_dict('records') if not df.empty else []
-
-    # Calculate summary stats
+    # Calculate summary stats (before pagination)
+    total_count = len(df)
     total_value = float(df['current_amount'].sum()) if not df.empty else 0
     at_risk_count = len(df[df['overall_health_score'] < 50]) if not df.empty and 'overall_health_score' in df.columns else 0
     overrun_count = len(df[df['current_amount'] > df['original_amount']]) if not df.empty else 0
+
+    # Pagination
+    page = request.args.get('page', 1, type=int)
+    per_page = request.args.get('per_page', 10, type=int)
+    per_page = min(per_page, 100)  # Max 100 per page
+
+    total_pages = (total_count + per_page - 1) // per_page if total_count > 0 else 1
+    page = max(1, min(page, total_pages))  # Ensure page is within bounds
+
+    start_idx = (page - 1) * per_page
+    end_idx = start_idx + per_page
+
+    # Apply pagination
+    paginated_df = df.iloc[start_idx:end_idx] if not df.empty else df
+    contracts = paginated_df.to_dict('records') if not paginated_df.empty else []
+
+    # Pagination info
+    pagination = {
+        'page': page,
+        'per_page': per_page,
+        'total_count': total_count,
+        'total_pages': total_pages,
+        'has_prev': page > 1,
+        'has_next': page < total_pages,
+        'start_idx': start_idx + 1 if total_count > 0 else 0,
+        'end_idx': min(end_idx, total_count),
+        'pages': list(range(max(1, page - 2), min(total_pages + 1, page + 3)))
+    }
 
     # Get unique departments for filter
     departments = current_contracts['department'].unique().tolist() if current_contracts is not None and 'department' in current_contracts.columns else []
@@ -374,6 +455,7 @@ def contracts_list():
                           at_risk_count=at_risk_count,
                           overrun_count=overrun_count,
                           saved_searches=saved_searches,
+                          pagination=pagination,
                           title='All Contracts')
 
 

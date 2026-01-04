@@ -70,7 +70,17 @@
             </select>
         </div>
         <div>
-            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Health</label>
+            <label class="text-sm font-medium text-gray-700 dark:text-gray-300 mb-1 flex items-center gap-1.5">
+                Health
+                <span class="relative">
+                    <button type="button" onclick="toggleHealthLegend(event, 'healthLegendFilter')" class="health-info-btn" aria-label="Health score information">
+                        <svg class="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
+                            <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clip-rule="evenodd"></path>
+                        </svg>
+                    </button>
+                    <div id="healthLegendFilter" class="health-legend"></div>
+                </span>
+            </label>
             <select name="health" id="healthFilter" class="w-full px-3 py-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 dark:text-white">
                 <option value="">All Health Scores</option>
                 <option value="critical" {% if request.args.get('health') == 'critical' %}selected{% endif %}>Critical (&lt;30)</option>
@@ -148,9 +158,9 @@
 </div>
 
 <!-- Bulk Status Update Modal -->
-<div id="bulkStatusModal" class="fixed inset-0 bg-black bg-opacity-50 hidden items-center justify-center z-50">
+<div id="bulkStatusModal" class="fixed inset-0 bg-black bg-opacity-50 hidden items-center justify-center z-50" role="dialog" aria-modal="true" aria-labelledby="bulkStatusModal-title">
     <div class="bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-md w-full mx-4 p-6">
-        <h3 class="text-lg font-semibold text-gray-800 dark:text-white mb-4">Update Contract Status</h3>
+        <h3 id="bulkStatusModal-title" class="text-lg font-semibold text-gray-800 dark:text-white mb-4">Update Contract Status</h3>
         <p class="text-sm text-gray-600 dark:text-gray-400 mb-4">Update status for <span id="bulkStatusCount">0</span> selected contracts</p>
         <select id="bulkStatusSelect" class="w-full px-3 py-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 dark:text-white mb-4">
             <option value="">Select New Status</option>
@@ -172,9 +182,9 @@
 </div>
 
 <!-- Bulk Department Assign Modal -->
-<div id="bulkDeptModal" class="fixed inset-0 bg-black bg-opacity-50 hidden items-center justify-center z-50">
+<div id="bulkDeptModal" class="fixed inset-0 bg-black bg-opacity-50 hidden items-center justify-center z-50" role="dialog" aria-modal="true" aria-labelledby="bulkDeptModal-title">
     <div class="bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-md w-full mx-4 p-6">
-        <h3 class="text-lg font-semibold text-gray-800 dark:text-white mb-4">Assign Department</h3>
+        <h3 id="bulkDeptModal-title" class="text-lg font-semibold text-gray-800 dark:text-white mb-4">Assign Department</h3>
         <p class="text-sm text-gray-600 dark:text-gray-400 mb-4">Assign department for <span id="bulkDeptCount">0</span> selected contracts</p>
         <select id="bulkDeptSelect" class="w-full px-3 py-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 dark:text-white mb-4">
             <option value="">Select Department</option>
@@ -193,8 +203,92 @@
     </div>
 </div>
 
-<!-- Contracts Table -->
-<div class="bg-white dark:bg-gray-800 rounded-lg shadow overflow-hidden">
+<!-- View Toggle (visible on mobile) -->
+<div class="flex justify-end mb-4 md:hidden">
+    <div class="inline-flex rounded-lg border dark:border-gray-600 p-1 bg-white dark:bg-gray-800">
+        <button id="tableViewBtn" onclick="setContractView('table')" class="px-3 py-1.5 text-sm rounded-md transition-colors bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-200" aria-pressed="true">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h18M3 14h18m-9-4v8m-7 0h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"></path>
+            </svg>
+        </button>
+        <button id="cardViewBtn" onclick="setContractView('card')" class="px-3 py-1.5 text-sm rounded-md transition-colors text-gray-600 dark:text-gray-400" aria-pressed="false">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z"></path>
+            </svg>
+        </button>
+    </div>
+</div>
+
+<!-- Mobile Card View -->
+<div id="contractCardsView" class="hidden space-y-4 md:hidden">
+    {% for contract in contracts %}
+    <div class="bg-white dark:bg-gray-800 rounded-lg shadow p-4 cursor-pointer hover:shadow-md transition-shadow" onclick="window.location='{{ url_for('contract_detail', contract_id=contract.contract_id) }}'">
+        <div class="flex justify-between items-start mb-3">
+            <div class="flex-1 min-w-0">
+                <h3 class="font-medium text-gray-800 dark:text-white truncate">{{ contract.title }}</h3>
+                <p class="text-xs text-gray-500 dark:text-gray-400">{{ contract.contract_number }}</p>
+            </div>
+            <span class="ml-2 px-2 py-1 text-xs font-medium rounded-full shrink-0
+                {% if contract.status == 'Active' %}bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200
+                {% elif contract.status == 'Completed' %}bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200
+                {% elif contract.status == 'Draft' %}bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-200
+                {% else %}bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200{% endif %}">
+                {{ contract.status }}
+            </span>
+        </div>
+        <div class="grid grid-cols-2 gap-3 text-sm">
+            <div>
+                <p class="text-xs text-gray-500 dark:text-gray-400">Vendor</p>
+                <p class="text-gray-800 dark:text-white truncate">{{ contract.vendor_name }}</p>
+            </div>
+            <div>
+                <p class="text-xs text-gray-500 dark:text-gray-400">Value</p>
+                <p class="font-medium text-gray-800 dark:text-white">${{ '{:,.0f}'.format(contract.current_amount or contract.original_amount) }}</p>
+            </div>
+            <div>
+                <p class="text-xs text-gray-500 dark:text-gray-400">Department</p>
+                <span class="px-2 py-0.5 text-xs rounded-full bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-200">{{ contract.department }}</span>
+            </div>
+            <div>
+                <p class="text-xs text-gray-500 dark:text-gray-400">End Date</p>
+                <p class="text-gray-800 dark:text-white">{{ contract.end_date|format_date }}</p>
+                {% if contract.days_remaining is defined and contract.days_remaining < 30 %}
+                <p class="text-xs text-red-600">{{ contract.days_remaining }} days left</p>
+                {% endif %}
+            </div>
+        </div>
+        <div class="mt-3 pt-3 border-t dark:border-gray-700 flex justify-between items-center">
+            {% set health = contract.overall_health_score|int if contract.overall_health_score else 100 %}
+            <div class="flex items-center">
+                <span class="text-xs text-gray-500 dark:text-gray-400 mr-2">Health:</span>
+                <div class="w-20 bg-gray-200 dark:bg-gray-600 rounded-full h-2 mr-2">
+                    <div class="h-2 rounded-full
+                        {% if health < 30 %}bg-red-600
+                        {% elif health < 50 %}bg-orange-500
+                        {% elif health < 70 %}bg-yellow-500
+                        {% else %}bg-green-500{% endif %}"
+                        style="width: {{ health }}%"></div>
+                </div>
+                <span class="text-sm font-medium
+                    {% if health < 30 %}text-red-600
+                    {% elif health < 50 %}text-orange-600
+                    {% elif health < 70 %}text-yellow-600
+                    {% else %}text-green-600{% endif %}">{{ health }}</span>
+            </div>
+            <a href="{{ url_for('contract_detail', contract_id=contract.contract_id) }}" class="text-blue-600 dark:text-blue-400 text-sm font-medium" onclick="event.stopPropagation()">
+                View Details →
+            </a>
+        </div>
+    </div>
+    {% else %}
+    <div class="bg-white dark:bg-gray-800 rounded-lg shadow p-6 text-center">
+        <p class="text-gray-500 dark:text-gray-400">No contracts found</p>
+    </div>
+    {% endfor %}
+</div>
+
+<!-- Contracts Table (hidden on mobile when card view is active) -->
+<div id="contractTableView" class="bg-white dark:bg-gray-800 rounded-lg shadow overflow-hidden">
     <div class="overflow-x-auto">
         <table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
             <thead class="bg-gray-50 dark:bg-gray-700">
@@ -220,14 +314,14 @@
                     </td>
                     <td class="px-6 py-4 cursor-pointer" onclick="window.location='{{ url_for('contract_detail', contract_id=contract.contract_id) }}'">
                         <div class="flex items-center">
-                            <div>
-                                <p class="font-medium text-gray-800 dark:text-white">{{ contract.title[:40] }}{% if contract.title|length > 40 %}...{% endif %}</p>
+                            <div class="max-w-xs">
+                                <p class="font-medium text-gray-800 dark:text-white truncate-tooltip" {% if contract.title|length > 40 %}data-tooltip="{{ contract.title }}"{% endif %}>{{ contract.title[:40] }}{% if contract.title|length > 40 %}...{% endif %}</p>
                                 <p class="text-xs text-gray-500 dark:text-gray-400">{{ contract.contract_number }}</p>
                             </div>
                         </div>
                     </td>
                     <td class="px-6 py-4">
-                        <p class="text-sm text-gray-800 dark:text-white">{{ contract.vendor_name }}</p>
+                        <p class="text-sm text-gray-800 dark:text-white truncate-tooltip max-w-[150px]" {% if contract.vendor_name|length > 20 %}data-tooltip="{{ contract.vendor_name }}"{% endif %}>{{ contract.vendor_name }}</p>
                     </td>
                     <td class="px-6 py-4">
                         <span class="px-2 py-1 text-xs rounded-full bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-200">
@@ -273,7 +367,7 @@
                         </div>
                     </td>
                     <td class="px-6 py-4">
-                        <p class="text-sm text-gray-800 dark:text-white">{{ contract.end_date }}</p>
+                        <p class="text-sm text-gray-800 dark:text-white">{{ contract.end_date|format_date }}</p>
                         {% if contract.days_remaining is defined %}
                         <p class="text-xs {% if contract.days_remaining < 30 %}text-red-600{% elif contract.days_remaining < 90 %}text-yellow-600{% else %}text-gray-500{% endif %}">
                             {% if contract.days_remaining < 0 %}{{ -contract.days_remaining }} days overdue
@@ -302,22 +396,92 @@
                 </tr>
                 {% else %}
                 <tr>
-                    <td colspan="9" class="px-6 py-12 text-center text-gray-500 dark:text-gray-400">
-                        No contracts found matching your criteria
+                    <td colspan="9">
+                        <div class="empty-state">
+                            <svg class="empty-state-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+                            </svg>
+                            <h3 class="empty-state-title">No contracts found</h3>
+                            <p class="empty-state-description">
+                                {% if request.args.get('search') or request.args.get('status') or request.args.get('department') %}
+                                    Try adjusting your search filters or clear all filters to see all contracts.
+                                {% else %}
+                                    Get started by creating your first contract.
+                                {% endif %}
+                            </p>
+                            <div class="flex justify-center space-x-3">
+                                {% if request.args.get('search') or request.args.get('status') or request.args.get('department') %}
+                                    <a href="{{ url_for('contracts_list') }}" class="btn btn-outline">Clear Filters</a>
+                                {% endif %}
+                                <button onclick="openAddContractModal()" class="btn btn-primary">
+                                    <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path>
+                                    </svg>
+                                    New Contract
+                                </button>
+                            </div>
+                        </div>
                     </td>
                 </tr>
                 {% endfor %}
             </tbody>
         </table>
     </div>
+
+    <!-- Pagination -->
+    {% if pagination and pagination.total_count > 0 %}
+    <div class="px-6 py-4 border-t dark:border-gray-700 flex flex-col sm:flex-row items-center justify-between gap-4">
+        <div class="text-sm text-gray-600 dark:text-gray-400">
+            Showing <span class="font-medium">{{ pagination.start_idx }}</span> to <span class="font-medium">{{ pagination.end_idx }}</span> of <span class="font-medium">{{ pagination.total_count }}</span> contracts
+        </div>
+        <div class="flex items-center space-x-2">
+            <!-- Per Page Selector -->
+            <select onchange="changePerPage(this.value)" class="text-sm border rounded-lg px-2 py-1 dark:bg-gray-700 dark:border-gray-600 dark:text-white">
+                <option value="10" {% if pagination.per_page == 10 %}selected{% endif %}>10 per page</option>
+                <option value="25" {% if pagination.per_page == 25 %}selected{% endif %}>25 per page</option>
+                <option value="50" {% if pagination.per_page == 50 %}selected{% endif %}>50 per page</option>
+                <option value="100" {% if pagination.per_page == 100 %}selected{% endif %}>100 per page</option>
+            </select>
+
+            <!-- Pagination Buttons -->
+            <nav class="flex items-center space-x-1" aria-label="Pagination">
+                <!-- Previous -->
+                <a href="{{ url_for('contracts_list', page=pagination.page - 1, per_page=pagination.per_page, search=request.args.get('search', ''), status=request.args.get('status', ''), department=request.args.get('department', ''), health=request.args.get('health', '')) }}"
+                   class="px-3 py-1.5 text-sm rounded-lg {% if pagination.has_prev %}text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700{% else %}text-gray-400 dark:text-gray-600 cursor-not-allowed pointer-events-none{% endif %}"
+                   {% if not pagination.has_prev %}aria-disabled="true"{% endif %}>
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path>
+                    </svg>
+                </a>
+
+                <!-- Page Numbers -->
+                {% for p in pagination.pages %}
+                <a href="{{ url_for('contracts_list', page=p, per_page=pagination.per_page, search=request.args.get('search', ''), status=request.args.get('status', ''), department=request.args.get('department', ''), health=request.args.get('health', '')) }}"
+                   class="px-3 py-1.5 text-sm rounded-lg {% if p == pagination.page %}bg-blue-600 text-white{% else %}text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700{% endif %}">
+                    {{ p }}
+                </a>
+                {% endfor %}
+
+                <!-- Next -->
+                <a href="{{ url_for('contracts_list', page=pagination.page + 1, per_page=pagination.per_page, search=request.args.get('search', ''), status=request.args.get('status', ''), department=request.args.get('department', ''), health=request.args.get('health', '')) }}"
+                   class="px-3 py-1.5 text-sm rounded-lg {% if pagination.has_next %}text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700{% else %}text-gray-400 dark:text-gray-600 cursor-not-allowed pointer-events-none{% endif %}"
+                   {% if not pagination.has_next %}aria-disabled="true"{% endif %}>
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
+                    </svg>
+                </a>
+            </nav>
+        </div>
+    </div>
+    {% endif %}
 </div>
 
 <!-- Add Contract Modal -->
-<div id="addContractModal" class="fixed inset-0 bg-black bg-opacity-50 hidden items-center justify-center z-50">
+<div id="addContractModal" class="fixed inset-0 bg-black bg-opacity-50 hidden items-center justify-center z-50" role="dialog" aria-modal="true" aria-labelledby="addContractModal-title">
     <div class="bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-2xl w-full mx-4 max-h-[90vh] overflow-y-auto">
         <div class="px-6 py-4 border-b dark:border-gray-700 flex justify-between items-center">
-            <h3 class="text-lg font-semibold text-gray-800 dark:text-white">New Contract</h3>
-            <button onclick="closeAddContractModal()" class="text-gray-500 hover:text-gray-700 dark:text-gray-400">
+            <h3 id="addContractModal-title" class="text-lg font-semibold text-gray-800 dark:text-white">New Contract</h3>
+            <button onclick="closeAddContractModal()" class="text-gray-500 hover:text-gray-700 dark:text-gray-400" aria-label="Close modal">
                 <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
                 </svg>
@@ -325,12 +489,13 @@
         </div>
         <form id="addContractForm" class="p-6 space-y-4">
             <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
+                <div class="form-field">
                     <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Contract Number *</label>
                     <input type="text" name="contract_number" required
-                           class="w-full px-3 py-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 dark:text-white">
+                           class="w-full px-3 py-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+                           placeholder="e.g., CON-2024-001">
                 </div>
-                <div>
+                <div class="form-field">
                     <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Vendor *</label>
                     <select name="vendor_id" required
                             class="w-full px-3 py-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 dark:text-white">
@@ -341,18 +506,20 @@
                     </select>
                 </div>
             </div>
-            <div>
+            <div class="form-field">
                 <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Title *</label>
                 <input type="text" name="title" required
-                       class="w-full px-3 py-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 dark:text-white">
+                       class="w-full px-3 py-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+                       placeholder="Enter contract title">
             </div>
-            <div>
+            <div class="form-field">
                 <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Description</label>
                 <textarea name="description" rows="3"
-                          class="w-full px-3 py-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 dark:text-white"></textarea>
+                          class="w-full px-3 py-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+                          placeholder="Brief description of the contract"></textarea>
             </div>
             <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
+                <div class="form-field">
                     <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Department *</label>
                     <select name="department" required
                             class="w-full px-3 py-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 dark:text-white">
@@ -364,7 +531,7 @@
                         <option value="Administration">Administration</option>
                     </select>
                 </div>
-                <div>
+                <div class="form-field">
                     <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Contract Type *</label>
                     <select name="contract_type" required
                             class="w-full px-3 py-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 dark:text-white">
@@ -377,26 +544,28 @@
                 </div>
             </div>
             <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
+                <div class="form-field">
                     <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Original Amount *</label>
-                    <input type="number" name="original_amount" required step="0.01"
-                           class="w-full px-3 py-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 dark:text-white">
+                    <input type="number" name="original_amount" required step="0.01" min="0"
+                           class="w-full px-3 py-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+                           placeholder="0.00">
                 </div>
-                <div>
+                <div class="form-field">
                     <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Funded Amount</label>
-                    <input type="number" name="funded_amount" step="0.01"
-                           class="w-full px-3 py-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 dark:text-white">
+                    <input type="number" name="funded_amount" step="0.01" min="0"
+                           class="w-full px-3 py-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+                           placeholder="0.00">
                 </div>
             </div>
             <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
+                <div class="form-field">
                     <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Start Date *</label>
-                    <input type="date" name="start_date" required
+                    <input type="date" name="start_date" id="contract_start_date" required
                            class="w-full px-3 py-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 dark:text-white">
                 </div>
-                <div>
+                <div class="form-field">
                     <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">End Date *</label>
-                    <input type="date" name="end_date" required
+                    <input type="date" name="end_date" id="contract_end_date" required
                            class="w-full px-3 py-2 border rounded-lg dark:bg-gray-700 dark:border-gray-600 dark:text-white">
                 </div>
             </div>
@@ -416,19 +585,96 @@
 
 {% block scripts %}
 <script>
+    // ====== Mobile View Toggle ======
+    function setContractView(view) {
+        const tableView = document.getElementById('contractTableView');
+        const cardView = document.getElementById('contractCardsView');
+        const tableBtn = document.getElementById('tableViewBtn');
+        const cardBtn = document.getElementById('cardViewBtn');
+
+        if (view === 'card') {
+            tableView.classList.add('hidden');
+            cardView.classList.remove('hidden');
+            tableBtn.classList.remove('bg-blue-100', 'text-blue-700', 'dark:bg-blue-900', 'dark:text-blue-200');
+            tableBtn.classList.add('text-gray-600', 'dark:text-gray-400');
+            cardBtn.classList.add('bg-blue-100', 'text-blue-700', 'dark:bg-blue-900', 'dark:text-blue-200');
+            cardBtn.classList.remove('text-gray-600', 'dark:text-gray-400');
+            tableBtn.setAttribute('aria-pressed', 'false');
+            cardBtn.setAttribute('aria-pressed', 'true');
+            setPagePreference('contracts', 'mobileView', 'card');
+        } else {
+            tableView.classList.remove('hidden');
+            cardView.classList.add('hidden');
+            cardBtn.classList.remove('bg-blue-100', 'text-blue-700', 'dark:bg-blue-900', 'dark:text-blue-200');
+            cardBtn.classList.add('text-gray-600', 'dark:text-gray-400');
+            tableBtn.classList.add('bg-blue-100', 'text-blue-700', 'dark:bg-blue-900', 'dark:text-blue-200');
+            tableBtn.classList.remove('text-gray-600', 'dark:text-gray-400');
+            cardBtn.setAttribute('aria-pressed', 'false');
+            tableBtn.setAttribute('aria-pressed', 'true');
+            setPagePreference('contracts', 'mobileView', 'table');
+        }
+    }
+
+    function loadMobileViewPreference() {
+        const savedView = getPagePreference('contracts', 'mobileView', 'table');
+        if (savedView === 'card' && window.innerWidth < 768) {
+            setContractView('card');
+        }
+    }
+
     // ====== Modal Functions ======
+    let addContractTrigger = null;
+
     function openAddContractModal() {
-        document.getElementById('addContractModal').classList.remove('hidden');
-        document.getElementById('addContractModal').classList.add('flex');
+        addContractTrigger = document.activeElement;
+        openAccessibleModal('addContractModal', addContractTrigger);
     }
 
     function closeAddContractModal() {
-        document.getElementById('addContractModal').classList.add('hidden');
-        document.getElementById('addContractModal').classList.remove('flex');
+        closeAccessibleModal('addContractModal');
     }
 
-    document.getElementById('addContractModal').addEventListener('click', function(e) {
-        if (e.target === this) closeAddContractModal();
+    // Setup backdrop click close for addContractModal
+    document.addEventListener('DOMContentLoaded', function() {
+        setupModalBackdropClose('addContractModal', closeAddContractModal);
+
+        // Initialize form validation for add contract form
+        initFormValidation('addContractForm', {
+            contract_number: { minLength: 3 },
+            title: { minLength: 5 },
+            original_amount: { positiveNumber: true },
+            funded_amount: { positiveNumber: true }
+        });
+
+        // Custom validation for end date > start date
+        const endDateField = document.getElementById('contract_end_date');
+        const startDateField = document.getElementById('contract_start_date');
+
+        if (endDateField && startDateField) {
+            endDateField.addEventListener('blur', function() {
+                if (startDateField.value && this.value) {
+                    if (new Date(this.value) <= new Date(startDateField.value)) {
+                        const container = this.closest('.form-field');
+                        container.classList.remove('is-valid');
+                        container.classList.add('is-invalid');
+                        let errorEl = container.querySelector('.error-message');
+                        if (!errorEl) {
+                            errorEl = document.createElement('span');
+                            errorEl.className = 'error-message';
+                            container.appendChild(errorEl);
+                        }
+                        errorEl.textContent = 'End date must be after start date';
+                    }
+                }
+            });
+
+            startDateField.addEventListener('change', function() {
+                // Re-validate end date when start date changes
+                if (endDateField.dataset.touched === 'true') {
+                    endDateField.dispatchEvent(new Event('blur'));
+                }
+            });
+        }
     });
 
     document.getElementById('addContractForm').addEventListener('submit', async function(e) {
@@ -436,6 +682,9 @@
         const formData = new FormData(this);
         const data = Object.fromEntries(formData);
         data.contract_id = 'CNT-' + Date.now();
+
+        const submitBtn = this.querySelector('button[type="submit"]');
+        setButtonLoading(submitBtn, true);
 
         try {
             const response = await fetch('/api/contract', {
@@ -445,13 +694,16 @@
             });
 
             if (response.ok) {
-                window.location.reload();
+                showSuccess('Contract created successfully!');
+                setTimeout(() => window.location.reload(), 1000);
             } else {
                 const error = await response.json();
-                alert('Error: ' + (error.error || 'Failed to create contract'));
+                showError(error.error || 'Failed to create contract');
+                setButtonLoading(submitBtn, false);
             }
         } catch (err) {
-            alert('Error creating contract: ' + err.message);
+            showError('Error creating contract: ' + err.message);
+            setButtonLoading(submitBtn, false);
         }
     });
 
@@ -506,81 +758,126 @@
     // ====== Bulk Operations ======
     function compareSelected() {
         if (selectedContracts.size < 2) {
-            alert('Please select at least 2 contracts to compare');
+            showWarning('Please select at least 2 contracts to compare');
             return;
         }
         if (selectedContracts.size > 4) {
-            alert('You can compare up to 4 contracts at a time');
+            showWarning('You can compare up to 4 contracts at a time');
             return;
         }
         const params = Array.from(selectedContracts).map(id => `contracts=${encodeURIComponent(id)}`).join('&');
         window.location.href = `/compare?${params}`;
     }
 
+    let bulkStatusTrigger = null;
+
     function bulkUpdateStatus() {
+        bulkStatusTrigger = document.activeElement;
         document.getElementById('bulkStatusCount').textContent = selectedContracts.size;
-        document.getElementById('bulkStatusModal').classList.remove('hidden');
-        document.getElementById('bulkStatusModal').classList.add('flex');
+        openAccessibleModal('bulkStatusModal', bulkStatusTrigger);
     }
 
     function closeBulkStatusModal() {
-        document.getElementById('bulkStatusModal').classList.add('hidden');
-        document.getElementById('bulkStatusModal').classList.remove('flex');
+        closeAccessibleModal('bulkStatusModal');
     }
 
     async function applyBulkStatus() {
         const newStatus = document.getElementById('bulkStatusSelect').value;
         if (!newStatus) {
-            alert('Please select a status');
+            showWarning('Please select a status');
             return;
         }
 
-        for (const contractId of selectedContracts) {
-            try {
-                await fetch(`/api/contract/${contractId}`, {
-                    method: 'PUT',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ status: newStatus })
-                });
-            } catch (err) {
-                console.error('Error updating contract:', err);
-            }
-        }
+        // Close the status select modal first
         closeBulkStatusModal();
-        window.location.reload();
+
+        // Show confirmation dialog
+        const statusLabel = document.querySelector(`#bulkStatusSelect option[value="${newStatus}"]`).textContent;
+        showConfirmDialog({
+            title: 'Confirm Status Update',
+            message: `Are you sure you want to change the status to "${statusLabel}" for ${selectedContracts.size} contract(s)?`,
+            details: `<p><strong>${selectedContracts.size}</strong> contract(s) will be updated to status: <strong>${statusLabel}</strong></p>`,
+            type: newStatus === 'Cancelled' ? 'danger' : 'warning',
+            confirmText: 'Update Status',
+            onConfirm: async () => {
+                showLoading(`Updating contracts... 0 of ${selectedContracts.size}`);
+
+                let count = 0;
+                const total = selectedContracts.size;
+
+                for (const contractId of selectedContracts) {
+                    try {
+                        await fetch(`/api/contract/${contractId}`, {
+                            method: 'PUT',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ status: newStatus })
+                        });
+                        count++;
+                        document.getElementById('loadingMessage').textContent = `Updating contracts... ${count} of ${total}`;
+                    } catch (err) {
+                        console.error('Error updating contract:', err);
+                    }
+                }
+
+                hideLoading();
+                window.location.reload();
+            }
+        });
     }
 
+    let bulkDeptTrigger = null;
+
     function bulkAssignDepartment() {
+        bulkDeptTrigger = document.activeElement;
         document.getElementById('bulkDeptCount').textContent = selectedContracts.size;
-        document.getElementById('bulkDeptModal').classList.remove('hidden');
-        document.getElementById('bulkDeptModal').classList.add('flex');
+        openAccessibleModal('bulkDeptModal', bulkDeptTrigger);
     }
 
     function closeBulkDeptModal() {
-        document.getElementById('bulkDeptModal').classList.add('hidden');
-        document.getElementById('bulkDeptModal').classList.remove('flex');
+        closeAccessibleModal('bulkDeptModal');
     }
 
     async function applyBulkDept() {
         const newDept = document.getElementById('bulkDeptSelect').value;
         if (!newDept) {
-            alert('Please select a department');
+            showWarning('Please select a department');
             return;
         }
 
-        for (const contractId of selectedContracts) {
-            try {
-                await fetch(`/api/contract/${contractId}`, {
-                    method: 'PUT',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ department: newDept })
-                });
-            } catch (err) {
-                console.error('Error updating contract:', err);
-            }
-        }
+        // Close the department select modal first
         closeBulkDeptModal();
-        window.location.reload();
+
+        // Show confirmation dialog
+        showConfirmDialog({
+            title: 'Confirm Department Assignment',
+            message: `Are you sure you want to assign ${selectedContracts.size} contract(s) to "${newDept}"?`,
+            details: `<p><strong>${selectedContracts.size}</strong> contract(s) will be assigned to department: <strong>${newDept}</strong></p>`,
+            type: 'warning',
+            confirmText: 'Assign Department',
+            onConfirm: async () => {
+                showLoading(`Assigning department... 0 of ${selectedContracts.size}`);
+
+                let count = 0;
+                const total = selectedContracts.size;
+
+                for (const contractId of selectedContracts) {
+                    try {
+                        await fetch(`/api/contract/${contractId}`, {
+                            method: 'PUT',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ department: newDept })
+                        });
+                        count++;
+                        document.getElementById('loadingMessage').textContent = `Assigning department... ${count} of ${total}`;
+                    } catch (err) {
+                        console.error('Error updating contract:', err);
+                    }
+                }
+
+                hideLoading();
+                window.location.reload();
+            }
+        });
     }
 
     function bulkExport() {
@@ -613,7 +910,7 @@
     function saveCurrentSearch() {
         const params = window.location.search.substring(1);
         if (!params) {
-            alert('No filters applied to save');
+            showWarning('No filters applied to save');
             return;
         }
 
@@ -624,13 +921,18 @@
         searches.push({ name, params });
         localStorage.setItem('savedSearches', JSON.stringify(searches));
         loadSavedSearches();
+        showSuccess(`Search "${name}" saved!`);
     }
 
     function deleteSavedSearch(index) {
         const searches = JSON.parse(localStorage.getItem('savedSearches') || '[]');
-        searches.splice(index, 1);
-        localStorage.setItem('savedSearches', JSON.stringify(searches));
-        loadSavedSearches();
+        const searchName = searches[index]?.name || 'this search';
+
+        confirmDelete('saved search', searchName, () => {
+            searches.splice(index, 1);
+            localStorage.setItem('savedSearches', JSON.stringify(searches));
+            loadSavedSearches();
+        });
     }
 
     // ====== Sorting ======
@@ -643,17 +945,155 @@
         window.location.href = '?' + currentParams.toString();
     }
 
+    // ====== Pagination ======
+    function changePerPage(perPage) {
+        const currentParams = new URLSearchParams(window.location.search);
+        currentParams.set('per_page', perPage);
+        currentParams.set('page', '1'); // Reset to first page when changing per_page
+        window.location.href = '?' + currentParams.toString();
+    }
+
+    // ====== Auto-apply Filters with Debounce ======
+    function debounce(func, wait) {
+        let timeout;
+        return function executedFunction(...args) {
+            const later = () => {
+                clearTimeout(timeout);
+                func(...args);
+            };
+            clearTimeout(timeout);
+            timeout = setTimeout(later, wait);
+        };
+    }
+
+    function applyFilters() {
+        const form = document.querySelector('form[method="GET"]');
+        if (form) {
+            // Show loading indicator
+            showLoading('Filtering...');
+            form.submit();
+        }
+    }
+
+    const debouncedApplyFilters = debounce(applyFilters, 500);
+
+    function setupAutoFilters() {
+        // Auto-apply on search input (with debounce)
+        const searchInput = document.getElementById('searchInput');
+        if (searchInput) {
+            searchInput.addEventListener('input', debouncedApplyFilters);
+            // Also apply on Enter key immediately
+            searchInput.addEventListener('keydown', function(e) {
+                if (e.key === 'Enter') {
+                    e.preventDefault();
+                    applyFilters();
+                }
+            });
+        }
+
+        // Auto-apply on select change (immediate)
+        const statusFilter = document.getElementById('statusFilter');
+        const deptFilter = document.getElementById('deptFilter');
+        const healthFilter = document.getElementById('healthFilter');
+
+        [statusFilter, deptFilter, healthFilter].forEach(select => {
+            if (select) {
+                select.addEventListener('change', applyFilters);
+            }
+        });
+    }
+
+    // ====== Preference Persistence ======
+    function saveContractFilters() {
+        const filters = {
+            status: document.getElementById('statusFilter')?.value || '',
+            department: document.getElementById('deptFilter')?.value || '',
+            health: document.getElementById('healthFilter')?.value || ''
+        };
+        setPagePreference('contracts', 'filters', filters);
+    }
+
+    function saveContractPerPage(perPage) {
+        setPagePreference('contracts', 'perPage', perPage);
+    }
+
+    function loadContractPreferences() {
+        // Only apply saved preferences if there are no URL params (fresh visit)
+        const urlParams = new URLSearchParams(window.location.search);
+        const hasUrlFilters = urlParams.has('status') || urlParams.has('department') ||
+                              urlParams.has('health') || urlParams.has('search');
+
+        if (!hasUrlFilters) {
+            // Load saved filters
+            const savedFilters = getPagePreference('contracts', 'filters', null);
+            if (savedFilters) {
+                const statusFilter = document.getElementById('statusFilter');
+                const deptFilter = document.getElementById('deptFilter');
+                const healthFilter = document.getElementById('healthFilter');
+
+                let hasFilters = false;
+                if (savedFilters.status && statusFilter) {
+                    statusFilter.value = savedFilters.status;
+                    hasFilters = hasFilters || savedFilters.status !== '';
+                }
+                if (savedFilters.department && deptFilter) {
+                    deptFilter.value = savedFilters.department;
+                    hasFilters = hasFilters || savedFilters.department !== '';
+                }
+                if (savedFilters.health && healthFilter) {
+                    healthFilter.value = savedFilters.health;
+                    hasFilters = hasFilters || savedFilters.health !== '';
+                }
+
+                // Apply filters if any were loaded
+                if (hasFilters) {
+                    applyFilters();
+                }
+            }
+
+            // Load saved per page preference
+            const savedPerPage = getPagePreference('contracts', 'perPage', null);
+            if (savedPerPage) {
+                const perPageSelect = document.querySelector('select[onchange*="changePerPage"]');
+                if (perPageSelect && perPageSelect.value !== savedPerPage.toString()) {
+                    changePerPage(savedPerPage);
+                }
+            }
+        }
+    }
+
+    function setupPreferenceSaving() {
+        // Save filters when they change
+        const statusFilter = document.getElementById('statusFilter');
+        const deptFilter = document.getElementById('deptFilter');
+        const healthFilter = document.getElementById('healthFilter');
+
+        [statusFilter, deptFilter, healthFilter].forEach(select => {
+            if (select) {
+                select.addEventListener('change', saveContractFilters);
+            }
+        });
+
+        // Save per page preference
+        const perPageSelect = document.querySelector('select[onchange*="changePerPage"]');
+        if (perPageSelect) {
+            perPageSelect.addEventListener('change', function() {
+                saveContractPerPage(this.value);
+            });
+        }
+    }
+
     // ====== Initialize ======
     document.addEventListener('DOMContentLoaded', function() {
         loadSavedSearches();
-    });
+        setupAutoFilters();
+        setupPreferenceSaving();
+        loadContractPreferences();
+        loadMobileViewPreference();
 
-    // Close modals on outside click
-    document.getElementById('bulkStatusModal').addEventListener('click', function(e) {
-        if (e.target === this) closeBulkStatusModal();
-    });
-    document.getElementById('bulkDeptModal').addEventListener('click', function(e) {
-        if (e.target === this) closeBulkDeptModal();
+        // Setup accessible modal backdrop close handlers
+        setupModalBackdropClose('bulkStatusModal', closeBulkStatusModal);
+        setupModalBackdropClose('bulkDeptModal', closeBulkDeptModal);
     });
 </script>
 {% endblock %}

@@ -27,7 +27,17 @@
 <div class="bg-gradient-to-r {% if overall_health >= 70 %}from-green-500 to-green-600{% elif overall_health >= 50 %}from-yellow-500 to-yellow-600{% else %}from-red-500 to-red-600{% endif %} rounded-xl shadow-lg p-6 mb-8 text-white">
     <div class="grid grid-cols-1 md:grid-cols-4 gap-6">
         <div class="text-center md:border-r border-white/30">
-            <p class="text-white/80 text-sm uppercase tracking-wide">Overall Portfolio Health</p>
+            <p class="text-white/80 text-sm uppercase tracking-wide flex items-center justify-center gap-1">
+                Overall Portfolio Health
+                <span class="relative">
+                    <button type="button" onclick="toggleHealthLegend(event, 'healthLegendExec')" class="inline-flex items-center justify-center w-4 h-4 rounded-full bg-white/20 hover:bg-white/30 transition-colors" aria-label="Health score information">
+                        <svg class="w-2.5 h-2.5" fill="currentColor" viewBox="0 0 20 20">
+                            <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clip-rule="evenodd"></path>
+                        </svg>
+                    </button>
+                    <div id="healthLegendExec" class="health-legend"></div>
+                </span>
+            </p>
             <p class="text-5xl font-bold mt-2">{{ overall_health }}<span class="text-2xl">/100</span></p>
             <p class="text-white/80 text-sm mt-1">
                 {% if overall_health >= 70 %}Good Standing{% elif overall_health >= 50 %}Needs Attention{% else %}Critical{% endif %}
@@ -394,16 +404,22 @@
         }, { responsive: true, displayModeBar: false });
     }
 
-    // Department Pie Chart
-    const deptData = {{ summary.department_distribution | tojson | safe }};
-    if (Object.keys(deptData).length > 0) {
+    // Department Pie Chart - using spending values for more meaningful visualization
+    const deptSpending = {{ summary.department_spending | tojson | safe }};
+    if (Object.keys(deptSpending).length > 0) {
+        // Format values for display
+        const labels = Object.keys(deptSpending);
+        const values = Object.values(deptSpending);
+        const total = values.reduce((a, b) => a + b, 0);
+
         Plotly.newPlot('deptPieChart', [{
             type: 'pie',
-            labels: Object.keys(deptData),
-            values: Object.values(deptData),
+            labels: labels,
+            values: values,
             hole: 0.4,
             textinfo: 'percent',
             textposition: 'inside',
+            hovertemplate: '%{label}<br>$%{value:,.0f}<br>%{percent}<extra></extra>',
             marker: {
                 colors: ['#3B82F6', '#10B981', '#F59E0B', '#EF4444', '#8B5CF6', '#EC4899', '#6366F1', '#14B8A6']
             }

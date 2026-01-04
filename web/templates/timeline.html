@@ -85,8 +85,8 @@
                         <p class="text-xs text-gray-500">{{ contract.department }}</p>
                     </td>
                     <td class="px-6 py-4 text-sm text-gray-600 dark:text-gray-300">{{ contract.vendor_name }}</td>
-                    <td class="px-6 py-4 text-sm text-gray-600 dark:text-gray-300">{{ contract.start_date }}</td>
-                    <td class="px-6 py-4 text-sm text-gray-600 dark:text-gray-300">{{ contract.current_end_date or contract.end_date }}</td>
+                    <td class="px-6 py-4 text-sm text-gray-600 dark:text-gray-300">{{ contract.start_date|format_date }}</td>
+                    <td class="px-6 py-4 text-sm text-gray-600 dark:text-gray-300">{{ (contract.current_end_date or contract.end_date)|format_date }}</td>
                     <td class="px-6 py-4 text-sm text-gray-600 dark:text-gray-300">
                         {{ contract.duration_days }} days
                     </td>
@@ -159,7 +159,7 @@
                         {% elif milestone.days_until == 1 %}Tomorrow
                         {% else %}In {{ milestone.days_until }} days{% endif %}
                     </p>
-                    <p class="text-sm text-gray-500">{{ milestone.due_date }}</p>
+                    <p class="text-sm text-gray-500">{{ milestone.due_date|format_date }}</p>
                     {% if milestone.payment_amount %}
                     <p class="text-sm font-medium text-green-600">${{ '{:,.0f}'.format(milestone.payment_amount) }}</p>
                     {% endif %}
