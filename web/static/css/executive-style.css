@@ -381,3 +381,20 @@
 .risk-critical {
     @apply bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200;
 }
+
+/* === Button Styles === */
+.btn {
+    @apply px-4 py-2 rounded-lg font-medium transition-colors duration-200 inline-flex items-center justify-center;
+}
+
+.btn-primary {
+    @apply bg-blue-600 text-white hover:bg-blue-700 focus:ring-2 focus:ring-blue-500 focus:ring-offset-2;
+}
+
+.btn-secondary {
+    @apply bg-gray-600 text-white hover:bg-gray-700 focus:ring-2 focus:ring-gray-500 focus:ring-offset-2;
+}
+
+.btn-outline {
+    @apply border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 focus:ring-2 focus:ring-gray-500 focus:ring-offset-2;
+}
