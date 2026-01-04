@@ -24,8 +24,8 @@
 
 {% block content %}
 <!-- Contract Header -->
-<div class="bg-white dark:bg-gray-800 rounded-lg shadow mb-6">
-    <div class="p-6">
+<div class="card-executive with-top-border-blue mb-6">
+    <div class="card-padding">
         <div class="flex flex-col md:flex-row md:items-start md:justify-between">
             <div class="flex-1">
                 <div class="flex items-center space-x-3 mb-2">
@@ -86,9 +86,12 @@
 </div>
 
 <!-- Project Timeline & KPIs -->
-<div class="bg-white dark:bg-gray-800 rounded-lg shadow mb-6">
-    <div class="p-6">
-        <h3 class="text-lg font-semibold text-gray-800 dark:text-white mb-4">Project Timeline</h3>
+<div class="card-executive mb-6">
+    <div class="section-header-executive neutral">
+        <h3 class="text-lg font-semibold text-gray-900 dark:text-white">Project Timeline</h3>
+        <span class="text-xs text-gray-500 dark:text-gray-400">Schedule tracking & milestones</span>
+    </div>
+    <div class="card-padding">
 
         <!-- Timeline Progress Bar -->
         <div class="mb-6">
@@ -163,9 +166,9 @@
 </div>
 
 <!-- KPI Cards -->
-<div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+<div class="grid-executive-metrics mb-6">
     <!-- Schedule Status -->
-    <div class="bg-white dark:bg-gray-800 rounded-lg shadow p-4">
+    <div class="metric-card-executive {% if milestone_stats.overdue > 0 %}border-accent-red{% elif milestone_stats.delayed > 0 %}border-accent-yellow{% else %}border-accent-green{% endif %} hover-lift">
         <div class="flex items-center justify-between">
             <div>
                 <p class="text-xs text-gray-500 dark:text-gray-400 uppercase">Schedule</p>
@@ -189,7 +192,7 @@
     </div>
 
     <!-- Budget Status -->
-    <div class="bg-white dark:bg-gray-800 rounded-lg shadow p-4">
+    <div class="metric-card-executive {% if budget_variance > 10 %}border-accent-red{% elif budget_variance > 0 %}border-accent-yellow{% else %}border-accent-green{% endif %} hover-lift">
         {% set budget_variance = ((contract.current_amount or contract.original_amount) - contract.original_amount) / contract.original_amount * 100 if contract.original_amount else 0 %}
         <div class="flex items-center justify-between">
             <div>
@@ -214,7 +217,7 @@
     </div>
 
     <!-- Milestone Progress -->
-    <div class="bg-white dark:bg-gray-800 rounded-lg shadow p-4">
+    <div class="metric-card-executive border-accent-blue hover-lift">
         <div class="flex items-center justify-between">
             <div>
                 <p class="text-xs text-gray-500 dark:text-gray-400 uppercase">Milestones</p>
@@ -233,7 +236,7 @@
     </div>
 
     <!-- Issues -->
-    <div class="bg-white dark:bg-gray-800 rounded-lg shadow p-4">
+    <div class="metric-card-executive {% if critical_issues > 0 %}border-accent-red{% elif open_issues > 0 %}border-accent-yellow{% else %}border-accent-green{% endif %} hover-lift">
         {% set open_issues = issues|selectattr('status', 'equalto', 'Open')|list|length if issues else 0 %}
         {% set critical_issues = issues|selectattr('severity', 'equalto', 'Critical')|selectattr('status', 'ne', 'Resolved')|list|length if issues else 0 %}
         <div class="flex items-center justify-between">
@@ -260,10 +263,14 @@
 </div>
 
 <!-- Score Breakdown & Financial Summary -->
-<div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+<div class="grid-executive-2col mb-6">
     <!-- Score Breakdown -->
-    <div class="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
-        <h3 class="text-lg font-semibold text-gray-800 dark:text-white mb-4">Score Breakdown</h3>
+    <div class="card-executive with-top-border-blue">
+        <div class="section-header-executive neutral">
+            <h3 class="text-lg font-semibold text-gray-900 dark:text-white">Score Breakdown</h3>
+            <span class="text-xs text-gray-500 dark:text-gray-400">Performance metrics</span>
+        </div>
+        <div class="card-padding">
         <div class="space-y-4">
             <div>
                 <div class="flex justify-between mb-1">
@@ -309,8 +316,12 @@
     </div>
 
     <!-- Financial Summary -->
-    <div class="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
-        <h3 class="text-lg font-semibold text-gray-800 dark:text-white mb-4">Financial Summary</h3>
+    <div class="card-executive with-top-border-green">
+        <div class="section-header-executive neutral">
+            <h3 class="text-lg font-semibold text-gray-900 dark:text-white">Financial Summary</h3>
+            <span class="text-xs text-gray-500 dark:text-gray-400">Budget & payments</span>
+        </div>
+        <div class="card-padding">
         <div class="space-y-3">
             <div class="flex justify-between py-2 border-b dark:border-gray-700">
                 <span class="text-gray-600 dark:text-gray-400">Original Contract</span>
@@ -352,7 +363,7 @@
 </div>
 
 <!-- Tabs -->
-<div class="bg-white dark:bg-gray-800 rounded-lg shadow">
+<div class="card-executive with-top-border-blue">
     <div class="border-b dark:border-gray-700">
         <nav class="flex space-x-8 px-6" aria-label="Tabs">
             <button onclick="showTab('milestones')" id="tab-milestones"
@@ -379,9 +390,9 @@
     </div>
 
     <!-- Milestones Tab -->
-    <div id="content-milestones" class="tab-content p-6">
+    <div id="content-milestones" class="tab-content card-padding">
         <!-- Milestone Progress Summary -->
-        <div class="grid grid-cols-2 md:grid-cols-5 gap-4 mb-6 p-4 bg-gray-50 dark:bg-gray-700 rounded-lg">
+        <div class="grid grid-cols-2 md:grid-cols-5 gap-4 mb-6">
             <div class="text-center">
                 <p class="text-2xl font-bold text-gray-800 dark:text-white">{{ milestone_stats.total }}</p>
                 <p class="text-xs text-gray-500 dark:text-gray-400">Total</p>
@@ -519,7 +530,7 @@
     </div>
 
     <!-- Change Orders Tab -->
-    <div id="content-changes" class="tab-content p-6 hidden">
+    <div id="content-changes" class="tab-content card-padding hidden">
         <div class="flex justify-between items-center mb-4">
             <h3 class="font-semibold text-gray-800 dark:text-white">Change Orders</h3>
             <button onclick="openAddChangeOrderModal()" class="px-3 py-1.5 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700">
@@ -580,7 +591,7 @@
     </div>
 
     <!-- Payments Tab -->
-    <div id="content-payments" class="tab-content p-6 hidden">
+    <div id="content-payments" class="tab-content card-padding hidden">
         <div class="flex justify-between items-center mb-4">
             <h3 class="font-semibold text-gray-800 dark:text-white">Payment History</h3>
             <button onclick="openAddPaymentModal()" class="px-3 py-1.5 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700">
@@ -627,7 +638,7 @@
     </div>
 
     <!-- Issues Tab -->
-    <div id="content-issues" class="tab-content p-6 hidden">
+    <div id="content-issues" class="tab-content card-padding hidden">
         <div class="flex justify-between items-center mb-4">
             <h3 class="font-semibold text-gray-800 dark:text-white">Issues & Concerns</h3>
             <button onclick="openAddIssueModal()" class="px-3 py-1.5 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700">
@@ -682,7 +693,7 @@
     </div>
 
     <!-- Activity Tab -->
-    <div id="content-activity" class="tab-content p-6 hidden">
+    <div id="content-activity" class="tab-content card-padding hidden">
         <h3 class="font-semibold text-gray-800 dark:text-white mb-4">Activity Log</h3>
         {% if audit_log %}
         <div class="space-y-3">

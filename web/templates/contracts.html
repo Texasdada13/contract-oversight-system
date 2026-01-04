@@ -1,20 +1,20 @@
 {% extends "base.html" %}
 
 {% block content %}
-<!-- Page Header -->
-<div class="flex flex-col md:flex-row md:items-center md:justify-between mb-6">
+<!-- Page Header (Executive Style) -->
+<div class="page-header-executive flex flex-col md:flex-row md:items-center md:justify-between">
     <div>
-        <h1 class="text-2xl font-bold text-gray-800 dark:text-white">Contract Management</h1>
-        <p class="text-gray-500 dark:text-gray-400">Monitor and manage all government contracts</p>
+        <h1 class="page-title-executive">Contract Management</h1>
+        <p class="page-subtitle-executive">Monitor and manage all government contracts across departments</p>
     </div>
     <div class="mt-4 md:mt-0 flex space-x-3">
-        <button onclick="openAddContractModal()" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 flex items-center">
+        <button onclick="openAddContractModal()" class="btn btn-primary">
             <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path>
             </svg>
             New Contract
         </button>
-        <button onclick="exportContracts()" class="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 flex items-center">
+        <button onclick="exportContracts()" class="btn btn-secondary">
             <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
             </svg>
@@ -23,26 +23,60 @@
     </div>
 </div>
 
-<!-- Saved Searches -->
-<div class="bg-white dark:bg-gray-800 rounded-lg shadow mb-4 p-4">
-    <div class="flex items-center justify-between">
-        <div class="flex items-center space-x-2">
-            <span class="text-sm font-medium text-gray-700 dark:text-gray-300">Saved Searches:</span>
-            <div id="savedSearchesList" class="flex flex-wrap gap-2">
-                <!-- Populated by JavaScript -->
-            </div>
-        </div>
-        <button onclick="saveCurrentSearch()" class="text-sm text-blue-600 hover:text-blue-800 flex items-center">
-            <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path>
+<!-- Portfolio Summary Banner -->
+<div class="executive-summary-banner section-spacing">
+    <div class="flex items-start">
+        <div class="flex-shrink-0">
+            <svg class="w-6 h-6 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
             </svg>
-            Save Current Search
-        </button>
+        </div>
+        <div class="ml-3 flex-1">
+            <h3 class="text-sm font-semibold text-blue-900 dark:text-blue-100 mb-1">Contract Portfolio Overview</h3>
+            <p class="text-sm text-blue-800 dark:text-blue-200 leading-relaxed">
+                Showing <span class="font-semibold">{{ contracts|length }} contracts</span> worth <span class="font-semibold">${{ '{:,.0f}'.format(total_value) }}</span>.
+                {% if at_risk_count > 0 %}
+                <span class="font-semibold text-red-600 dark:text-red-400">{{ at_risk_count }} contract{% if at_risk_count != 1 %}s{% endif %} require{% if at_risk_count == 1 %}s{% endif %} attention.</span>
+                {% else %}
+                <span class="font-semibold text-green-600 dark:text-green-400">All contracts are performing well.</span>
+                {% endif %}
+            </p>
+        </div>
+    </div>
+</div>
+
+<!-- Saved Searches -->
+<div class="card-executive mb-4">
+    <div class="card-padding">
+        <div class="flex items-center justify-between">
+            <div class="flex items-center space-x-2">
+                <span class="text-sm font-semibold text-gray-700 dark:text-gray-300">Saved Searches:</span>
+                <div id="savedSearchesList" class="flex flex-wrap gap-2">
+                    <!-- Populated by JavaScript -->
+                </div>
+            </div>
+            <button onclick="saveCurrentSearch()" class="text-sm font-semibold text-blue-600 hover:text-blue-800 flex items-center">
+                <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path>
+                </svg>
+                Save Current Search
+            </button>
+        </div>
     </div>
 </div>
 
 <!-- Filters -->
-<div class="bg-white dark:bg-gray-800 rounded-lg shadow mb-6 p-4">
+<div class="card-executive with-top-border-blue mb-6">
+    <div class="section-header-executive neutral">
+        <h3 class="text-sm font-bold text-gray-900 dark:text-white flex items-center gap-2">
+            <svg class="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z"></path>
+            </svg>
+            Filter & Search
+        </h3>
+        <span class="text-xs text-gray-500 dark:text-gray-400">Refine contract list</span>
+    </div>
+    <div class="card-padding">
     <form method="GET" class="grid grid-cols-1 md:grid-cols-6 gap-4">
         <div>
             <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Search</label>
@@ -113,44 +147,54 @@
     </form>
 </div>
 
-<!-- Summary Stats -->
-<div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-    <div class="bg-white dark:bg-gray-800 rounded-lg shadow p-4 text-center">
-        <p class="text-2xl font-bold text-blue-600">{{ contracts|length }}</p>
-        <p class="text-sm text-gray-500 dark:text-gray-400">Total Shown</p>
+<!-- Summary Stats (Executive Style) -->
+<div class="grid-executive-metrics section-spacing">
+    <div class="metric-card-executive border-accent-blue text-center hover-lift">
+        <p class="metric-label-executive">Contracts Shown</p>
+        <p class="metric-value-executive text-blue-600">{{ contracts|length }}</p>
+        <p class="metric-subtitle-executive">
+            {% if contracts|length == 1 %}1 contract{% else %}{{ contracts|length }} contracts{% endif %}
+        </p>
     </div>
-    <div class="bg-white dark:bg-gray-800 rounded-lg shadow p-4 text-center">
-        <p class="text-2xl font-bold text-green-600">${{ '{:,.0f}'.format(total_value) }}</p>
-        <p class="text-sm text-gray-500 dark:text-gray-400">Total Value</p>
+    <div class="metric-card-executive border-accent-green text-center hover-lift">
+        <p class="metric-label-executive">Total Value</p>
+        <p class="metric-value-executive text-green-600">${{ '{:,.0f}'.format(total_value/1000000) }}M</p>
+        <p class="metric-subtitle-executive">Portfolio value</p>
     </div>
-    <div class="bg-white dark:bg-gray-800 rounded-lg shadow p-4 text-center">
-        <p class="text-2xl font-bold text-red-600">{{ at_risk_count }}</p>
-        <p class="text-sm text-gray-500 dark:text-gray-400">At Risk</p>
+    <div class="metric-card-executive {% if at_risk_count > 10 %}border-accent-red{% elif at_risk_count > 5 %}border-accent-yellow{% else %}border-accent-green{% endif %} text-center hover-lift">
+        <p class="metric-label-executive">At-Risk Projects</p>
+        <p class="metric-value-executive {% if at_risk_count > 10 %}text-red-600{% elif at_risk_count > 5 %}text-yellow-600{% else %}text-green-600{% endif %}">{{ at_risk_count }}</p>
+        <p class="metric-subtitle-executive">
+            {% if at_risk_count > 10 %}Critical attention{% elif at_risk_count > 5 %}Needs monitoring{% else %}On track{% endif %}
+        </p>
     </div>
-    <div class="bg-white dark:bg-gray-800 rounded-lg shadow p-4 text-center">
-        <p class="text-2xl font-bold text-orange-600">{{ overrun_count }}</p>
-        <p class="text-sm text-gray-500 dark:text-gray-400">Over Budget</p>
+    <div class="metric-card-executive {% if overrun_count > 10 %}border-accent-red{% elif overrun_count > 5 %}border-accent-orange{% else %}border-accent-green{% endif %} text-center hover-lift">
+        <p class="metric-label-executive">Over Budget</p>
+        <p class="metric-value-executive {% if overrun_count > 10 %}text-red-600{% elif overrun_count > 5 %}text-orange-600{% else %}text-green-600{% endif %}">{{ overrun_count }}</p>
+        <p class="metric-subtitle-executive">
+            {% if overrun_count > 10 %}Immediate action{% elif overrun_count > 5 %}Review needed{% else %}Under control{% endif %}
+        </p>
     </div>
 </div>
 
 <!-- Bulk Actions Bar (hidden until contracts selected) -->
-<div id="bulkActionsBar" class="hidden bg-blue-600 text-white rounded-lg shadow mb-4 p-4">
-    <div class="flex items-center justify-between">
+<div id="bulkActionsBar" class="hidden card-executive with-top-border-blue mb-4">
+    <div class="card-padding flex items-center justify-between">
         <div class="flex items-center space-x-4">
-            <span id="selectedCount">0 contracts selected</span>
-            <button onclick="clearSelection()" class="text-blue-200 hover:text-white underline text-sm">Clear</button>
+            <span class="font-semibold text-gray-800 dark:text-white" id="selectedCount">0 contracts selected</span>
+            <button onclick="clearSelection()" class="text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300 underline text-sm font-medium">Clear</button>
         </div>
         <div class="flex space-x-3">
-            <button onclick="compareSelected()" class="px-4 py-2 bg-white text-blue-600 rounded-lg hover:bg-blue-50 font-medium">
+            <button onclick="compareSelected()" class="btn btn-secondary">
                 Compare
             </button>
-            <button onclick="bulkUpdateStatus()" class="px-4 py-2 bg-white text-blue-600 rounded-lg hover:bg-blue-50 font-medium">
+            <button onclick="bulkUpdateStatus()" class="btn btn-secondary">
                 Update Status
             </button>
-            <button onclick="bulkExport()" class="px-4 py-2 bg-white text-blue-600 rounded-lg hover:bg-blue-50 font-medium">
+            <button onclick="bulkExport()" class="btn btn-secondary">
                 Export
             </button>
-            <button onclick="bulkAssignDepartment()" class="px-4 py-2 bg-white text-blue-600 rounded-lg hover:bg-blue-50 font-medium">
+            <button onclick="bulkAssignDepartment()" class="btn btn-secondary">
                 Assign Dept
             </button>
         </div>
@@ -222,7 +266,7 @@
 <!-- Mobile Card View -->
 <div id="contractCardsView" class="hidden space-y-4 md:hidden">
     {% for contract in contracts %}
-    <div class="bg-white dark:bg-gray-800 rounded-lg shadow p-4 cursor-pointer hover:shadow-md transition-shadow" onclick="window.location='{{ url_for('contract_detail', contract_id=contract.contract_id) }}'">
+    <div class="card-executive hover-lift p-4 cursor-pointer" onclick="window.location='{{ url_for('contract_detail', contract_id=contract.contract_id) }}'">
         <div class="flex justify-between items-start mb-3">
             <div class="flex-1 min-w-0">
                 <h3 class="font-medium text-gray-800 dark:text-white truncate">{{ contract.title }}</h3>
@@ -288,22 +332,22 @@
 </div>
 
 <!-- Contracts Table (hidden on mobile when card view is active) -->
-<div id="contractTableView" class="bg-white dark:bg-gray-800 rounded-lg shadow overflow-hidden">
+<div id="contractTableView" class="card-executive with-top-border-blue overflow-hidden">
     <div class="overflow-x-auto">
-        <table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
-            <thead class="bg-gray-50 dark:bg-gray-700">
+        <table class="table-executive">
+            <thead>
                 <tr>
-                    <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                    <th class="px-4 py-3">
                         <input type="checkbox" id="selectAll" onchange="toggleSelectAll()" class="rounded">
                     </th>
-                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Contract</th>
-                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Vendor</th>
-                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Department</th>
-                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Value</th>
-                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Status</th>
-                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Health</th>
-                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">End Date</th>
-                    <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Actions</th>
+                    <th>Contract</th>
+                    <th>Vendor</th>
+                    <th>Department</th>
+                    <th>Value</th>
+                    <th>Status</th>
+                    <th>Health</th>
+                    <th>End Date</th>
+                    <th class="text-right">Actions</th>
                 </tr>
             </thead>
             <tbody class="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
