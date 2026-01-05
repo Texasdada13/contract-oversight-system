@@ -1,0 +1,400 @@
+/**
+ * Executive Dashboard Styling
+ * Consistent UI/UX patterns for board-level decision support
+ */
+
+/* === Hero Metric Cards === */
+.metric-card-executive {
+    @apply bg-white dark:bg-gray-800 rounded-xl shadow-lg p-6 hover:shadow-xl transition-shadow;
+}
+
+.metric-card-executive.border-accent-blue {
+    @apply border-l-4 border-blue-500;
+}
+
+.metric-card-executive.border-accent-green {
+    @apply border-l-4 border-green-500;
+}
+
+.metric-card-executive.border-accent-red {
+    @apply border-l-4 border-red-500;
+}
+
+.metric-card-executive.border-accent-yellow {
+    @apply border-l-4 border-yellow-500;
+}
+
+.metric-card-executive.border-accent-orange {
+    @apply border-l-4 border-orange-500;
+}
+
+/* === Executive Summary Banner === */
+.executive-summary-banner {
+    @apply bg-blue-50 dark:bg-blue-900/20 border-l-4 border-blue-500 p-5 mb-6 rounded-r-lg shadow-md;
+}
+
+.executive-summary-banner.warning {
+    @apply bg-orange-50 dark:bg-orange-900/20 border-orange-500;
+}
+
+.executive-summary-banner.error {
+    @apply bg-red-50 dark:bg-red-900/20 border-red-500;
+}
+
+.executive-summary-banner.success {
+    @apply bg-green-50 dark:bg-green-900/20 border-green-500;
+}
+
+/* === Section Headers === */
+.section-header-executive {
+    @apply px-6 py-4 border-b dark:border-gray-700 flex justify-between items-center rounded-t-lg;
+}
+
+.section-header-executive.priority-critical {
+    @apply bg-gradient-to-r from-red-50 to-orange-50 dark:from-red-900/20 dark:to-orange-900/20;
+}
+
+.section-header-executive.priority-high {
+    @apply bg-gradient-to-r from-orange-50 to-yellow-50 dark:from-orange-900/20 dark:to-yellow-900/20;
+}
+
+.section-header-executive.priority-medium {
+    @apply bg-gradient-to-r from-yellow-50 to-blue-50 dark:from-yellow-900/20 dark:to-blue-900/20;
+}
+
+.section-header-executive.neutral {
+    @apply bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-900/20 dark:to-indigo-900/20;
+}
+
+/* === Card Containers === */
+.card-executive {
+    @apply bg-white dark:bg-gray-800 rounded-xl shadow-lg;
+}
+
+.card-executive.with-top-border-red {
+    @apply border-t-4 border-red-500;
+}
+
+.card-executive.with-top-border-yellow {
+    @apply border-t-4 border-yellow-500;
+}
+
+.card-executive.with-top-border-blue {
+    @apply border-t-4 border-blue-500;
+}
+
+.card-executive.with-top-border-green {
+    @apply border-t-4 border-green-500;
+}
+
+/* === Priority Badges === */
+.priority-badge {
+    @apply px-2 py-0.5 rounded text-xs font-bold;
+}
+
+.priority-badge.critical {
+    @apply bg-red-600 text-white;
+}
+
+.priority-badge.high {
+    @apply bg-orange-600 text-white;
+}
+
+.priority-badge.medium {
+    @apply bg-yellow-600 text-white;
+}
+
+.priority-badge.low {
+    @apply bg-blue-600 text-white;
+}
+
+/* === Health Score Indicators === */
+.health-score-display {
+    @apply text-lg font-bold;
+}
+
+.health-score-display.critical {
+    @apply text-red-600;
+}
+
+.health-score-display.warning {
+    @apply text-yellow-600 dark:text-yellow-500;
+}
+
+.health-score-display.good {
+    @apply text-green-600;
+}
+
+.health-score-display.excellent {
+    @apply text-blue-600;
+}
+
+/* === Action Required Items === */
+.action-required-item {
+    @apply p-3 rounded-r;
+}
+
+.action-required-item.critical {
+    @apply border-l-4 border-red-600 bg-red-50 dark:bg-red-900/20;
+}
+
+.action-required-item.high {
+    @apply border-l-4 border-orange-500 bg-orange-50 dark:bg-orange-900/20;
+}
+
+.action-required-item.medium {
+    @apply border-l-4 border-yellow-500 bg-yellow-50 dark:bg-yellow-900/20;
+}
+
+/* === Metric Labels === */
+.metric-label-executive {
+    @apply text-xs text-gray-500 dark:text-gray-400 uppercase tracking-wider font-semibold mb-2;
+}
+
+.metric-value-executive {
+    @apply text-3xl font-bold text-gray-800 dark:text-white;
+}
+
+.metric-subtitle-executive {
+    @apply text-sm text-gray-500 dark:text-gray-400 mt-1;
+}
+
+/* === Trend Indicators === */
+.trend-indicator {
+    @apply inline-flex items-center text-xs;
+}
+
+.trend-indicator.improving {
+    @apply text-green-600;
+}
+
+.trend-indicator.declining {
+    @apply text-red-600;
+}
+
+.trend-indicator.stable {
+    @apply text-gray-600;
+}
+
+/* === Decision Prompt Box === */
+.decision-prompt {
+    @apply bg-white dark:bg-gray-800 p-2 rounded border border-gray-200 dark:border-gray-700;
+}
+
+.decision-prompt-label {
+    @apply text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1;
+}
+
+.decision-prompt-text {
+    @apply text-xs text-gray-900 dark:text-white font-medium;
+}
+
+/* === Alert Styling === */
+.alert-item {
+    @apply flex items-start space-x-3 p-3 rounded-lg;
+}
+
+.alert-item.critical {
+    @apply bg-red-50 dark:bg-red-900/30 border-l-4 border-red-500;
+}
+
+.alert-item.high {
+    @apply bg-orange-50 dark:bg-orange-900/30 border-l-4 border-orange-500;
+}
+
+.alert-item.medium {
+    @apply bg-yellow-50 dark:bg-yellow-900/30 border-l-4 border-yellow-500;
+}
+
+.alert-item.low {
+    @apply bg-gray-50 dark:bg-gray-700/30 border-l-4 border-gray-400;
+}
+
+/* === Table Enhancements === */
+.table-executive {
+    @apply w-full text-sm;
+}
+
+.table-executive thead {
+    @apply bg-gradient-to-r from-gray-50 to-gray-100 dark:from-gray-800 dark:to-gray-700;
+}
+
+.table-executive th {
+    @apply px-4 py-3 text-left text-xs font-bold text-gray-700 dark:text-gray-200 uppercase tracking-wider;
+}
+
+.table-executive td {
+    @apply px-4 py-3 border-b border-gray-200 dark:border-gray-700;
+}
+
+.table-executive tbody tr:hover {
+    @apply bg-gray-50 dark:bg-gray-700/50;
+}
+
+/* === Page Headers === */
+.page-header-executive {
+    @apply mb-4;
+}
+
+.page-title-executive {
+    @apply text-3xl font-bold text-gray-900 dark:text-white;
+}
+
+.page-subtitle-executive {
+    @apply text-sm text-gray-500 dark:text-gray-400;
+}
+
+/* === Icon Badges === */
+.icon-badge {
+    @apply p-3 rounded-full;
+}
+
+.icon-badge.blue {
+    @apply bg-blue-100 dark:bg-blue-900;
+}
+
+.icon-badge.green {
+    @apply bg-green-100 dark:bg-green-900;
+}
+
+.icon-badge.red {
+    @apply bg-red-100 dark:bg-red-900;
+}
+
+.icon-badge.yellow {
+    @apply bg-yellow-100 dark:bg-yellow-900;
+}
+
+.icon-badge.orange {
+    @apply bg-orange-100 dark:bg-orange-900;
+}
+
+/* === Responsive Grid Layouts === */
+.grid-executive-metrics {
+    @apply grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6;
+}
+
+.grid-executive-2col {
+    @apply grid grid-cols-1 lg:grid-cols-2 gap-6;
+}
+
+.grid-executive-3col {
+    @apply grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6;
+}
+
+/* === Spacing Utilities === */
+.section-spacing {
+    @apply mb-8;
+}
+
+.card-padding {
+    @apply p-6;
+}
+
+/* === Status Pills === */
+.status-pill {
+    @apply px-3 py-1 rounded-full text-xs font-semibold;
+}
+
+.status-pill.active {
+    @apply bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200;
+}
+
+.status-pill.pending {
+    @apply bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200;
+}
+
+.status-pill.completed {
+    @apply bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200;
+}
+
+.status-pill.at-risk {
+    @apply bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200;
+}
+
+/* === Hover Effects === */
+.hover-lift {
+    @apply transition-all duration-200 ease-in-out;
+}
+
+.hover-lift:hover {
+    @apply transform -translate-y-1 shadow-xl;
+}
+
+/* === Loading States === */
+.loading-shimmer {
+    @apply animate-pulse bg-gradient-to-r from-gray-200 via-gray-300 to-gray-200 dark:from-gray-700 dark:via-gray-600 dark:to-gray-700;
+    background-size: 200% 100%;
+}
+
+/* === Empty States === */
+.empty-state {
+    @apply text-center py-12;
+}
+
+.empty-state-icon {
+    @apply w-16 h-16 mx-auto mb-4 text-gray-400;
+}
+
+.empty-state-title {
+    @apply text-lg font-semibold text-gray-700 dark:text-gray-300 mb-2;
+}
+
+.empty-state-text {
+    @apply text-sm text-gray-500 dark:text-gray-400;
+}
+
+/* === Progress Bars === */
+.progress-bar-container {
+    @apply w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2;
+}
+
+.progress-bar-fill {
+    @apply h-2 rounded-full transition-all duration-300;
+}
+
+.progress-bar-fill.low {
+    @apply bg-red-500;
+}
+
+.progress-bar-fill.medium {
+    @apply bg-yellow-500;
+}
+
+.progress-bar-fill.high {
+    @apply bg-green-500;
+}
+
+/* === Risk Matrix Colors === */
+.risk-low {
+    @apply bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200;
+}
+
+.risk-medium {
+    @apply bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200;
+}
+
+.risk-high {
+    @apply bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-200;
+}
+
+.risk-critical {
+    @apply bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200;
+}
+
+/* === Button Styles === */
+.btn {
+    @apply px-4 py-2 rounded-lg font-medium transition-colors duration-200 inline-flex items-center justify-center;
+}
+
+.btn-primary {
+    @apply bg-blue-600 text-white hover:bg-blue-700 focus:ring-2 focus:ring-blue-500 focus:ring-offset-2;
+}
+
+.btn-secondary {
+    @apply bg-gray-600 text-white hover:bg-gray-700 focus:ring-2 focus:ring-gray-500 focus:ring-offset-2;
+}
+
+.btn-outline {
+    @apply border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 focus:ring-2 focus:ring-gray-500 focus:ring-offset-2;
+}

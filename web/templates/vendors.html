@@ -2,13 +2,13 @@
 
 {% block content %}
 <!-- Page Header -->
-<div class="flex flex-col md:flex-row md:items-center md:justify-between mb-6">
+<div class="page-header-executive flex flex-col md:flex-row md:items-center md:justify-between">
     <div>
-        <h1 class="text-2xl font-bold text-gray-800 dark:text-white">Vendor Management</h1>
-        <p class="text-gray-500 dark:text-gray-400">Monitor vendor performance and compliance</p>
+        <h1 class="page-title-executive">Vendor Management</h1>
+        <p class="page-subtitle-executive">Monitor vendor performance and compliance</p>
     </div>
     <div class="mt-4 md:mt-0">
-        <button onclick="openAddVendorModal()" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 flex items-center">
+        <button onclick="openAddVendorModal()" class="btn btn-primary flex items-center">
             <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path>
             </svg>
@@ -18,27 +18,45 @@
 </div>
 
 <!-- Summary Stats -->
-<div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-    <div class="bg-white dark:bg-gray-800 rounded-lg shadow p-4 text-center">
-        <p class="text-2xl font-bold text-blue-600">{{ vendors|length }}</p>
-        <p class="text-sm text-gray-500 dark:text-gray-400">Total Vendors</p>
+<div class="grid-executive-metrics section-spacing">
+    <div class="metric-card-executive border-accent-blue text-center hover-lift">
+        <p class="metric-label-executive">Total Vendors</p>
+        <p class="metric-value-executive text-blue-600">{{ vendors|length }}</p>
+        <p class="metric-subtitle-executive">Registered vendors</p>
     </div>
-    <div class="bg-white dark:bg-gray-800 rounded-lg shadow p-4 text-center">
-        <p class="text-2xl font-bold text-green-600">{{ active_count }}</p>
-        <p class="text-sm text-gray-500 dark:text-gray-400">Active</p>
+    <div class="metric-card-executive border-accent-green text-center hover-lift">
+        <p class="metric-label-executive">Active</p>
+        <p class="metric-value-executive text-green-600">{{ active_count }}</p>
+        <p class="metric-subtitle-executive">Currently engaged</p>
     </div>
-    <div class="bg-white dark:bg-gray-800 rounded-lg shadow p-4 text-center">
-        <p class="text-2xl font-bold text-yellow-600">{{ expiring_insurance }}</p>
-        <p class="text-sm text-gray-500 dark:text-gray-400">Insurance Expiring</p>
+    <div class="metric-card-executive {% if expiring_insurance > 5 %}border-accent-red{% elif expiring_insurance > 2 %}border-accent-yellow{% else %}border-accent-green{% endif %} text-center hover-lift">
+        <p class="metric-label-executive">Insurance Expiring</p>
+        <p class="metric-value-executive {% if expiring_insurance > 5 %}text-red-600{% elif expiring_insurance > 2 %}text-yellow-600{% else %}text-green-600{% endif %}">{{ expiring_insurance }}</p>
+        <p class="metric-subtitle-executive">
+            {% if expiring_insurance > 5 %}Immediate action{% elif expiring_insurance > 2 %}Monitor closely{% else %}All current{% endif %}
+        </p>
     </div>
-    <div class="bg-white dark:bg-gray-800 rounded-lg shadow p-4 text-center">
-        <p class="text-2xl font-bold text-purple-600">{{ avg_score|int }}</p>
-        <p class="text-sm text-gray-500 dark:text-gray-400">Avg. Performance</p>
+    <div class="metric-card-executive {% if avg_score < 50 %}border-accent-red{% elif avg_score < 70 %}border-accent-yellow{% else %}border-accent-green{% endif %} text-center hover-lift">
+        <p class="metric-label-executive">Avg. Performance</p>
+        <p class="metric-value-executive {% if avg_score < 50 %}text-red-600{% elif avg_score < 70 %}text-yellow-600{% else %}text-green-600{% endif %}">{{ avg_score|int }}</p>
+        <p class="metric-subtitle-executive">
+            {% if avg_score < 50 %}Needs improvement{% elif avg_score < 70 %}Satisfactory{% else %}Excellent{% endif %}
+        </p>
     </div>
 </div>
 
 <!-- Filters -->
-<div class="bg-white dark:bg-gray-800 rounded-lg shadow mb-6 p-4">
+<div class="card-executive with-top-border-blue mb-6">
+    <div class="section-header-executive neutral">
+        <h3 class="text-sm font-bold text-gray-900 dark:text-white flex items-center gap-2">
+            <svg class="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z"></path>
+            </svg>
+            Filter & Search
+        </h3>
+        <span class="text-xs text-gray-500 dark:text-gray-400">Refine vendor list</span>
+    </div>
+    <div class="card-padding">
     <form method="GET" class="grid grid-cols-1 md:grid-cols-4 gap-4">
         <div>
             <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Search</label>
@@ -73,9 +91,9 @@
 </div>
 
 <!-- Vendors Grid -->
-<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+<div class="grid-executive-3col">
     {% for vendor in vendors %}
-    <div class="bg-white dark:bg-gray-800 rounded-lg shadow hover:shadow-lg transition-shadow cursor-pointer"
+    <div class="card-executive hover-lift cursor-pointer"
          onclick="window.location='{{ url_for('vendor_detail', vendor_id=vendor.vendor_id) }}'">
         <div class="p-6">
             <div class="flex items-start justify-between mb-4">

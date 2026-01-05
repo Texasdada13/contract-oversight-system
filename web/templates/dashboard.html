@@ -1,15 +1,43 @@
 {% extends "base.html" %}
 
 {% block content %}
-<!-- Key Metrics -->
-<div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6 mb-8 stats-grid">
-    <div class="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
+<!-- Dashboard Header -->
+<div class="mb-4">
+    <h1 class="text-3xl font-bold text-gray-900 dark:text-white">Contract Oversight Dashboard</h1>
+    <p class="text-sm text-gray-500 dark:text-gray-400">Operational Management & Monitoring</p>
+</div>
+
+<!-- Portfolio Status Summary Banner -->
+<div class="bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-900/20 dark:to-indigo-900/20 border-l-4 border-blue-500 p-5 mb-6 rounded-r-lg shadow-md">
+    <div class="flex items-start">
+        <div class="flex-shrink-0">
+            <svg class="w-6 h-6 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path>
+            </svg>
+        </div>
+        <div class="ml-3 flex-1">
+            <h3 class="text-sm font-semibold text-blue-900 dark:text-blue-100 mb-1">Portfolio Status</h3>
+            <p class="text-sm text-blue-800 dark:text-blue-200 leading-relaxed">
+                Monitoring {{ summary.active_count or 0 }} active contracts worth ${{ '{:,.0f}'.format(summary.total_value or 0) }}.
+                {% if summary.at_risk_count > 0 %}
+                <span class="font-semibold text-red-600 dark:text-red-400">{{ summary.at_risk_count }} contract{% if summary.at_risk_count != 1 %}s{% endif %} require{% if summary.at_risk_count == 1 %}s{% endif %} immediate attention.</span>
+                {% else %}
+                <span class="font-semibold text-green-600 dark:text-green-400">All contracts are on track.</span>
+                {% endif %}
+            </p>
+        </div>
+    </div>
+</div>
+
+<!-- Key Metrics (Enhanced Executive Style) -->
+<div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+    <div class="bg-white dark:bg-gray-800 rounded-xl shadow-lg p-6 border-l-4 border-blue-500 hover:shadow-xl transition-shadow">
         <div class="flex items-center justify-between">
-            <div>
-                <p class="text-sm text-gray-500 dark:text-gray-400">Total Contracts</p>
+            <div class="flex-1">
+                <p class="text-xs text-gray-500 dark:text-gray-400 uppercase tracking-wider font-semibold mb-2">Total Contracts</p>
                 <p class="text-3xl font-bold text-gray-800 dark:text-white">{{ summary.total_contracts or 0 }}</p>
                 <p class="text-sm text-gray-500 dark:text-gray-400 mt-1">
-                    {{ summary.active_count or 0 }} active
+                    <span class="font-semibold text-blue-600">{{ summary.active_count or 0 }}</span> active
                 </p>
             </div>
             <div class="p-3 bg-blue-100 dark:bg-blue-900 rounded-full">
@@ -20,13 +48,13 @@
         </div>
     </div>
 
-    <div class="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
+    <div class="bg-white dark:bg-gray-800 rounded-xl shadow-lg p-6 border-l-4 border-green-500 hover:shadow-xl transition-shadow">
         <div class="flex items-center justify-between">
-            <div>
-                <p class="text-sm text-gray-500 dark:text-gray-400">Total Contract Value</p>
-                <p class="text-3xl font-bold text-gray-800 dark:text-white">${{ '{:,.0f}'.format(summary.total_value or 0) }}</p>
+            <div class="flex-1">
+                <p class="text-xs text-gray-500 dark:text-gray-400 uppercase tracking-wider font-semibold mb-2">Portfolio Value</p>
+                <p class="text-3xl font-bold text-gray-800 dark:text-white">${{ '{:,.0f}'.format((summary.total_value or 0)/1000000) }}M</p>
                 <p class="text-sm text-gray-500 dark:text-gray-400 mt-1">
-                    ${{ '{:,.0f}'.format(summary.total_paid or 0) }} paid
+                    <span class="font-semibold text-green-600">${{ '{:,.0f}'.format(summary.total_paid or 0) }}</span> paid
                 </p>
             </div>
             <div class="p-3 bg-green-100 dark:bg-green-900 rounded-full">
@@ -37,13 +65,15 @@
         </div>
     </div>
 
-    <div class="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
+    <div class="bg-white dark:bg-gray-800 rounded-xl shadow-lg p-6 border-l-4 {% if summary.overrun_pct > 5 %}border-red-500{% elif summary.overrun_pct > 0 %}border-yellow-500{% else %}border-green-500{% endif %} hover:shadow-xl transition-shadow">
         <div class="flex items-center justify-between">
-            <div>
-                <p class="text-sm text-gray-500 dark:text-gray-400">Cost Overruns</p>
-                <p class="text-3xl font-bold {% if summary.total_overrun > 0 %}text-red-600{% else %}text-green-600{% endif %}">${{ '{:,.0f}'.format(summary.total_overrun or 0) }}</p>
-                <p class="text-sm {% if summary.overrun_pct > 0 %}text-red-500{% else %}text-green-500{% endif %} mt-1">
-                    {% if summary.overrun_pct > 0 %}+{% endif %}{{ '{:.1f}'.format(summary.overrun_pct or 0) }}% from original
+            <div class="flex-1">
+                <p class="text-xs text-gray-500 dark:text-gray-400 uppercase tracking-wider font-semibold mb-2">Budget Variance</p>
+                <p class="text-3xl font-bold {% if summary.overrun_pct > 5 %}text-red-600{% elif summary.overrun_pct > 0 %}text-yellow-600{% else %}text-green-600{% endif %}">
+                    {% if summary.overrun_pct > 0 %}+{% endif %}{{ '{:.1f}'.format(summary.overrun_pct or 0) }}%
+                </p>
+                <p class="text-sm text-gray-500 dark:text-gray-400 mt-1">
+                    {% if summary.overrun_pct > 5 %}Over Budget{% elif summary.overrun_pct > 0 %}Slight Overrun{% else %}On Track{% endif %}
                 </p>
             </div>
             <div class="p-3 {% if summary.total_overrun > 0 %}bg-red-100 dark:bg-red-900{% else %}bg-green-100 dark:bg-green-900{% endif %} rounded-full">
@@ -54,13 +84,13 @@
         </div>
     </div>
 
-    <div class="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
+    <div class="bg-white dark:bg-gray-800 rounded-xl shadow-lg p-6 border-l-4 {% if summary.at_risk_count > 10 %}border-red-500{% elif summary.at_risk_count > 5 %}border-yellow-500{% else %}border-gray-300{% endif %} hover:shadow-xl transition-shadow">
         <div class="flex items-center justify-between">
-            <div>
-                <p class="text-sm text-gray-500 dark:text-gray-400">At-Risk Contracts</p>
-                <p class="text-3xl font-bold {% if summary.at_risk_count > 0 %}text-red-600{% else %}text-green-600{% endif %}">{{ summary.at_risk_count or 0 }}</p>
+            <div class="flex-1">
+                <p class="text-xs text-gray-500 dark:text-gray-400 uppercase tracking-wider font-semibold mb-2">At-Risk Projects</p>
+                <p class="text-3xl font-bold {% if summary.at_risk_count > 10 %}text-red-600{% elif summary.at_risk_count > 5 %}text-yellow-600{% else %}text-gray-800 dark:text-white{% endif %}">{{ summary.at_risk_count or 0 }}</p>
                 <p class="text-sm text-gray-500 dark:text-gray-400 mt-1">
-                    {{ summary.critical_count or 0 }} critical
+                    <span class="font-semibold {% if summary.critical_count > 0 %}text-red-600{% else %}text-gray-600{% endif %}">{{ summary.critical_count or 0 }}</span> critical
                 </p>
             </div>
             <div class="p-3 {% if summary.at_risk_count > 0 %}bg-red-100 dark:bg-red-900{% else %}bg-green-100 dark:bg-green-900{% endif %} rounded-full">
@@ -75,10 +105,15 @@
 <!-- Alerts and At-Risk -->
 <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
     <!-- Active Alerts -->
-    <div class="bg-white dark:bg-gray-800 rounded-lg shadow">
-        <div class="px-6 py-4 border-b dark:border-gray-700 flex justify-between items-center">
-            <h3 class="text-lg font-semibold text-gray-800 dark:text-white">Active Alerts</h3>
-            <a href="{{ url_for('alerts_page') }}" class="text-sm text-blue-600 dark:text-blue-400 hover:underline">View All</a>
+    <div class="bg-white dark:bg-gray-800 rounded-xl shadow-lg border-t-4 border-red-500">
+        <div class="px-6 py-4 border-b dark:border-gray-700 flex justify-between items-center bg-gradient-to-r from-red-50 to-orange-50 dark:from-red-900/20 dark:to-orange-900/20 rounded-t-lg">
+            <h3 class="text-lg font-bold text-gray-900 dark:text-white flex items-center gap-2">
+                <svg class="w-5 h-5 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path>
+                </svg>
+                Active Alerts
+            </h3>
+            <a href="{{ url_for('alerts_page') }}" class="text-sm font-semibold text-blue-600 dark:text-blue-400 hover:underline">View All →</a>
         </div>
         <div class="p-4">
             {% if alerts %}
@@ -115,9 +150,12 @@
     </div>
 
     <!-- At-Risk Contracts -->
-    <div class="bg-white dark:bg-gray-800 rounded-lg shadow">
-        <div class="px-6 py-4 border-b dark:border-gray-700 flex justify-between items-center">
-            <h3 class="text-lg font-semibold text-gray-800 dark:text-white flex items-center gap-2">
+    <div class="bg-white dark:bg-gray-800 rounded-xl shadow-lg border-t-4 border-yellow-500">
+        <div class="px-6 py-4 border-b dark:border-gray-700 flex justify-between items-center bg-gradient-to-r from-yellow-50 to-orange-50 dark:from-yellow-900/20 dark:to-orange-900/20 rounded-t-lg">
+            <h3 class="text-lg font-bold text-gray-900 dark:text-white flex items-center gap-2">
+                <svg class="w-5 h-5 text-yellow-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path>
+                </svg>
                 At-Risk Contracts
                 <span class="relative">
                     <button type="button" onclick="toggleHealthLegend(event, 'healthLegendDashboard')" class="health-info-btn" aria-label="Health score information">
@@ -128,7 +166,7 @@
                     <div id="healthLegendDashboard" class="health-legend"></div>
                 </span>
             </h3>
-            <a href="{{ url_for('contracts_list') }}" class="text-sm text-blue-600 dark:text-blue-400 hover:underline">View All</a>
+            <a href="{{ url_for('contracts_list') }}" class="text-sm font-semibold text-blue-600 dark:text-blue-400 hover:underline">View All →</a>
         </div>
         <div class="p-4">
             {% if at_risk_contracts %}

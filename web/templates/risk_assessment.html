@@ -2,13 +2,13 @@
 
 {% block content %}
 <!-- Page Header -->
-<div class="flex items-center justify-between mb-6">
+<div class="page-header-executive flex items-center justify-between">
     <div>
-        <h1 class="text-2xl font-bold text-gray-800 dark:text-white">Contract Risk Assessment</h1>
-        <p class="text-gray-500 dark:text-gray-400">Analyze and monitor contract risk factors</p>
+        <h1 class="page-title-executive">Contract Risk Assessment</h1>
+        <p class="page-subtitle-executive">Analyze and monitor contract risk factors</p>
     </div>
     <div class="flex space-x-3">
-        <button onclick="window.print()" class="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700">
+        <button onclick="window.print()" class="btn btn-secondary">
             Export Report
         </button>
     </div>
@@ -43,24 +43,34 @@
 </div>
 
 <!-- Risk Distribution Charts -->
-<div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
-    <div class="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
-        <h3 class="text-lg font-semibold text-gray-800 dark:text-white mb-4">Risk Distribution</h3>
-        <div id="riskDistChart" style="height: 250px;"></div>
+<div class="grid-executive-2col section-spacing">
+    <div class="card-executive with-top-border-blue">
+        <div class="section-header-executive neutral">
+            <h3 class="text-lg font-semibold text-gray-900 dark:text-white">Risk Distribution</h3>
+            <span class="text-xs text-gray-500 dark:text-gray-400">Overall risk levels</span>
+        </div>
+        <div class="card-padding">
+            <div id="riskDistChart" style="height: 250px;"></div>
+        </div>
     </div>
-    <div class="bg-white dark:bg-gray-800 rounded-lg shadow p-6">
-        <h3 class="text-lg font-semibold text-gray-800 dark:text-white mb-4">Risk by Department</h3>
-        <div id="deptRiskChart" style="height: 250px;"></div>
+    <div class="card-executive with-top-border-orange">
+        <div class="section-header-executive neutral">
+            <h3 class="text-lg font-semibold text-gray-900 dark:text-white">Risk by Department</h3>
+            <span class="text-xs text-gray-500 dark:text-gray-400">Departmental breakdown</span>
+        </div>
+        <div class="card-padding">
+            <div id="deptRiskChart" style="height: 250px;"></div>
+        </div>
     </div>
 </div>
 
 <!-- Risk Matrix -->
-<div class="bg-white dark:bg-gray-800 rounded-lg shadow mb-8">
-    <div class="px-6 py-4 border-b dark:border-gray-700">
-        <h3 class="text-lg font-semibold text-gray-800 dark:text-white">Risk Factor Analysis</h3>
-        <p class="text-sm text-gray-500">Breakdown of risk factors for each contract</p>
+<div class="card-executive with-top-border-red section-spacing">
+    <div class="section-header-executive neutral">
+        <h3 class="text-lg font-semibold text-gray-900 dark:text-white">Risk Factor Analysis</h3>
+        <span class="text-xs text-gray-500 dark:text-gray-400">Breakdown of risk factors for each contract</span>
     </div>
-    <div class="p-6">
+    <div class="card-padding">
         <div class="grid grid-cols-4 gap-4 mb-6">
             <div class="p-4 bg-blue-50 dark:bg-blue-900/30 rounded-lg text-center">
                 <p class="text-2xl font-bold text-blue-600">35%</p>
@@ -83,9 +93,9 @@
 </div>
 
 <!-- Risk Table -->
-<div class="bg-white dark:bg-gray-800 rounded-lg shadow">
-    <div class="px-6 py-4 border-b dark:border-gray-700 flex justify-between items-center">
-        <h3 class="text-lg font-semibold text-gray-800 dark:text-white">Contract Risk Assessment</h3>
+<div class="card-executive with-top-border-red">
+    <div class="section-header-executive neutral flex justify-between items-center">
+        <h3 class="text-lg font-semibold text-gray-900 dark:text-white">Contract Risk Assessment</h3>
         <div class="flex space-x-2">
             <input type="text" id="riskSearch" placeholder="Search contracts..." onkeyup="filterRisks()"
                 class="px-3 py-2 border rounded-lg text-sm dark:bg-gray-700 dark:border-gray-600 dark:text-white">

@@ -28,6 +28,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 from src.database import get_database
 from src.scoring_engine import ContractScoringEngine, VendorScoringEngine, AlertGenerator
 from src.benchmarking import get_benchmarking_engine, COUPA_BENCHMARKS, BENCHMARK_CATEGORIES
+from src.executive_analytics import get_executive_analytics
 
 app = Flask(__name__)
 app.secret_key = os.environ.get('SECRET_KEY', 'contract-oversight-dev-key')
@@ -38,6 +39,7 @@ db = get_database()
 contract_scorer = ContractScoringEngine()
 vendor_scorer = VendorScoringEngine()
 alert_generator = AlertGenerator()
+executive_analytics = get_executive_analytics()
 
 
 # ====== Custom Template Filters ======
@@ -189,7 +191,7 @@ def dashboard():
 
 @app.route('/executive')
 def executive_dashboard():
-    """Executive dashboard for commissioners and board members."""
+    """Enhanced executive dashboard for commissioners and board members with predictive analytics."""
     global current_contracts, current_vendors
 
     if current_contracts is None:
@@ -200,12 +202,69 @@ def executive_dashboard():
     # Calculate overall health score
     overall_health = int(summary.get('avg_health_score', 50))
 
+    # Generate executive summary text (AI-powered insight)
+    executive_summary = executive_analytics.generate_executive_summary()
+
     # Get alerts for critical items
     contracts_list_data = current_contracts.to_dict('records') if current_contracts is not None else []
     all_alerts = alert_generator.generate_alerts(contracts_list_data)
 
-    # Critical items requiring immediate action
+    # Enhanced Action Required section with decision prompts and risk scoring
     critical_items = []
+    action_required = []
+
+    # Get contracts requiring board decisions (high value + issues)
+    if current_contracts is not None and not current_contracts.empty:
+        for _, row in current_contracts.iterrows():
+            contract_id = row.get('contract_id')
+            health_score = row.get('overall_health_score', 50)
+            current_amount = row.get('current_amount', 0)
+
+            # Calculate risk probability
+            risk_score, risk_category = executive_analytics.calculate_risk_probability(contract_id)
+
+            # Get forecast budget
+            forecast_budget = executive_analytics.forecast_budget_at_completion(contract_id)
+            budget_overrun = forecast_budget - current_amount if forecast_budget > 0 else 0
+
+            # Criteria for Action Required: High value + (Low health OR significant overrun prediction)
+            requires_action = False
+            decision_prompt = ""
+            priority = "Medium"
+
+            if current_amount > 5000000 and health_score < 50:
+                requires_action = True
+                decision_prompt = f"Approve ${budget_overrun:,.0f} additional funding or halt project"
+                priority = "Critical"
+            elif budget_overrun > (current_amount * 0.15):  # Forecast >15% overrun
+                requires_action = True
+                decision_prompt = f"Review {budget_overrun/current_amount*100:.0f}% projected cost overrun"
+                priority = "High"
+            elif risk_category == 'High' and current_amount > 1000000:
+                requires_action = True
+                decision_prompt = f"Assess {risk_category.lower()} risk factors before proceeding"
+                priority = "High"
+
+            if requires_action:
+                action_required.append({
+                    'contract_id': contract_id,
+                    'title': row.get('title', 'Unknown Contract')[:50],
+                    'department': row.get('department', 'Unknown'),
+                    'value': current_amount,
+                    'forecast_budget': forecast_budget,
+                    'budget_overrun': budget_overrun,
+                    'health_score': health_score,
+                    'risk_score': risk_score,
+                    'risk_category': risk_category,
+                    'decision_prompt': decision_prompt,
+                    'priority': priority
+                })
+
+    # Sort action required by priority (Critical > High > Medium)
+    priority_order = {'Critical': 0, 'High': 1, 'Medium': 2}
+    action_required = sorted(action_required, key=lambda x: priority_order.get(x['priority'], 3))[:5]
+
+    # Also keep critical items from alerts for backward compatibility
     for alert in all_alerts:
         if alert.get('severity') in ['Critical', 'High']:
             critical_items.append({
@@ -346,9 +405,25 @@ def executive_dashboard():
             if durations:
                 kpis['avg_duration_months'] = int(sum(durations) / len(durations))
 
+    # Calculate trend indicator (compared to last month - placeholder for now)
+    # In production, this would compare to previous month's health score
+    health_trend = "stable"
+    health_change = 0
+    # Placeholder: if health > 60, trending up; if < 40, trending down
+    if overall_health > 60:
+        health_trend = "improving"
+        health_change = 5
+    elif overall_health < 40:
+        health_trend = "declining"
+        health_change = -5
+
     return render_template('executive_dashboard.html',
                           summary=summary,
                           overall_health=overall_health,
+                          executive_summary=executive_summary,
+                          health_trend=health_trend,
+                          health_change=health_change,
+                          action_required=action_required,
                           critical_items=critical_items[:5],
                           top_contracts=top_contracts,
                           on_time_rate=on_time_rate,
@@ -364,7 +439,7 @@ def executive_dashboard():
                           kpis=kpis,
                           report_date=datetime.now().strftime('%B %d, %Y'),
                           last_updated=datetime.now().strftime('%I:%M %p'),
-                          title='Executive Dashboard')
+                          title='Executive Dashboard - Board-Level Decision Support')
 
 
 @app.route('/contracts')
