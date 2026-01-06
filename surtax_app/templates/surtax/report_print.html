@@ -1,0 +1,416 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Annual Report - Marion County School Surtax Oversight</title>
+    <style>
+        @media print {
+            @page { margin: 0.75in; }
+            .no-print { display: none !important; }
+            .page-break { page-break-before: always; }
+        }
+
+        body {
+            font-family: 'Times New Roman', Times, serif;
+            line-height: 1.6;
+            color: #333;
+            max-width: 8.5in;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        .header {
+            text-align: center;
+            border-bottom: 2px solid #1e40af;
+            padding-bottom: 20px;
+            margin-bottom: 30px;
+        }
+
+        .header h1 {
+            font-size: 24px;
+            margin: 0;
+            color: #1e40af;
+        }
+
+        .header h2 {
+            font-size: 18px;
+            font-weight: normal;
+            margin: 5px 0;
+            color: #374151;
+        }
+
+        .header .report-title {
+            font-size: 20px;
+            font-weight: bold;
+            color: #1e40af;
+            margin-top: 15px;
+        }
+
+        .header .date {
+            font-size: 12px;
+            color: #6b7280;
+            margin-top: 5px;
+        }
+
+        .section {
+            margin-bottom: 30px;
+        }
+
+        .section-title {
+            font-size: 16px;
+            font-weight: bold;
+            color: #1e40af;
+            border-bottom: 1px solid #ddd;
+            padding-bottom: 5px;
+            margin-bottom: 15px;
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+
+        .stat-box {
+            text-align: center;
+            padding: 15px;
+            background: #f9fafb;
+            border: 1px solid #e5e7eb;
+        }
+
+        .stat-box .value {
+            font-size: 24px;
+            font-weight: bold;
+            color: #111827;
+        }
+
+        .stat-box .label {
+            font-size: 11px;
+            color: #6b7280;
+            text-transform: uppercase;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 12px;
+            margin-bottom: 20px;
+        }
+
+        th, td {
+            border: 1px solid #e5e7eb;
+            padding: 8px;
+            text-align: left;
+        }
+
+        th {
+            background: #f3f4f6;
+            font-weight: bold;
+        }
+
+        .text-right { text-align: right; }
+        .text-center { text-align: center; }
+
+        .checklist-item {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 8px;
+        }
+
+        .check-yes {
+            color: #059669;
+            font-weight: bold;
+        }
+
+        .check-pending {
+            color: #d97706;
+            font-weight: bold;
+        }
+
+        .concern-item {
+            padding: 10px;
+            margin-bottom: 10px;
+            border-left: 4px solid #ef4444;
+            background: #fef2f2;
+        }
+
+        .concern-item.medium {
+            border-left-color: #f59e0b;
+            background: #fffbeb;
+        }
+
+        .opinion-box {
+            border: 2px solid #1e40af;
+            padding: 20px;
+            margin: 20px 0;
+            background: #eff6ff;
+        }
+
+        .signature-line {
+            display: inline-block;
+            width: 250px;
+            border-top: 1px solid #333;
+            margin-top: 40px;
+            padding-top: 5px;
+            font-size: 11px;
+            color: #6b7280;
+        }
+
+        .print-btn {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            padding: 10px 20px;
+            background: #1e40af;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 14px;
+        }
+
+        .print-btn:hover {
+            background: #1e3a8a;
+        }
+    </style>
+</head>
+<body>
+    <button class="print-btn no-print" onclick="window.print()">Print Report</button>
+
+    <div class="header">
+        <h1>Marion County School District</h1>
+        <h2>School Capital Outlay Surtax Oversight Committee</h2>
+        <div class="report-title">Annual Compliance Report</div>
+        <div class="report-title">{{ report.fiscal_year }}</div>
+        <div class="date">Report Generated: {{ report.generated_at.strftime('%B %d, %Y') }}</div>
+    </div>
+
+    <div class="section">
+        <div class="section-title">1. Executive Summary</div>
+        <p>
+            The School Capital Outlay Surtax Oversight Committee has reviewed the expenditure of surtax funds
+            for the {{ report.fiscal_year }} reporting period. This report summarizes the status of all surtax-funded
+            projects and provides the committee's compliance opinion.
+        </p>
+
+        <div class="stats-grid">
+            <div class="stat-box">
+                <div class="value">{{ report.stats.total_projects }}</div>
+                <div class="label">Total Projects</div>
+            </div>
+            <div class="stat-box">
+                <div class="value">${{ '{:,.0f}'.format(report.stats.total_budget) }}</div>
+                <div class="label">Total Budget</div>
+            </div>
+            <div class="stat-box">
+                <div class="value">{{ report.stats.percent_spent|int }}%</div>
+                <div class="label">Funds Expended</div>
+            </div>
+            <div class="stat-box">
+                <div class="value">{{ report.stats.on_track_projects }}/{{ report.stats.active_projects }}</div>
+                <div class="label">Projects On Track</div>
+            </div>
+        </div>
+    </div>
+
+    <div class="section">
+        <div class="section-title">2. Compliance Checklist</div>
+        <p>The committee has verified compliance with the following statutory requirements:</p>
+
+        <div class="checklist-item">
+            {% if report.compliance.funds_for_listed_purposes %}
+            <span class="check-yes">[X]</span>
+            {% else %}
+            <span class="check-pending">[ ]</span>
+            {% endif %}
+            <span>Bond proceeds used only for voter-approved purposes</span>
+        </div>
+
+        <div class="checklist-item">
+            {% if report.compliance.no_salary_expenditures %}
+            <span class="check-yes">[X]</span>
+            {% else %}
+            <span class="check-pending">[ ]</span>
+            {% endif %}
+            <span>No funds used for teacher/administrator salaries or operating expenses</span>
+        </div>
+
+        <div class="checklist-item">
+            {% if report.compliance.public_meetings_held %}
+            <span class="check-yes">[X]</span>
+            {% else %}
+            <span class="check-pending">[ ]</span>
+            {% endif %}
+            <span>Public meetings held as required</span>
+        </div>
+
+        <div class="checklist-item">
+            {% if report.compliance.annual_audit_completed %}
+            <span class="check-yes">[X]</span>
+            {% else %}
+            <span class="check-pending">[ ]</span>
+            {% endif %}
+            <span>Annual independent financial audit completed {% if not report.compliance.annual_audit_completed %}(Pending){% endif %}</span>
+        </div>
+
+        <div class="checklist-item">
+            {% if report.compliance.performance_audit_completed %}
+            <span class="check-yes">[X]</span>
+            {% else %}
+            <span class="check-pending">[ ]</span>
+            {% endif %}
+            <span>Annual independent performance audit completed {% if not report.compliance.performance_audit_completed %}(Pending){% endif %}</span>
+        </div>
+    </div>
+
+    <div class="section page-break">
+        <div class="section-title">3. Expenditures by Category</div>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>Category</th>
+                    <th class="text-center">Projects</th>
+                    <th class="text-right">Budget</th>
+                    <th class="text-right">Expended</th>
+                    <th class="text-right">% of Total</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for cat in report.categories %}
+                <tr>
+                    <td>{{ cat.category_name or cat.surtax_category }}</td>
+                    <td class="text-center">{{ cat.project_count }}</td>
+                    <td class="text-right">${{ '{:,.0f}'.format(cat.total_budget) }}</td>
+                    <td class="text-right">${{ '{:,.0f}'.format(cat.total_spent) }}</td>
+                    <td class="text-right">{{ '{:.1f}'.format(cat.percent_of_total) }}%</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+            <tfoot>
+                <tr>
+                    <th>TOTAL</th>
+                    <th class="text-center">{{ report.stats.total_projects }}</th>
+                    <th class="text-right">${{ '{:,.0f}'.format(report.stats.total_budget) }}</th>
+                    <th class="text-right">${{ '{:,.0f}'.format(report.stats.total_spent) }}</th>
+                    <th class="text-right">100%</th>
+                </tr>
+            </tfoot>
+        </table>
+    </div>
+
+    <div class="section">
+        <div class="section-title">4. Major Projects Status</div>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>Project</th>
+                    <th>School</th>
+                    <th class="text-right">Budget</th>
+                    <th class="text-center">Progress</th>
+                    <th class="text-center">Status</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for project in report.top_projects %}
+                <tr>
+                    <td>{{ project.title[:45] }}{% if project.title|length > 45 %}...{% endif %}</td>
+                    <td>{{ project.school_name or '-' }}</td>
+                    <td class="text-right">${{ '{:,.0f}'.format(project.current_amount) }}</td>
+                    <td class="text-center">{{ (project.percent_complete or 0)|int }}%</td>
+                    <td class="text-center">
+                        {% if project.is_delayed %}DELAYED
+                        {% elif project.is_over_budget %}OVER BUDGET
+                        {% else %}{{ project.status }}{% endif %}
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    {% if report.concerns %}
+    <div class="section">
+        <div class="section-title">5. Issues Identified</div>
+        <p>The committee has identified the following issues requiring attention:</p>
+
+        {% for concern in report.concerns[:10] %}
+        <div class="concern-item {% if concern.severity == 'Medium' %}medium{% endif %}">
+            <strong>{{ concern.severity }} Priority - {{ concern.type }}:</strong>
+            {{ concern.title }}<br>
+            <em>{{ concern.detail }}</em>
+        </div>
+        {% endfor %}
+    </div>
+    {% endif %}
+
+    <div class="section page-break">
+        <div class="section-title">6. Committee Compliance Opinion</div>
+
+        <div class="opinion-box">
+            <p><strong>Annual Compliance Opinion</strong></p>
+            <p><strong>Marion County School Capital Outlay Surtax</strong></p>
+            <p><strong>{{ report.fiscal_year }}</strong></p>
+
+            <p style="margin-top: 20px;">
+                Based on our review of the Marion County School District's expenditure of School Capital
+                Outlay Surtax funds for the {{ report.fiscal_year }} fiscal year, the Citizens' Oversight
+                Committee finds that:
+            </p>
+
+            <p style="margin: 20px 0; font-style: italic;">
+                "The Marion County School District has expended surtax funds in accordance with the
+                purposes approved by voters. All expenditures reviewed were for authorized school
+                construction, renovation, and improvement projects as specified in the ballot measure.
+                The committee has reviewed supporting documentation and finds no evidence of misuse
+                of funds."
+            </p>
+
+            <p>
+                <strong>Approved by the Marion County School Capital Outlay Surtax Oversight Committee</strong>
+            </p>
+
+            <div style="display: flex; justify-content: space-between; margin-top: 30px;">
+                <div>
+                    <div class="signature-line">Committee Chair</div>
+                    <br><br>
+                    <div class="signature-line">Date</div>
+                </div>
+                <div>
+                    <div class="signature-line">Committee Vice-Chair</div>
+                    <br><br>
+                    <div class="signature-line">Date</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="section">
+        <div class="section-title">Appendix: Committee Members</div>
+        <p>The following individuals served on the School Capital Outlay Surtax Oversight Committee during this reporting period:</p>
+
+        <table>
+            <thead>
+                <tr>
+                    <th>Name</th>
+                    <th>Representing</th>
+                    <th>Term</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr><td colspan="3" style="text-align: center; color: #6b7280;">[Committee member list to be added]</td></tr>
+            </tbody>
+        </table>
+
+        <p style="margin-top: 20px; font-size: 11px; color: #6b7280;">
+            <strong>Note:</strong> This report was prepared by the Citizens' Oversight Committee as required
+            by Florida Statute. For questions or additional information, please contact the Marion County
+            School District Facilities Department.
+        </p>
+    </div>
+</body>
+</html>

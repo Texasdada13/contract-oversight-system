@@ -1,0 +1,113 @@
+{% extends "surtax/base.html" %}
+
+{% block content %}
+<div class="space-y-6">
+    <!-- Header -->
+    <div class="bg-gradient-to-r from-blue-600 to-blue-800 rounded-xl p-8 text-white">
+        <h2 class="text-3xl font-bold mb-2">Marion County School Surtax</h2>
+        <p class="text-blue-100 text-lg">Public Transparency Portal</p>
+        <p class="text-blue-200 text-sm mt-2">Half-Cent Sales Tax for School Facilities (2025-2035)</p>
+    </div>
+
+    <!-- Summary Cards -->
+    <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+        <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-6 text-center">
+            <p class="text-4xl font-bold text-blue-600">{{ summary.total_projects or 0 }}</p>
+            <p class="text-gray-500 mt-1">Total Projects</p>
+        </div>
+        <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-6 text-center">
+            <p class="text-4xl font-bold text-green-600">${{ '{:,.0f}'.format((summary.total_budget or 0) / 1000000) }}M</p>
+            <p class="text-gray-500 mt-1">Total Budget</p>
+        </div>
+        <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-6 text-center">
+            <p class="text-4xl font-bold text-purple-600">${{ '{:,.0f}'.format((summary.total_spent or 0) / 1000000) }}M</p>
+            <p class="text-gray-500 mt-1">Spent to Date</p>
+        </div>
+        <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-6 text-center">
+            <p class="text-4xl font-bold text-yellow-600">{{ summary.completed or 0 }}</p>
+            <p class="text-gray-500 mt-1">Completed</p>
+        </div>
+    </div>
+
+    <!-- About Section -->
+    <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+        <h3 class="text-xl font-semibold text-gray-900 mb-4">About the Surtax</h3>
+        <div class="prose prose-blue max-w-none text-gray-600">
+            <p>
+                In November 2024, Marion County voters approved a half-cent sales tax dedicated to improving school facilities.
+                This 10-year initiative will fund critical infrastructure improvements including:
+            </p>
+            <ul class="mt-4 space-y-2">
+                <li class="flex items-start">
+                    <svg class="w-5 h-5 text-green-500 mr-2 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+                    </svg>
+                    <span><strong>New Construction</strong> - Building new schools to accommodate growth</span>
+                </li>
+                <li class="flex items-start">
+                    <svg class="w-5 h-5 text-green-500 mr-2 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+                    </svg>
+                    <span><strong>Renovations</strong> - Updating aging facilities</span>
+                </li>
+                <li class="flex items-start">
+                    <svg class="w-5 h-5 text-green-500 mr-2 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+                    </svg>
+                    <span><strong>Safety & Security</strong> - Enhanced security systems district-wide</span>
+                </li>
+                <li class="flex items-start">
+                    <svg class="w-5 h-5 text-green-500 mr-2 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+                    </svg>
+                    <span><strong>Technology</strong> - Modern learning environments</span>
+                </li>
+            </ul>
+        </div>
+    </div>
+
+    <!-- Recently Completed -->
+    <div class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+        <div class="px-6 py-4 border-b border-gray-200">
+            <h3 class="text-lg font-semibold text-gray-900">Recently Completed Projects</h3>
+        </div>
+        {% if completed %}
+        <div class="divide-y divide-gray-200">
+            {% for project in completed %}
+            <div class="p-4 hover:bg-gray-50">
+                <div class="flex justify-between items-center">
+                    <div>
+                        <h4 class="font-medium text-gray-900">{{ project.title }}</h4>
+                        <p class="text-sm text-gray-500">{{ project.school_name }} - {{ project.surtax_category }}</p>
+                    </div>
+                    <div class="text-right">
+                        <span class="font-medium text-gray-900">${{ '{:,.0f}'.format(project.current_amount or 0) }}</span>
+                        <span class="block text-xs text-green-600">Completed</span>
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+        {% else %}
+        <div class="p-8 text-center text-gray-500">
+            <p>No completed projects yet. Check back soon!</p>
+        </div>
+        {% endif %}
+    </div>
+
+    <!-- Oversight Committee -->
+    <div class="bg-blue-50 rounded-xl p-6 border border-blue-200">
+        <h3 class="text-lg font-semibold text-blue-900 mb-2">Citizen Oversight Committee</h3>
+        <p class="text-blue-800">
+            An independent citizen oversight committee monitors all surtax expenditures to ensure funds are used appropriately.
+            Committee meetings are open to the public.
+        </p>
+        <a href="{{ url_for('meeting_minutes') }}" class="inline-flex items-center mt-4 text-blue-600 hover:text-blue-800 font-medium">
+            View Meeting Schedule & Minutes
+            <svg class="w-4 h-4 ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
+            </svg>
+        </a>
+    </div>
+</div>
+{% endblock %}

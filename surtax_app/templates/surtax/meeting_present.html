@@ -1,0 +1,222 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Presentation Mode - Surtax Oversight</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body {
+            background: #111827;
+            overflow: hidden;
+        }
+        .slide {
+            display: none;
+            animation: fadeIn 0.3s ease-in-out;
+        }
+        .slide.active {
+            display: flex;
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        .stat-card {
+            background: rgba(255,255,255,0.1);
+            backdrop-filter: blur(10px);
+        }
+    </style>
+</head>
+<body class="h-screen w-screen">
+    <!-- Navigation -->
+    <div class="fixed top-4 right-4 z-50 flex items-center gap-4">
+        <span class="text-white/60 text-sm">Slide {{ current_slide }} of {{ total_slides }}</span>
+        <a href="{{ url_for('meeting_mode') }}" class="text-white/60 hover:text-white text-sm">
+            Exit
+        </a>
+    </div>
+
+    <!-- Slide Container -->
+    <div class="h-full w-full flex items-center justify-center p-8">
+        {% for slide in slides %}
+        <div id="slide-{{ slide.id }}" class="slide w-full h-full {% if slide.id == current_slide %}active{% endif %}">
+
+            {% if slide.type == 'title' %}
+            <!-- Title Slide -->
+            <div class="flex flex-col items-center justify-center w-full h-full text-center">
+                <div class="w-20 h-20 bg-blue-500 rounded-full flex items-center justify-center mb-8">
+                    <svg class="w-10 h-10 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"></path>
+                    </svg>
+                </div>
+                <h1 class="text-5xl font-bold text-white mb-4">{{ slide.title }}</h1>
+                <p class="text-2xl text-blue-400">{{ slide.subtitle }}</p>
+                <p class="text-white/40 mt-8">Marion County School District</p>
+            </div>
+
+            {% elif slide.type == 'stats' %}
+            <!-- Stats Slide -->
+            <div class="flex flex-col w-full h-full">
+                <h2 class="text-4xl font-bold text-white mb-12 text-center">{{ slide.title }}</h2>
+                <div class="flex-1 grid grid-cols-2 lg:grid-cols-4 gap-8 max-w-6xl mx-auto">
+                    <div class="stat-card rounded-2xl p-8 flex flex-col items-center justify-center">
+                        <p class="text-6xl font-bold text-white">{{ slide.data.total_projects }}</p>
+                        <p class="text-xl text-white/60 mt-2">Total Projects</p>
+                    </div>
+                    <div class="stat-card rounded-2xl p-8 flex flex-col items-center justify-center">
+                        <p class="text-5xl font-bold text-blue-400">${{ '{:,.0f}'.format(slide.data.total_budget / 1000000) }}M</p>
+                        <p class="text-xl text-white/60 mt-2">Total Budget</p>
+                    </div>
+                    <div class="stat-card rounded-2xl p-8 flex flex-col items-center justify-center">
+                        <p class="text-6xl font-bold text-green-400">{{ slide.data.percent_spent|int }}%</p>
+                        <p class="text-xl text-white/60 mt-2">Funds Spent</p>
+                    </div>
+                    <div class="stat-card rounded-2xl p-8 flex flex-col items-center justify-center">
+                        <p class="text-6xl font-bold {% if slide.data.on_track_projects == slide.data.active_projects %}text-green-400{% else %}text-yellow-400{% endif %}">
+                            {{ slide.data.on_track_projects }}
+                        </p>
+                        <p class="text-xl text-white/60 mt-2">Projects On Track</p>
+                    </div>
+                </div>
+                <div class="mt-8 text-center">
+                    <p class="text-white/40">
+                        {{ slide.data.active_projects }} active | {{ slide.data.completed_projects }} completed |
+                        {{ slide.data.delayed_projects }} delayed | {{ slide.data.over_budget_projects }} over budget
+                    </p>
+                </div>
+            </div>
+
+            {% elif slide.type == 'categories' %}
+            <!-- Categories Slide -->
+            <div class="flex flex-col w-full h-full">
+                <h2 class="text-4xl font-bold text-white mb-8 text-center">{{ slide.title }}</h2>
+                <div class="flex-1 max-w-4xl mx-auto w-full">
+                    <div class="space-y-6">
+                        {% for cat in slide.data %}
+                        <div class="flex items-center gap-4">
+                            <div class="w-48 text-right">
+                                <span class="text-white text-lg">{{ cat.category_name or cat.surtax_category }}</span>
+                            </div>
+                            <div class="flex-1 bg-white/10 rounded-full h-8 overflow-hidden">
+                                <div class="h-full rounded-full flex items-center justify-end px-4"
+                                     style="width: {{ cat.percent_of_total }}%; background-color: {{ cat.color or '#3B82F6' }};">
+                                    <span class="text-white text-sm font-bold">{{ cat.percent_of_total|round(1) }}%</span>
+                                </div>
+                            </div>
+                            <div class="w-32 text-left">
+                                <span class="text-white/60 text-sm">${{ '{:,.0f}'.format(cat.total_budget / 1000000) }}M</span>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+
+            {% elif slide.type == 'concerns' %}
+            <!-- Concerns Slide -->
+            <div class="flex flex-col w-full h-full">
+                <h2 class="text-4xl font-bold text-white mb-8 text-center">{{ slide.title }}</h2>
+                <div class="flex-1 max-w-5xl mx-auto w-full overflow-y-auto">
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        {% for concern in slide.data[:6] %}
+                        <div class="bg-white/5 border-l-4 {% if concern.severity == 'High' %}border-red-500{% else %}border-yellow-500{% endif %} rounded-r-lg p-6">
+                            <div class="flex items-center gap-2 mb-2">
+                                <span class="px-2 py-1 text-xs font-bold rounded {% if concern.severity == 'High' %}bg-red-500/20 text-red-400{% else %}bg-yellow-500/20 text-yellow-400{% endif %}">
+                                    {{ concern.severity }}
+                                </span>
+                                <span class="text-white/40 text-sm">{{ concern.type }}</span>
+                            </div>
+                            <p class="text-white font-medium text-lg">{{ concern.title[:50] }}{% if concern.title|length > 50 %}...{% endif %}</p>
+                            <p class="text-white/60 text-sm mt-1">{{ concern.detail }}</p>
+                        </div>
+                        {% endfor %}
+                    </div>
+                    {% if slide.data|length > 6 %}
+                    <p class="text-center text-white/40 mt-6">+ {{ slide.data|length - 6 }} more items</p>
+                    {% endif %}
+                </div>
+            </div>
+
+            {% elif slide.type == 'summary' %}
+            <!-- Summary Slide -->
+            <div class="flex flex-col items-center justify-center w-full h-full text-center">
+                <h2 class="text-4xl font-bold text-white mb-12">{{ slide.title }}</h2>
+
+                <div class="grid grid-cols-3 gap-12 mb-12">
+                    <div>
+                        <p class="text-6xl font-bold text-blue-400">{{ slide.data.total_projects }}</p>
+                        <p class="text-white/60 mt-2">Projects Managed</p>
+                    </div>
+                    <div>
+                        <p class="text-6xl font-bold text-green-400">{{ slide.data.on_track }}</p>
+                        <p class="text-white/60 mt-2">On Track</p>
+                    </div>
+                    <div>
+                        <p class="text-6xl font-bold {% if slide.data.concerns_count > 0 %}text-yellow-400{% else %}text-green-400{% endif %}">
+                            {{ slide.data.concerns_count }}
+                        </p>
+                        <p class="text-white/60 mt-2">Items for Review</p>
+                    </div>
+                </div>
+
+                <div class="bg-white/5 rounded-2xl p-8 max-w-2xl">
+                    <p class="text-xl text-white/80">
+                        Total program budget of <span class="text-blue-400 font-bold">${{ '{:,.0f}'.format(slide.data.total_budget / 1000000) }}M</span>
+                        with <span class="text-green-400 font-bold">{{ slide.data.percent_spent|int }}%</span> expended to date.
+                    </p>
+                </div>
+
+                <p class="text-white/40 mt-12 text-lg">Questions?</p>
+            </div>
+            {% endif %}
+
+        </div>
+        {% endfor %}
+    </div>
+
+    <!-- Navigation Controls -->
+    <div class="fixed bottom-8 left-1/2 transform -translate-x-1/2 flex items-center gap-4">
+        <a href="{{ url_for('meeting_present', slide=current_slide - 1) }}"
+           class="w-12 h-12 rounded-full bg-white/10 flex items-center justify-center hover:bg-white/20 {% if current_slide <= 1 %}opacity-30 pointer-events-none{% endif %}">
+            <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path>
+            </svg>
+        </a>
+
+        <!-- Slide Dots -->
+        <div class="flex items-center gap-2 px-4">
+            {% for slide in slides %}
+            <a href="{{ url_for('meeting_present', slide=slide.id) }}"
+               class="w-3 h-3 rounded-full {% if slide.id == current_slide %}bg-blue-500{% else %}bg-white/30 hover:bg-white/50{% endif %}"></a>
+            {% endfor %}
+        </div>
+
+        <a href="{{ url_for('meeting_present', slide=current_slide + 1) }}"
+           class="w-12 h-12 rounded-full bg-white/10 flex items-center justify-center hover:bg-white/20 {% if current_slide >= total_slides %}opacity-30 pointer-events-none{% endif %}">
+            <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
+            </svg>
+        </a>
+    </div>
+
+    <!-- Keyboard Navigation -->
+    <script>
+        document.addEventListener('keydown', function(e) {
+            const currentSlide = {{ current_slide }};
+            const totalSlides = {{ total_slides }};
+
+            if (e.key === 'ArrowRight' || e.key === ' ' || e.key === 'Enter') {
+                if (currentSlide < totalSlides) {
+                    window.location.href = '{{ url_for("meeting_present") }}?slide=' + (currentSlide + 1);
+                }
+            } else if (e.key === 'ArrowLeft') {
+                if (currentSlide > 1) {
+                    window.location.href = '{{ url_for("meeting_present") }}?slide=' + (currentSlide - 1);
+                }
+            } else if (e.key === 'Escape') {
+                window.location.href = '{{ url_for("meeting_mode") }}';
+            }
+        });
+    </script>
+</body>
+</html>

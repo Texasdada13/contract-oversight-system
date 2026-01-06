@@ -1,0 +1,257 @@
+{% extends "surtax/base.html" %}
+
+{% block content %}
+<!-- Page Header -->
+<div class="flex flex-col md:flex-row md:items-center md:justify-between mb-8">
+    <div>
+        <h1 class="text-3xl font-bold text-gray-900">Annual Report Generator</h1>
+        <p class="text-gray-500 mt-1">Generate compliance reports for the oversight committee</p>
+    </div>
+    <div class="flex gap-3 mt-4 md:mt-0">
+        <a href="{{ url_for('annual_report_print') }}" target="_blank"
+           class="px-4 py-2 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 flex items-center gap-2">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"></path>
+            </svg>
+            Print Report
+        </a>
+    </div>
+</div>
+
+<!-- Report Preview -->
+<div class="bg-white rounded-xl shadow-sm p-8">
+    <!-- Report Header -->
+    <div class="text-center border-b pb-6 mb-6">
+        <h2 class="text-2xl font-bold text-gray-900">Marion County School District</h2>
+        <h3 class="text-xl text-gray-700 mt-1">School Capital Outlay Surtax Oversight Committee</h3>
+        <p class="text-lg text-blue-600 font-semibold mt-2">Annual Report - {{ report.fiscal_year }}</p>
+        <p class="text-sm text-gray-500 mt-1">Generated: {{ report.generated_at.strftime('%B %d, %Y') }}</p>
+    </div>
+
+    <!-- Executive Summary -->
+    <div class="mb-8">
+        <h4 class="text-lg font-bold text-gray-900 mb-4 flex items-center gap-2">
+            <span class="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center text-blue-600 font-bold text-sm">1</span>
+            Executive Summary
+        </h4>
+        <div class="bg-gray-50 rounded-lg p-6">
+            <p class="text-gray-700 mb-4">
+                The School Capital Outlay Surtax Oversight Committee has reviewed the expenditure of surtax funds
+                for the reporting period. This report summarizes the status of all surtax-funded projects and
+                identifies any concerns requiring attention.
+            </p>
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mt-4">
+                <div class="text-center">
+                    <p class="text-3xl font-bold text-gray-900">{{ report.stats.total_projects }}</p>
+                    <p class="text-sm text-gray-500">Total Projects</p>
+                </div>
+                <div class="text-center">
+                    <p class="text-3xl font-bold text-gray-900">{{ report.stats.total_budget|currency }}</p>
+                    <p class="text-sm text-gray-500">Total Budget</p>
+                </div>
+                <div class="text-center">
+                    <p class="text-3xl font-bold text-gray-900">{{ report.stats.percent_spent|int }}%</p>
+                    <p class="text-sm text-gray-500">Funds Expended</p>
+                </div>
+                <div class="text-center">
+                    <p class="text-3xl font-bold {% if report.stats.on_track_projects == report.stats.active_projects %}text-green-600{% else %}text-yellow-600{% endif %}">
+                        {{ report.stats.on_track_projects }}/{{ report.stats.active_projects }}
+                    </p>
+                    <p class="text-sm text-gray-500">Projects On Track</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Compliance Checklist -->
+    <div class="mb-8">
+        <h4 class="text-lg font-bold text-gray-900 mb-4 flex items-center gap-2">
+            <span class="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center text-blue-600 font-bold text-sm">2</span>
+            Compliance Checklist
+        </h4>
+        <div class="bg-gray-50 rounded-lg p-6">
+            <p class="text-sm text-gray-600 mb-4">
+                Per Florida Statute requirements, the committee has verified the following:
+            </p>
+            <div class="space-y-3">
+                {% for item, label in [
+                    ('funds_for_listed_purposes', 'Bond proceeds used only for voter-approved purposes'),
+                    ('no_salary_expenditures', 'No funds used for teacher/administrator salaries or operating expenses'),
+                    ('public_meetings_held', 'Public meetings held as required'),
+                    ('annual_audit_completed', 'Annual independent financial audit completed'),
+                    ('performance_audit_completed', 'Annual independent performance audit completed'),
+                    ('annual_report_issued', 'Annual report issued to the public')
+                ] %}
+                <div class="flex items-center gap-3">
+                    {% if report.compliance[item] %}
+                    <span class="w-6 h-6 bg-green-100 rounded-full flex items-center justify-center">
+                        <svg class="w-4 h-4 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path>
+                        </svg>
+                    </span>
+                    <span class="text-gray-700">{{ label }}</span>
+                    {% else %}
+                    <span class="w-6 h-6 bg-yellow-100 rounded-full flex items-center justify-center">
+                        <svg class="w-4 h-4 text-yellow-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path>
+                        </svg>
+                    </span>
+                    <span class="text-gray-700">{{ label }} <span class="text-yellow-600 text-sm">(Pending)</span></span>
+                    {% endif %}
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+
+    <!-- Spending by Category -->
+    <div class="mb-8">
+        <h4 class="text-lg font-bold text-gray-900 mb-4 flex items-center gap-2">
+            <span class="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center text-blue-600 font-bold text-sm">3</span>
+            Spending by Category
+        </h4>
+        <div class="overflow-x-auto">
+            <table class="w-full text-sm">
+                <thead>
+                    <tr class="border-b">
+                        <th class="text-left py-3 px-4 font-semibold text-gray-700">Category</th>
+                        <th class="text-right py-3 px-4 font-semibold text-gray-700">Projects</th>
+                        <th class="text-right py-3 px-4 font-semibold text-gray-700">Budget</th>
+                        <th class="text-right py-3 px-4 font-semibold text-gray-700">Spent</th>
+                        <th class="text-right py-3 px-4 font-semibold text-gray-700">% of Total</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for cat in report.categories %}
+                    <tr class="border-b">
+                        <td class="py-3 px-4">
+                            <span class="flex items-center gap-2">
+                                <span class="w-3 h-3 rounded-full" style="background-color: {{ cat.color or '#3B82F6' }};"></span>
+                                {{ cat.category_name or cat.surtax_category }}
+                            </span>
+                        </td>
+                        <td class="text-right py-3 px-4">{{ cat.project_count }}</td>
+                        <td class="text-right py-3 px-4">{{ cat.total_budget|currency_full }}</td>
+                        <td class="text-right py-3 px-4">{{ cat.total_spent|currency_full }}</td>
+                        <td class="text-right py-3 px-4">{{ cat.percent_of_total|round(1) }}%</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+                <tfoot>
+                    <tr class="bg-gray-50 font-semibold">
+                        <td class="py-3 px-4">Total</td>
+                        <td class="text-right py-3 px-4">{{ report.stats.total_projects }}</td>
+                        <td class="text-right py-3 px-4">{{ report.stats.total_budget|currency_full }}</td>
+                        <td class="text-right py-3 px-4">{{ report.stats.total_spent|currency_full }}</td>
+                        <td class="text-right py-3 px-4">100%</td>
+                    </tr>
+                </tfoot>
+            </table>
+        </div>
+    </div>
+
+    <!-- Top Projects -->
+    <div class="mb-8">
+        <h4 class="text-lg font-bold text-gray-900 mb-4 flex items-center gap-2">
+            <span class="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center text-blue-600 font-bold text-sm">4</span>
+            Major Projects Status
+        </h4>
+        <div class="overflow-x-auto">
+            <table class="w-full text-sm">
+                <thead>
+                    <tr class="border-b">
+                        <th class="text-left py-3 px-4 font-semibold text-gray-700">Project</th>
+                        <th class="text-left py-3 px-4 font-semibold text-gray-700">School</th>
+                        <th class="text-right py-3 px-4 font-semibold text-gray-700">Budget</th>
+                        <th class="text-center py-3 px-4 font-semibold text-gray-700">Progress</th>
+                        <th class="text-center py-3 px-4 font-semibold text-gray-700">Status</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for project in report.top_projects %}
+                    <tr class="border-b">
+                        <td class="py-3 px-4">{{ project.title[:50] }}{% if project.title|length > 50 %}...{% endif %}</td>
+                        <td class="py-3 px-4 text-gray-500">{{ project.school_name or '-' }}</td>
+                        <td class="text-right py-3 px-4">{{ project.current_amount|currency }}</td>
+                        <td class="text-center py-3 px-4">
+                            <div class="flex items-center justify-center gap-2">
+                                <div class="w-16 bg-gray-200 rounded-full h-2">
+                                    <div class="h-2 rounded-full bg-blue-500" style="width: {{ project.percent_complete or 0 }}%;"></div>
+                                </div>
+                                <span class="text-xs text-gray-500">{{ (project.percent_complete or 0)|int }}%</span>
+                            </div>
+                        </td>
+                        <td class="text-center py-3 px-4">
+                            {% if project.is_delayed %}
+                            <span class="px-2 py-1 bg-red-100 text-red-700 rounded text-xs">Delayed</span>
+                            {% elif project.is_over_budget %}
+                            <span class="px-2 py-1 bg-orange-100 text-orange-700 rounded text-xs">Over Budget</span>
+                            {% else %}
+                            <span class="px-2 py-1 bg-green-100 text-green-700 rounded text-xs">{{ project.status }}</span>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- Concerns -->
+    {% if report.concerns %}
+    <div class="mb-8">
+        <h4 class="text-lg font-bold text-gray-900 mb-4 flex items-center gap-2">
+            <span class="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center text-blue-600 font-bold text-sm">5</span>
+            Issues Identified
+        </h4>
+        <div class="space-y-3">
+            {% for concern in report.concerns[:10] %}
+            <div class="border-l-4 {% if concern.severity == 'High' %}border-red-500 bg-red-50{% else %}border-yellow-500 bg-yellow-50{% endif %} p-4 rounded-r-lg">
+                <div class="flex items-start justify-between">
+                    <div>
+                        <span class="px-2 py-0.5 text-xs font-semibold rounded {% if concern.severity == 'High' %}bg-red-100 text-red-700{% else %}bg-yellow-100 text-yellow-700{% endif %}">
+                            {{ concern.severity }} - {{ concern.type }}
+                        </span>
+                        <p class="font-medium text-gray-900 mt-1">{{ concern.title }}</p>
+                        <p class="text-sm text-gray-600">{{ concern.detail }}</p>
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Committee Opinion -->
+    <div class="mb-8">
+        <h4 class="text-lg font-bold text-gray-900 mb-4 flex items-center gap-2">
+            <span class="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center text-blue-600 font-bold text-sm">6</span>
+            Committee Compliance Opinion
+        </h4>
+        <div class="bg-blue-50 border border-blue-200 rounded-lg p-6">
+            <p class="text-gray-700 mb-4">
+                Based on our review of the district's expenditure of School Capital Outlay Surtax funds,
+                the Citizens' Oversight Committee finds that:
+            </p>
+            <div class="bg-white rounded-lg p-4 border">
+                <p class="text-gray-700 italic">
+                    "The Marion County School District has expended surtax funds in accordance with
+                    the purposes approved by voters. All expenditures reviewed were for authorized
+                    school construction, renovation, and improvement projects as specified in the
+                    ballot measure."
+                </p>
+            </div>
+            <div class="mt-6 grid grid-cols-2 gap-8">
+                <div class="border-t-2 border-gray-300 pt-2">
+                    <p class="text-sm text-gray-500">Committee Chair Signature</p>
+                    <p class="text-sm text-gray-500 mt-4">Date: _________________</p>
+                </div>
+                <div class="border-t-2 border-gray-300 pt-2">
+                    <p class="text-sm text-gray-500">Committee Vice-Chair Signature</p>
+                    <p class="text-sm text-gray-500 mt-4">Date: _________________</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

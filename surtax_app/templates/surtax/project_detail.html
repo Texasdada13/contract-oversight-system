@@ -1,0 +1,304 @@
+{% extends "surtax/base.html" %}
+
+{% block content %}
+<!-- Back Link -->
+<a href="{{ url_for('projects') }}" class="inline-flex items-center text-sm text-gray-500 hover:text-gray-700 mb-6">
+    <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path>
+    </svg>
+    Back to Projects
+</a>
+
+<!-- Project Header -->
+<div class="bg-white rounded-xl shadow-sm p-6 mb-6 border-l-4" style="border-left-color: {{ project.color or '#3B82F6' }};">
+    <div class="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-4">
+        <div>
+            <div class="flex flex-wrap items-center gap-2 mb-2">
+                <h1 class="text-2xl font-bold text-gray-900">{{ project.title }}</h1>
+                {% if project.is_delayed %}
+                <span class="px-2 py-1 text-xs font-semibold bg-red-100 text-red-700 rounded-full">Delayed</span>
+                {% endif %}
+                {% if project.is_over_budget %}
+                <span class="px-2 py-1 text-xs font-semibold bg-orange-100 text-orange-700 rounded-full">Over Budget</span>
+                {% endif %}
+            </div>
+            <div class="flex flex-wrap items-center gap-4 text-sm text-gray-500">
+                <span class="flex items-center gap-1">
+                    <span class="w-2 h-2 rounded-full" style="background-color: {{ project.color or '#3B82F6' }};"></span>
+                    {{ project.category_name or project.surtax_category }}
+                    {% if project.surtax_subcategory %} / {{ project.surtax_subcategory }}{% endif %}
+                </span>
+                {% if project.school_name %}
+                <span>📍 {{ project.school_name }}</span>
+                {% endif %}
+                <span class="px-2 py-0.5 rounded-full text-xs font-medium
+                    {% if project.status == 'Active' %}bg-blue-100 text-blue-700
+                    {% elif project.status == 'Completed' %}bg-green-100 text-green-700
+                    {% elif project.status == 'Proposed' %}bg-gray-100 text-gray-700
+                    {% else %}bg-yellow-100 text-yellow-700{% endif %}">
+                    {{ project.status }}
+                </span>
+            </div>
+        </div>
+
+        <!-- Watch Button and Progress Circle -->
+        <div class="flex items-center gap-4">
+            <!-- Watch Button -->
+            <button id="watchBtn" onclick="toggleWatch('{{ project.contract_id }}')"
+                    class="flex items-center gap-2 px-4 py-2 rounded-lg border-2 transition-all
+                           {% if is_watched %}bg-blue-50 border-blue-500 text-blue-700{% else %}border-gray-300 text-gray-600 hover:border-blue-400{% endif %}">
+                <svg class="w-5 h-5" fill="{% if is_watched %}currentColor{% else %}none{% endif %}" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"></path>
+                </svg>
+                <span id="watchText">{% if is_watched %}Watching{% else %}Watch{% endif %}</span>
+            </button>
+
+            <div class="text-center">
+                <div class="relative w-20 h-20">
+                    <svg class="w-20 h-20 transform -rotate-90">
+                        <circle cx="40" cy="40" r="35" stroke="#E5E7EB" stroke-width="6" fill="none"/>
+                        <circle cx="40" cy="40" r="35"
+                                stroke="{% if project.percent_complete >= 75 %}#10B981{% elif project.percent_complete >= 50 %}#3B82F6{% else %}#F59E0B{% endif %}"
+                                stroke-width="6" fill="none"
+                                stroke-dasharray="{{ project.percent_complete * 2.2 }} 220"
+                                stroke-linecap="round"/>
+                    </svg>
+                    <span class="absolute inset-0 flex items-center justify-center text-lg font-bold text-gray-900">
+                        {{ project.percent_complete|int }}%
+                    </span>
+                </div>
+                <p class="text-xs text-gray-500 mt-1">Complete</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Stats Grid -->
+<div class="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+    <!-- Original Budget -->
+    <div class="bg-white rounded-xl shadow-sm p-4">
+        <p class="text-xs text-gray-500 uppercase tracking-wider">Original Budget</p>
+        <p class="text-xl font-bold text-gray-900 mt-1">{{ project.original_amount|currency_full }}</p>
+    </div>
+
+    <!-- Current Budget -->
+    <div class="bg-white rounded-xl shadow-sm p-4 {% if project.is_over_budget %}border-l-4 border-orange-500{% endif %}">
+        <p class="text-xs text-gray-500 uppercase tracking-wider">Current Budget</p>
+        <p class="text-xl font-bold {% if project.is_over_budget %}text-orange-600{% else %}text-gray-900{% endif %} mt-1">
+            {{ project.current_amount|currency_full }}
+        </p>
+        {% if project.is_over_budget %}
+        <p class="text-xs text-orange-600 mt-1">+{{ project.budget_variance_pct|percentage }} over</p>
+        {% endif %}
+    </div>
+
+    <!-- Spent -->
+    <div class="bg-white rounded-xl shadow-sm p-4">
+        <p class="text-xs text-gray-500 uppercase tracking-wider">Spent to Date</p>
+        <p class="text-xl font-bold text-gray-900 mt-1">{{ project.total_paid|currency_full }}</p>
+        {% if project.current_amount > 0 %}
+        <p class="text-xs text-gray-500 mt-1">{{ (project.total_paid / project.current_amount * 100)|percentage }} of budget</p>
+        {% endif %}
+    </div>
+
+    <!-- Remaining -->
+    <div class="bg-white rounded-xl shadow-sm p-4">
+        <p class="text-xs text-gray-500 uppercase tracking-wider">Remaining</p>
+        <p class="text-xl font-bold text-gray-900 mt-1">{{ project.remaining_balance|currency_full }}</p>
+    </div>
+</div>
+
+<!-- Two Column Layout -->
+<div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+    <!-- Left Column (2/3) -->
+    <div class="lg:col-span-2 space-y-6">
+        <!-- Schedule -->
+        <div class="bg-white rounded-xl shadow-sm p-6">
+            <h2 class="text-lg font-bold text-gray-900 mb-4">Schedule</h2>
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <div>
+                    <p class="text-xs text-gray-500">Start Date</p>
+                    <p class="font-medium text-gray-900">{{ project.start_date|date_format }}</p>
+                </div>
+                <div>
+                    <p class="text-xs text-gray-500">Original End</p>
+                    <p class="font-medium text-gray-900">{{ project.original_end_date|date_format }}</p>
+                </div>
+                <div>
+                    <p class="text-xs text-gray-500">Current End</p>
+                    <p class="font-medium {% if project.is_delayed %}text-red-600{% else %}text-gray-900{% endif %}">
+                        {{ project.current_end_date|date_format }}
+                    </p>
+                </div>
+                {% if project.is_delayed %}
+                <div>
+                    <p class="text-xs text-gray-500">Delay</p>
+                    <p class="font-medium text-red-600">{{ project.delay_days }} days</p>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- Change Orders -->
+        <div class="bg-white rounded-xl shadow-sm">
+            <div class="px-6 py-4 border-b border-gray-100 flex justify-between items-center">
+                <h2 class="text-lg font-bold text-gray-900">Change Orders ({{ project.change_orders|length }})</h2>
+                {% if project.total_change_order_amount > 0 %}
+                <span class="text-sm font-medium text-orange-600">Total: {{ project.total_change_order_amount|currency_full }}</span>
+                {% endif %}
+            </div>
+            <div class="p-4">
+                {% if project.change_orders %}
+                <div class="space-y-3">
+                    {% for co in project.change_orders %}
+                    <div class="flex items-start justify-between p-3 bg-gray-50 rounded-lg">
+                        <div>
+                            <p class="font-medium text-gray-900">{{ co.description or 'Change Order #' ~ loop.index }}</p>
+                            <p class="text-sm text-gray-500">{{ co.reason or 'No reason specified' }}</p>
+                            <p class="text-xs text-gray-400 mt-1">{{ co.approved_date|date_format }}</p>
+                        </div>
+                        <div class="text-right">
+                            <p class="font-bold {% if co.amount > 0 %}text-red-600{% else %}text-green-600{% endif %}">
+                                {% if co.amount > 0 %}+{% endif %}{{ co.amount|currency_full }}
+                            </p>
+                            <span class="text-xs px-2 py-0.5 rounded-full
+                                {% if co.status == 'Approved' %}bg-green-100 text-green-700
+                                {% elif co.status == 'Pending' %}bg-yellow-100 text-yellow-700
+                                {% else %}bg-gray-100 text-gray-700{% endif %}">
+                                {{ co.status }}
+                            </span>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+                {% else %}
+                <p class="text-sm text-gray-500 text-center py-4">No change orders</p>
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- Milestones -->
+        {% if project.milestones %}
+        <div class="bg-white rounded-xl shadow-sm">
+            <div class="px-6 py-4 border-b border-gray-100">
+                <h2 class="text-lg font-bold text-gray-900">Timeline & Milestones</h2>
+            </div>
+            <div class="p-4">
+                <div class="space-y-4">
+                    {% for milestone in project.milestones %}
+                    <div class="flex items-start gap-4">
+                        <div class="flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center
+                            {% if milestone.status == 'Completed' %}bg-green-100 text-green-600
+                            {% elif milestone.status == 'In Progress' %}bg-blue-100 text-blue-600
+                            {% else %}bg-gray-100 text-gray-400{% endif %}">
+                            {% if milestone.status == 'Completed' %}
+                            <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                                <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/>
+                            </svg>
+                            {% else %}
+                            <span class="w-2 h-2 rounded-full bg-current"></span>
+                            {% endif %}
+                        </div>
+                        <div class="flex-1">
+                            <div class="flex justify-between items-start">
+                                <div>
+                                    <p class="font-medium text-gray-900">{{ milestone.title }}</p>
+                                    <p class="text-sm text-gray-500">{{ milestone.due_date|date_format }}</p>
+                                </div>
+                                <span class="text-xs px-2 py-0.5 rounded-full
+                                    {% if milestone.status == 'Completed' %}bg-green-100 text-green-700
+                                    {% elif milestone.status == 'In Progress' %}bg-blue-100 text-blue-700
+                                    {% elif milestone.status == 'Delayed' %}bg-red-100 text-red-700
+                                    {% else %}bg-gray-100 text-gray-600{% endif %}">
+                                    {{ milestone.status }}
+                                </span>
+                            </div>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+        {% endif %}
+    </div>
+
+    <!-- Right Column (1/3) -->
+    <div class="space-y-6">
+        <!-- Vendor Info -->
+        {% if project.vendor_name %}
+        <div class="bg-white rounded-xl shadow-sm p-6">
+            <h2 class="text-lg font-bold text-gray-900 mb-4">Contractor</h2>
+            <p class="font-medium text-gray-900">{{ project.vendor_name }}</p>
+            {% if project.vendor_id %}
+            <p class="text-sm text-gray-500 mt-1">ID: {{ project.vendor_id }}</p>
+            {% endif %}
+        </div>
+        {% endif %}
+
+        <!-- Documents -->
+        <div class="bg-white rounded-xl shadow-sm">
+            <div class="px-6 py-4 border-b border-gray-100">
+                <h2 class="text-lg font-bold text-gray-900">Documents</h2>
+            </div>
+            <div class="p-4">
+                {% if project.documents %}
+                <div class="space-y-2">
+                    {% for doc in project.documents %}
+                    <a href="#" class="flex items-center gap-3 p-2 rounded-lg hover:bg-gray-50">
+                        <div class="w-8 h-8 bg-blue-100 rounded flex items-center justify-center">
+                            <svg class="w-4 h-4 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z"></path>
+                            </svg>
+                        </div>
+                        <div class="flex-1 min-w-0">
+                            <p class="text-sm font-medium text-gray-900 truncate">{{ doc.filename }}</p>
+                            <p class="text-xs text-gray-500">{{ doc.document_type or 'Document' }}</p>
+                        </div>
+                    </a>
+                    {% endfor %}
+                </div>
+                {% else %}
+                <p class="text-sm text-gray-500 text-center py-4">No documents uploaded</p>
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- Ask About This Project -->
+        <div class="bg-gradient-to-br from-blue-600 to-blue-700 rounded-xl shadow-sm p-6 text-white">
+            <h2 class="font-bold mb-2">Questions about this project?</h2>
+            <p class="text-sm text-blue-100 mb-4">Ask the AI assistant for more details.</p>
+            <a href="{{ url_for('ask') }}?q=Tell me about {{ project.title[:30] }}"
+               class="block w-full py-2 bg-white text-blue-600 rounded-lg font-medium text-center text-sm hover:bg-blue-50">
+                Ask a Question →
+            </a>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function toggleWatch(contractId) {
+    fetch(`/api/watchlist/toggle/${contractId}`, { method: 'POST' })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                const btn = document.getElementById('watchBtn');
+                const text = document.getElementById('watchText');
+                if (data.is_watched) {
+                    btn.classList.remove('border-gray-300', 'text-gray-600');
+                    btn.classList.add('bg-blue-50', 'border-blue-500', 'text-blue-700');
+                    btn.querySelector('svg').setAttribute('fill', 'currentColor');
+                    text.textContent = 'Watching';
+                } else {
+                    btn.classList.add('border-gray-300', 'text-gray-600');
+                    btn.classList.remove('bg-blue-50', 'border-blue-500', 'text-blue-700');
+                    btn.querySelector('svg').setAttribute('fill', 'none');
+                    text.textContent = 'Watch';
+                }
+            }
+        });
+}
+</script>
+{% endblock %}

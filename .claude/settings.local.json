@@ -32,7 +32,27 @@
       "Bash(gh issue close:*)",
       "Bash(sqlite3:*)",
       "Bash(dir:*)",
-      "Bash(cd:*)"
+      "Bash(cd:*)",
+      "Bash(start http://127.0.0.1:5847)",
+      "Bash(start http://127.0.0.1:5847/concerns)",
+      "Bash(start http://127.0.0.1:5847/projects)",
+      "Bash(start http://127.0.0.1:5847/meeting)",
+      "Bash(start http://127.0.0.1:5847/report)",
+      "Bash(start http://127.0.0.1:5847/watchlist)",
+      "Bash(start http://127.0.0.1:5847/compliance)",
+      "Bash(cat:*)",
+      "Bash(netstat:*)",
+      "Bash(findstr:*)",
+      "Bash(tasklist:*)",
+      "Bash(taskkill:*)",
+      "Bash(for path in / /projects /schools /ask /concerns /watchlist /risk /audit /vendors /change-orders /analytics /budget-performance /documents /minutes /report /meeting /compliance /map /public /alerts)",
+      "Bash(do echo -n \"$path: \":*)",
+      "Bash(done)",
+      "Bash(start http://127.0.0.1:5847/budget-performance)",
+      "Bash(start http://127.0.0.1:5847/vendor-profile)",
+      "Bash(ping:*)",
+      "Bash(start http://127.0.0.1:5847/county-comparison)",
+      "Bash(gh repo list:*)"
     ]
   }
 }

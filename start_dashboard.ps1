@@ -1,11 +1,14 @@
 # Contract Oversight System - Startup Script
-# Run this script to start the web dashboard
+# Run this script to start both web dashboards:
+#   - Main Dashboard (port 5002)
+#   - Surtax Oversight Dashboard (port 5847)
 
 $ErrorActionPreference = "Stop"
 
-Write-Host "================================" -ForegroundColor Cyan
+Write-Host "========================================" -ForegroundColor Cyan
 Write-Host "Contract Oversight System" -ForegroundColor Cyan
-Write-Host "================================" -ForegroundColor Cyan
+Write-Host "========================================" -ForegroundColor Cyan
+Write-Host "Starting both dashboards..." -ForegroundColor Cyan
 Write-Host ""
 
 # Get script directory
@@ -15,7 +18,8 @@ if (-not $scriptDir) {
 }
 
 # Configuration
-$Port = 5002
+$MainPort = 5002
+$SurtaxPort = 5847
 $AutoOpenBrowser = $true
 
 # Check for virtual environment
@@ -76,78 +80,79 @@ if ($missingPackages.Count -gt 0) {
     Write-Host "Dependencies installed successfully!" -ForegroundColor Green
 }
 
-# Check if port is in use
+# Check if ports are in use
 Write-Host ""
-Write-Host "Checking port $Port availability..." -ForegroundColor Yellow
+Write-Host "Checking port availability..." -ForegroundColor Yellow
 
-$portInUse = $false
-try {
-    $connections = Get-NetTCPConnection -LocalPort $Port -ErrorAction SilentlyContinue
-    if ($connections) {
-        $portInUse = $true
-    }
-} catch {
-    # Port check failed, assume available
-}
-
-if ($portInUse) {
-    Write-Host "WARNING: Port $Port is already in use!" -ForegroundColor Red
-    Write-Host ""
-
-    # Try to find an alternative port
-    $alternativePorts = @(5003, 5004, 5005, 5006, 8080, 8081)
-    $foundPort = $false
-
-    foreach ($altPort in $alternativePorts) {
-        try {
-            $altConnections = Get-NetTCPConnection -LocalPort $altPort -ErrorAction SilentlyContinue
-            if (-not $altConnections) {
-                $Port = $altPort
-                $foundPort = $true
-                Write-Host "Using alternative port: $Port" -ForegroundColor Yellow
-                break
-            }
-        } catch {
-            $Port = $altPort
-            $foundPort = $true
-            Write-Host "Using alternative port: $Port" -ForegroundColor Yellow
-            break
-        }
-    }
-
-    if (-not $foundPort) {
-        Write-Host "ERROR: Could not find an available port" -ForegroundColor Red
-        Write-Host "Please close the application using port $Port and try again" -ForegroundColor Yellow
-        exit 1
+function Test-PortAvailable {
+    param($port)
+    try {
+        $connections = Get-NetTCPConnection -LocalPort $port -ErrorAction SilentlyContinue
+        return -not $connections
+    } catch {
+        return $true
     }
 }
 
-Write-Host "Port $Port is available" -ForegroundColor Green
+if (Test-PortAvailable $MainPort) {
+    Write-Host "  Main Dashboard port $MainPort is available" -ForegroundColor Green
+} else {
+    Write-Host "  WARNING: Port $MainPort is in use, Main Dashboard may not start" -ForegroundColor Yellow
+}
+
+if (Test-PortAvailable $SurtaxPort) {
+    Write-Host "  Surtax Dashboard port $SurtaxPort is available" -ForegroundColor Green
+} else {
+    Write-Host "  WARNING: Port $SurtaxPort is in use, Surtax Dashboard may not start" -ForegroundColor Yellow
+}
 
 # Set PYTHONPATH
 $env:PYTHONPATH = $scriptDir
 
-# Change to web directory
+Write-Host ""
+Write-Host "========================================" -ForegroundColor Green
+Write-Host "Starting Both Dashboards..." -ForegroundColor Green
+Write-Host "========================================" -ForegroundColor Green
+Write-Host ""
+Write-Host "1. Main Contract Dashboard: http://localhost:$MainPort" -ForegroundColor Cyan
+Write-Host "2. Surtax Oversight Dashboard: http://localhost:$SurtaxPort" -ForegroundColor Cyan
+Write-Host ""
+Write-Host "Press Ctrl+C to stop the servers" -ForegroundColor Yellow
+Write-Host ""
+
+# Start Surtax Dashboard in background
+$surtaxDir = Join-Path $scriptDir "surtax_app"
+Write-Host "Starting Surtax Oversight Dashboard (port $SurtaxPort)..." -ForegroundColor Gray
+$surtaxJob = Start-Job -ScriptBlock {
+    param($dir, $port, $pythonPath)
+    $env:PYTHONPATH = $pythonPath
+    Set-Location $dir
+    python -c "from app import app; app.run(debug=False, host='127.0.0.1', port=$port)"
+} -ArgumentList $surtaxDir, $SurtaxPort, $scriptDir
+
+# Auto-open browsers after a short delay
+if ($AutoOpenBrowser) {
+    $browserJob = Start-Job -ScriptBlock {
+        param($mainPort, $surtaxPort)
+        Start-Sleep -Seconds 3
+        Start-Process "http://localhost:$mainPort"
+        Start-Sleep -Seconds 1
+        Start-Process "http://localhost:$surtaxPort"
+    } -ArgumentList $MainPort, $SurtaxPort
+    Write-Host "Browsers will open automatically..." -ForegroundColor Gray
+}
+
+# Change to web directory for main dashboard
 $webDir = Join-Path $scriptDir "web"
 Set-Location $webDir
 
-Write-Host ""
-Write-Host "Starting Contract Oversight Dashboard..." -ForegroundColor Green
-Write-Host "Dashboard will be available at: http://localhost:$Port" -ForegroundColor Cyan
-Write-Host ""
-Write-Host "Press Ctrl+C to stop the server" -ForegroundColor Yellow
+Write-Host "Starting Main Contract Dashboard (port $MainPort)..." -ForegroundColor Gray
 Write-Host ""
 
-# Auto-open browser after a short delay
-if ($AutoOpenBrowser) {
-    $job = Start-Job -ScriptBlock {
-        param($port)
-        Start-Sleep -Seconds 2
-        Start-Process "http://localhost:$port"
-    } -ArgumentList $Port
-    Write-Host "Browser will open automatically..." -ForegroundColor Gray
-}
+# Run the main Flask app (foreground)
+$env:FLASK_RUN_PORT = $MainPort
+python -c "from app import app; app.run(debug=True, host='127.0.0.1', port=$MainPort)"
 
-# Run the Flask app with the selected port
-$env:FLASK_RUN_PORT = $Port
-python -c "from app import app; app.run(debug=True, host='127.0.0.1', port=$Port)"
+# Cleanup background job when main app exits
+Stop-Job $surtaxJob -ErrorAction SilentlyContinue
+Remove-Job $surtaxJob -ErrorAction SilentlyContinue

@@ -1,0 +1,194 @@
+{% extends "surtax/base.html" %}
+
+{% block content %}
+<!-- Page Header -->
+<div class="flex flex-col md:flex-row md:items-center md:justify-between mb-6">
+    <div>
+        <h1 class="text-3xl font-bold text-gray-900">Projects</h1>
+        <p class="text-gray-500 mt-1">{{ projects|length }} surtax-funded projects</p>
+    </div>
+</div>
+
+<!-- Filters -->
+<div class="bg-white rounded-xl shadow-sm p-4 mb-6">
+    <form method="get" id="filterForm">
+        <!-- Search Bar -->
+        <div class="mb-4">
+            <div class="relative">
+                <input type="text" name="search" value="{{ filters.search or '' }}" placeholder="Search projects, vendors, descriptions..."
+                       class="w-full px-4 py-3 pl-10 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500">
+                <svg class="w-5 h-5 text-gray-400 absolute left-3 top-1/2 transform -translate-y-1/2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
+                </svg>
+            </div>
+        </div>
+
+        <div class="flex flex-wrap gap-4 items-end">
+            <!-- Category -->
+            <div class="flex-1 min-w-[150px]">
+                <label class="block text-xs font-medium text-gray-700 mb-1">Category</label>
+                <select name="category" id="categorySelect" onchange="this.form.submit()" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500">
+                    <option value="">All Categories</option>
+                    {% for cat in category_options %}
+                    <option value="{{ cat.category_id }}" {% if filters.category == cat.category_id %}selected{% endif %}>{{ cat.category_name }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <!-- Subcategory -->
+            {% if subcategory_options %}
+            <div class="flex-1 min-w-[150px]">
+                <label class="block text-xs font-medium text-gray-700 mb-1">Type</label>
+                <select name="subcategory" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500">
+                    <option value="">All Types</option>
+                    {% for subcat in subcategory_options %}
+                    <option value="{{ subcat }}" {% if filters.subcategory == subcat %}selected{% endif %}>{{ subcat }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            {% endif %}
+
+            <!-- Status -->
+            <div class="flex-1 min-w-[150px]">
+                <label class="block text-xs font-medium text-gray-700 mb-1">Status</label>
+                <select name="status" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500">
+                    <option value="">All Statuses</option>
+                    {% for status in status_options %}
+                    <option value="{{ status }}" {% if filters.status == status %}selected{% endif %}>{{ status }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <!-- School -->
+            <div class="flex-1 min-w-[200px]">
+                <label class="block text-xs font-medium text-gray-700 mb-1">School</label>
+                <select name="school" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500">
+                    <option value="">All Schools</option>
+                    {% for school in school_options %}
+                    <option value="{{ school }}" {% if filters.school == school %}selected{% endif %}>{{ school }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <!-- Flags -->
+            <div class="flex items-center gap-4">
+                <label class="flex items-center gap-2 text-sm cursor-pointer">
+                    <input type="checkbox" name="delayed" value="1" {% if filters.delayed %}checked{% endif %}
+                           class="w-4 h-4 text-red-600 rounded focus:ring-red-500">
+                    <span class="text-gray-700 flex items-center gap-1">
+                        <span class="w-2 h-2 bg-red-500 rounded-full"></span>
+                        Delayed
+                    </span>
+                </label>
+                <label class="flex items-center gap-2 text-sm cursor-pointer">
+                    <input type="checkbox" name="over_budget" value="1" {% if filters.over_budget %}checked{% endif %}
+                           class="w-4 h-4 text-orange-600 rounded focus:ring-orange-500">
+                    <span class="text-gray-700 flex items-center gap-1">
+                        <span class="w-2 h-2 bg-orange-500 rounded-full"></span>
+                        Over Budget
+                    </span>
+                </label>
+            </div>
+
+            <!-- Buttons -->
+            <div class="flex gap-2">
+                <button type="submit" class="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700">
+                    Filter
+                </button>
+                <a href="{{ url_for('projects') }}" class="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg text-sm font-medium hover:bg-gray-200">
+                    Clear
+                </a>
+            </div>
+        </div>
+    </form>
+</div>
+
+<!-- Active Filters Display -->
+{% set active_filters = [] %}
+{% if filters.search %}{% set _ = active_filters.append(('Search: ' ~ filters.search, 'search')) %}{% endif %}
+{% if filters.category %}{% set _ = active_filters.append((filters.category, 'category')) %}{% endif %}
+{% if filters.subcategory %}{% set _ = active_filters.append((filters.subcategory, 'subcategory')) %}{% endif %}
+{% if filters.status %}{% set _ = active_filters.append((filters.status, 'status')) %}{% endif %}
+{% if filters.school %}{% set _ = active_filters.append((filters.school, 'school')) %}{% endif %}
+{% if filters.delayed %}{% set _ = active_filters.append(('Delayed', 'delayed')) %}{% endif %}
+{% if filters.over_budget %}{% set _ = active_filters.append(('Over Budget', 'over_budget')) %}{% endif %}
+
+{% if active_filters %}
+<div class="flex flex-wrap gap-2 mb-4">
+    <span class="text-sm text-gray-500">Active filters:</span>
+    {% for label, param in active_filters %}
+    <span class="inline-flex items-center gap-1 px-3 py-1 bg-blue-100 text-blue-700 rounded-full text-sm">
+        {{ label }}
+    </span>
+    {% endfor %}
+</div>
+{% endif %}
+
+<!-- Project List -->
+<div class="space-y-4">
+    {% for project in projects %}
+    <a href="{{ url_for('project_detail', contract_id=project.contract_id) }}"
+       class="block bg-white rounded-xl shadow-sm p-5 hover:shadow-md transition-shadow border-l-4"
+       style="border-left-color: {{ project.color or '#3B82F6' }};">
+        <div class="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
+            <!-- Project Info -->
+            <div class="flex-1 min-w-0">
+                <div class="flex items-center gap-2 mb-1">
+                    <h3 class="text-lg font-semibold text-gray-900 truncate">{{ project.title }}</h3>
+                    {% if project.is_delayed %}
+                    <span class="px-2 py-0.5 text-xs font-semibold bg-red-100 text-red-700 rounded-full">Delayed</span>
+                    {% endif %}
+                    {% if project.is_over_budget %}
+                    <span class="px-2 py-0.5 text-xs font-semibold bg-orange-100 text-orange-700 rounded-full">Over Budget</span>
+                    {% endif %}
+                </div>
+                <div class="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-gray-500">
+                    <span class="flex items-center gap-1">
+                        <span class="w-2 h-2 rounded-full" style="background-color: {{ project.color or '#3B82F6' }};"></span>
+                        {{ project.category_name or project.surtax_category }}
+                    </span>
+                    {% if project.school_name %}
+                    <span>{{ project.school_name }}</span>
+                    {% endif %}
+                    <span>{{ project.status }}</span>
+                </div>
+            </div>
+
+            <!-- Budget & Progress -->
+            <div class="flex items-center gap-6">
+                <!-- Budget -->
+                <div class="text-right">
+                    <p class="text-lg font-bold text-gray-900">{{ project.current_amount|currency }}</p>
+                    <p class="text-xs text-gray-500">{{ project.total_paid|currency }} spent</p>
+                </div>
+
+                <!-- Progress -->
+                <div class="w-24">
+                    <div class="flex justify-between text-xs text-gray-500 mb-1">
+                        <span>Progress</span>
+                        <span>{{ project.percent_complete|int }}%</span>
+                    </div>
+                    <div class="w-full bg-gray-200 rounded-full h-2">
+                        <div class="h-2 rounded-full {% if project.percent_complete >= 75 %}bg-green-500{% elif project.percent_complete >= 50 %}bg-blue-500{% elif project.percent_complete >= 25 %}bg-yellow-500{% else %}bg-gray-400{% endif %}"
+                             style="width: {{ project.percent_complete }}%;"></div>
+                    </div>
+                </div>
+
+                <!-- Arrow -->
+                <svg class="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
+                </svg>
+            </div>
+        </div>
+    </a>
+    {% else %}
+    <div class="bg-white rounded-xl shadow-sm p-12 text-center">
+        <svg class="w-16 h-16 mx-auto text-gray-300 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"></path>
+        </svg>
+        <p class="text-gray-500">No projects match your filters</p>
+        <a href="{{ url_for('projects') }}" class="text-blue-600 hover:underline text-sm mt-2 inline-block">Clear filters</a>
+    </div>
+    {% endfor %}
+</div>
+{% endblock %}

@@ -1,0 +1,85 @@
+{% extends "surtax/base.html" %}
+
+{% block content %}
+<div class="space-y-6">
+    <!-- Header -->
+    <div class="flex justify-between items-center">
+        <div>
+            <h2 class="text-2xl font-bold text-gray-900">Map View</h2>
+            <p class="text-gray-500">Geographic visualization of surtax-funded projects</p>
+        </div>
+    </div>
+
+    <!-- Map Placeholder -->
+    <div class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+        <div class="h-96 bg-gradient-to-br from-blue-50 to-green-50 flex items-center justify-center relative">
+            <!-- Placeholder map graphic -->
+            <div class="absolute inset-0 opacity-20">
+                <svg viewBox="0 0 400 300" class="w-full h-full">
+                    <path d="M50,150 Q100,50 200,100 T350,150" stroke="#3b82f6" fill="none" stroke-width="2"/>
+                    <path d="M80,200 Q150,120 250,180 T380,200" stroke="#10b981" fill="none" stroke-width="2"/>
+                    <circle cx="120" cy="140" r="8" fill="#ef4444"/>
+                    <circle cx="200" cy="100" r="10" fill="#3b82f6"/>
+                    <circle cx="280" cy="160" r="6" fill="#f59e0b"/>
+                    <circle cx="160" cy="200" r="7" fill="#10b981"/>
+                    <circle cx="320" cy="120" r="9" fill="#8b5cf6"/>
+                </svg>
+            </div>
+            <div class="text-center z-10">
+                <div class="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                    <svg class="w-8 h-8 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7"></path>
+                    </svg>
+                </div>
+                <h3 class="text-lg font-medium text-gray-900 mb-2">Interactive Map Coming Soon</h3>
+                <p class="text-gray-500 max-w-md">
+                    View all project locations across Marion County schools
+                </p>
+            </div>
+        </div>
+    </div>
+
+    <!-- School List -->
+    <div class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+        <div class="px-6 py-4 border-b border-gray-200">
+            <h3 class="text-lg font-semibold text-gray-900">Schools with Projects</h3>
+        </div>
+        <div class="overflow-x-auto">
+            <table class="w-full">
+                <thead class="bg-gray-50">
+                    <tr>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">School</th>
+                        <th class="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">Projects</th>
+                        <th class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Total Value</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-gray-200">
+                    {% for school in schools %}
+                    <tr class="hover:bg-gray-50">
+                        <td class="px-6 py-4">
+                            <div class="flex items-center">
+                                <div class="w-8 h-8 bg-blue-100 rounded-lg flex items-center justify-center mr-3">
+                                    <svg class="w-4 h-4 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"></path>
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"></path>
+                                    </svg>
+                                </div>
+                                <span class="font-medium text-gray-900">{{ school.school_name }}</span>
+                            </div>
+                        </td>
+                        <td class="px-6 py-4 text-center">
+                            <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                                {{ school.project_count }}
+                            </span>
+                        </td>
+                        <td class="px-6 py-4 text-right font-medium text-gray-900">
+                            ${{ '{:,.0f}'.format(school.total_value or 0) }}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}

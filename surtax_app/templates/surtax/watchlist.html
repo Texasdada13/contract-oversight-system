@@ -1,0 +1,221 @@
+{% extends "surtax/base.html" %}
+
+{% block content %}
+<!-- Page Header -->
+<div class="flex flex-col md:flex-row md:items-center md:justify-between mb-8">
+    <div>
+        <h1 class="text-3xl font-bold text-gray-900">My Watchlist</h1>
+        <p class="text-gray-500 mt-1">Track projects you're monitoring closely</p>
+    </div>
+    <div class="flex gap-3 mt-4 md:mt-0">
+        {% if projects %}
+        <button onclick="clearWatchlist()"
+                class="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg font-medium hover:bg-gray-200 flex items-center gap-2">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
+            </svg>
+            Clear All
+        </button>
+        {% endif %}
+        <a href="{{ url_for('projects') }}"
+           class="px-4 py-2 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 flex items-center gap-2">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path>
+            </svg>
+            Add Projects
+        </a>
+    </div>
+</div>
+
+{% if projects %}
+<!-- Watchlist Stats -->
+<div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+    <div class="bg-white rounded-xl shadow-sm p-5 text-center">
+        <p class="text-3xl font-bold text-blue-600">{{ projects|length }}</p>
+        <p class="text-sm text-gray-500">Tracked Projects</p>
+    </div>
+    <div class="bg-white rounded-xl shadow-sm p-5 text-center">
+        {% set total_budget = projects|sum(attribute='current_amount') %}
+        <p class="text-3xl font-bold text-gray-900">{{ total_budget|currency }}</p>
+        <p class="text-sm text-gray-500">Total Value</p>
+    </div>
+    <div class="bg-white rounded-xl shadow-sm p-5 text-center">
+        {% set delayed = projects|selectattr('is_delayed')|list|length %}
+        <p class="text-3xl font-bold {% if delayed > 0 %}text-red-600{% else %}text-green-600{% endif %}">{{ delayed }}</p>
+        <p class="text-sm text-gray-500">Delayed</p>
+    </div>
+    <div class="bg-white rounded-xl shadow-sm p-5 text-center">
+        {% set over_budget = projects|selectattr('is_over_budget')|list|length %}
+        <p class="text-3xl font-bold {% if over_budget > 0 %}text-orange-600{% else %}text-green-600{% endif %}">{{ over_budget }}</p>
+        <p class="text-sm text-gray-500">Over Budget</p>
+    </div>
+</div>
+
+<!-- Concerns for Watched Projects -->
+{% if concerns %}
+<div class="bg-red-50 border border-red-200 rounded-xl p-6 mb-8">
+    <h2 class="text-lg font-bold text-red-800 mb-4 flex items-center gap-2">
+        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path>
+        </svg>
+        Active Concerns on Watched Projects
+    </h2>
+    <div class="space-y-3">
+        {% for concern in concerns %}
+        <div class="bg-white rounded-lg p-4 flex items-start gap-3">
+            <span class="px-2 py-1 text-xs font-semibold rounded {% if concern.severity == 'High' %}bg-red-100 text-red-700{% else %}bg-yellow-100 text-yellow-700{% endif %}">
+                {{ concern.severity }}
+            </span>
+            <div class="flex-1">
+                <p class="font-medium text-gray-900">{{ concern.title }}</p>
+                <p class="text-sm text-gray-600">{{ concern.detail }}</p>
+            </div>
+            <a href="{{ url_for('project_detail', contract_id=concern.contract_id) }}"
+               class="text-blue-600 hover:text-blue-700 text-sm font-medium">
+                View
+            </a>
+        </div>
+        {% endfor %}
+    </div>
+</div>
+{% endif %}
+
+<!-- Watched Projects List -->
+<div class="bg-white rounded-xl shadow-sm overflow-hidden">
+    <div class="px-6 py-4 border-b bg-gray-50">
+        <h2 class="font-bold text-gray-900">Tracked Projects</h2>
+    </div>
+    <div class="divide-y">
+        {% for project in projects %}
+        <div class="p-6 hover:bg-gray-50 transition-colors">
+            <div class="flex items-start justify-between gap-4">
+                <div class="flex-1 min-w-0">
+                    <div class="flex items-center gap-2 mb-1">
+                        {% if project.is_delayed %}
+                        <span class="px-2 py-0.5 bg-red-100 text-red-700 text-xs font-medium rounded">Delayed</span>
+                        {% endif %}
+                        {% if project.is_over_budget %}
+                        <span class="px-2 py-0.5 bg-orange-100 text-orange-700 text-xs font-medium rounded">Over Budget</span>
+                        {% endif %}
+                        {% if project.category_name %}
+                        <span class="px-2 py-0.5 text-xs font-medium rounded" style="background-color: {{ project.color }}20; color: {{ project.color }};">
+                            {{ project.category_name }}
+                        </span>
+                        {% endif %}
+                    </div>
+                    <a href="{{ url_for('project_detail', contract_id=project.contract_id) }}"
+                       class="text-lg font-semibold text-gray-900 hover:text-blue-600 block truncate">
+                        {{ project.title }}
+                    </a>
+                    <p class="text-sm text-gray-500 mt-1">
+                        {% if project.school_name %}{{ project.school_name }} &middot; {% endif %}
+                        {{ project.vendor_name or 'No vendor assigned' }}
+                    </p>
+                </div>
+                <div class="text-right flex-shrink-0">
+                    <p class="text-lg font-bold text-gray-900">{{ project.current_amount|currency }}</p>
+                    <div class="flex items-center gap-2 mt-1">
+                        <div class="w-20 bg-gray-200 rounded-full h-2">
+                            <div class="h-2 rounded-full bg-blue-500" style="width: {{ project.percent_complete or 0 }}%;"></div>
+                        </div>
+                        <span class="text-xs text-gray-500">{{ (project.percent_complete or 0)|int }}%</span>
+                    </div>
+                </div>
+                <button onclick="removeFromWatchlist('{{ project.contract_id }}')"
+                        class="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                        title="Remove from watchlist">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                    </svg>
+                </button>
+            </div>
+
+            <!-- Project quick stats -->
+            <div class="mt-4 flex flex-wrap gap-4 text-sm">
+                <div class="flex items-center gap-1 text-gray-500">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                    </svg>
+                    Status: <span class="font-medium text-gray-700">{{ project.status or 'Active' }}</span>
+                </div>
+                {% if project.delay_days %}
+                <div class="flex items-center gap-1 text-red-600">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                    </svg>
+                    {{ project.delay_days }} days behind
+                </div>
+                {% endif %}
+                {% if project.budget_variance_pct and project.budget_variance_pct > 0 %}
+                <div class="flex items-center gap-1 text-orange-600">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"></path>
+                    </svg>
+                    +{{ project.budget_variance_pct|round(1) }}% over budget
+                </div>
+                {% endif %}
+                {% if project.change_order_count %}
+                <div class="flex items-center gap-1 text-gray-500">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"></path>
+                    </svg>
+                    {{ project.change_order_count }} change order{{ 's' if project.change_order_count != 1 else '' }}
+                </div>
+                {% endif %}
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+</div>
+
+{% else %}
+<!-- Empty State -->
+<div class="bg-white rounded-xl shadow-sm p-12 text-center">
+    <div class="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
+        <svg class="w-8 h-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"></path>
+        </svg>
+    </div>
+    <h3 class="text-lg font-semibold text-gray-900 mb-2">No projects in your watchlist</h3>
+    <p class="text-gray-500 mb-6 max-w-md mx-auto">
+        Add projects to your watchlist to track their progress and get quick access to their status.
+        Click the eye icon on any project to start tracking it.
+    </p>
+    <a href="{{ url_for('projects') }}"
+       class="inline-flex items-center gap-2 px-6 py-3 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700">
+        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
+        </svg>
+        Browse Projects
+    </a>
+</div>
+{% endif %}
+{% endblock %}
+
+{% block scripts %}
+<script>
+function removeFromWatchlist(contractId) {
+    fetch(`/api/watchlist/remove/${contractId}`, { method: 'POST' })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                // Reload page to reflect changes
+                window.location.reload();
+            }
+        });
+}
+
+function clearWatchlist() {
+    if (confirm('Are you sure you want to remove all projects from your watchlist?')) {
+        fetch('/api/watchlist/clear', { method: 'POST' })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    window.location.reload();
+                }
+            });
+    }
+}
+</script>
+{% endblock %}
